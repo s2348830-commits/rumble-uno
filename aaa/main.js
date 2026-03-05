@@ -10,7 +10,9 @@ window.isInitialDealing = false;
 window.isDefending = false; 
 
 window.pendingDrawDefenseInfo = null; 
+window.pendingJanken = null;
 
+// ★ 全てのモーダル（じゃんけん画面含む）をはじめからDOMにセットしておく
 window.ensureModalsExist = function() {
     if (!document.getElementById('target-modal')) {
         const targetModal = document.createElement('div');
@@ -37,14 +39,46 @@ window.ensureModalsExist = function() {
         `;
         document.body.appendChild(multiDiscardModal);
     }
+    if (!document.getElementById('graveyard-modal')) {
+        const gyModal = document.createElement('div');
+        gyModal.id = 'graveyard-modal';
+        gyModal.className = 'action-popup hidden';
+        gyModal.innerHTML = `
+            <h3 style="margin-top:0;">墓地からカードを1枚回収(SSR以下)</h3>
+            <div id="graveyard-list" class="action-popup-grid" style="overflow-x:auto; flex-wrap:nowrap; max-width:90vw; gap:5px;"></div>
+            <button id="btn-cancel-graveyard" style="margin-top:15px; padding:8px 15px; background:#777; color:white; border:none; border-radius:8px; cursor:pointer;">キャンセル</button>
+        `;
+        document.body.appendChild(gyModal);
+        document.getElementById('btn-cancel-graveyard').onclick = () => {
+            gyModal.classList.add('hidden');
+        };
+    }
+    if (!document.getElementById('debuff-modal')) {
+        const dbModal = document.createElement('div');
+        dbModal.id = 'debuff-modal';
+        dbModal.className = 'action-popup hidden';
+        dbModal.innerHTML = `
+            <h3 style="margin-top:0;">解除するデバフを選択</h3>
+            <div style="display:flex; justify-content:center; gap:20px;">
+                <button id="btn-debuff-freeze" style="font-size:24px; padding:10px; border-radius:10px; background:#00bfff; cursor:pointer;">❄️凍結</button>
+                <button id="btn-debuff-burn" style="font-size:24px; padding:10px; border-radius:10px; background:#ff4500; cursor:pointer;">🔥燃焼</button>
+            </div>
+        `;
+        document.body.appendChild(dbModal);
+    }
     let defModal = document.getElementById('defense-modal');
     if (!defModal || !document.getElementById('defense-question-area')) {
         if (defModal) defModal.remove();
         defModal = document.createElement('div');
         defModal.id = 'defense-modal';
         defModal.className = 'action-popup hidden';
+        defModal.style.width = '90vw';
+        defModal.style.maxWidth = '400px';
+        defModal.style.maxHeight = '80vh';
+        defModal.style.boxSizing = 'border-box';
         defModal.innerHTML = `
-            <h3 id="defense-title" style="color:#ff5252;">攻撃を受けました！</h3>
+            <h3 id="defense-title" style="color:#ff5252; margin-top: 0;">攻撃を受けました！</h3>
+            <div id="defense-desc" style="font-size: 12px; color: #ddd; background: rgba(0,0,0,0.5); padding: 8px; border-radius: 6px; margin-bottom: 10px; line-height: 1.4; text-align: left; white-space: pre-wrap;" class="hidden"></div>
             <div style="font-size:24px; color:#fbc02d; font-weight:bold; margin: 10px 0;"><span id="defense-timer-text">30</span>秒</div>
             <div id="defense-question-area">
                 <p>防御カード(BL)を使用しますか？</p>
@@ -55,8 +89,8 @@ window.ensureModalsExist = function() {
             </div>
             <div id="defense-select-area" class="hidden">
                 <p>使用する防御カードを選んでください</p>
-                <div id="defense-modal-list" class="action-popup-grid" style="overflow-x:auto; flex-wrap:nowrap; max-width:90vw;"></div>
-                <button id="btn-cancel-defense" style="margin-top:15px; padding:8px 15px; background:#777; color:white; border:none; border-radius:8px; cursor:pointer;">キャンセル</button>
+                <div id="defense-modal-list" class="action-popup-grid" style="overflow-x:auto; flex-wrap:nowrap; max-width:100%; padding-bottom: 10px;"></div>
+                <button id="btn-cancel-defense" style="margin-top:15px; padding:8px 15px; background:#777; color:white; border:none; border-radius:8px; cursor:pointer; width: 100%;">キャンセル</button>
             </div>
         `;
         document.body.appendChild(defModal);
@@ -65,8 +99,71 @@ window.ensureModalsExist = function() {
         const cutin = document.createElement('div');
         cutin.id = 'ability-cutin';
         cutin.className = 'hidden';
-        cutin.innerHTML = `<img id="ability-cutin-img" src="" alt="Ability">`;
+        cutin.innerHTML = `
+            <div class="cutin-bg-red"></div>
+            <div class="cutin-bg-black"></div>
+            <div class="cutin-content">
+                <img id="ability-cutin-img" src="" alt="Ability">
+                <div class="cutin-text-container">
+                    <h2 id="ability-cutin-name"></h2>
+                    <p id="ability-cutin-text"></p>
+                </div>
+            </div>`;
         document.body.appendChild(cutin);
+    }
+    if (!document.getElementById('ability-reset-overlay')) {
+        const resOver = document.createElement('div');
+        resOver.id = 'ability-reset-overlay';
+        resOver.className = 'hidden';
+        resOver.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:8000; display:flex; flex-direction:column; justify-content:center; align-items:center;";
+        resOver.innerHTML = `
+            <h2 style="color:white; margin-bottom:5px;">能力カード入れ替え (<span id="reset-timer" style="color:#fbc02d;">10</span>秒)</h2>
+            <p style="color:#ccc; font-size:12px; margin-top:0;">手札の能力カードをタップして入れ替えます(最大 <span id="reset-max">0</span> 枚)</p>
+            <div id="reset-area" style="width:90%; max-width:400px; height:100px; border:2px dashed #4caf50; border-radius:10px; display:flex; justify-content:center; align-items:center; gap:5px; background:rgba(255,255,255,0.1); overflow-x:auto;"></div>
+            <div id="reset-hand-area" style="margin-top:20px; display:flex; justify-content:center; flex-wrap:wrap; gap:5px; max-width:90%;"></div>
+            <button id="btn-reset-confirm" class="start-btn" style="width:200px; margin-top:20px;">確定</button>
+        `;
+        document.body.appendChild(resOver);
+    }
+    // ★ じゃんけんのHTMLを最初から作っておく
+    if (!document.getElementById('janken-overlay')) {
+        const jOverlay = document.createElement('div');
+        jOverlay.id = 'janken-overlay';
+        jOverlay.className = 'hidden';
+        jOverlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.95); z-index:110000; display:flex; flex-direction:column; justify-content:center; align-items:center;";
+        jOverlay.innerHTML = `
+            <h2 id="janken-title" style="color:white; font-style:italic; margin-bottom: 5px;">じゃんけん 勝負！</h2>
+            <div id="janken-subtitle" style="color:#aaa; font-size:14px; margin-bottom:15px;">Loop: 1/4</div>
+            <div style="color:#fbc02d; font-size:36px; font-weight:bold; margin-bottom:20px;">残り <span id="janken-timer">10</span> 秒</div>
+            <div style="display:flex; gap:30px; align-items:center; margin-bottom:30px; width: 90%; max-width: 500px; justify-content: center;">
+                <div id="janken-player1" style="text-align:center; color:white; flex: 1;">
+                    <div id="janken-p1-result" style="font-size:24px; font-weight:bold; height:35px; text-shadow: 2px 2px 4px #000;"></div>
+                    <div id="janken-p1-name" style="margin-bottom:10px; font-weight:bold; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Player1</div>
+                    <img id="janken-p1-card" src="card/back.png" style="width:80px; max-width: 100%; border-radius:10px; transition:0.3s; border-top: 10px solid transparent;">
+                </div>
+                <div style="color:white; font-size:30px; font-weight:bold; font-style:italic;">VS</div>
+                <div id="janken-player2" style="text-align:center; color:white; flex: 1;">
+                    <div id="janken-p2-result" style="font-size:24px; font-weight:bold; height:35px; text-shadow: 2px 2px 4px #000;"></div>
+                    <div id="janken-p2-name" style="margin-bottom:10px; font-weight:bold; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Player2</div>
+                    <img id="janken-p2-card" src="card/back.png" style="width:80px; max-width: 100%; border-radius:10px; transition:0.3s; border-top: 10px solid transparent;">
+                </div>
+            </div>
+            <div id="janken-controls" style="display:flex; gap:15px;">
+                <button class="janken-btn" data-hand="1" style="background:none; border:none; cursor:pointer; transition:transform 0.2s;"><img src="card/custom/jyanken1.png" style="width:70px;"></button>
+                <button class="janken-btn" data-hand="2" style="background:none; border:none; cursor:pointer; transition:transform 0.2s;"><img src="card/custom/jyanken2.png" style="width:70px;"></button>
+                <button class="janken-btn" data-hand="3" style="background:none; border:none; cursor:pointer; transition:transform 0.2s;"><img src="card/custom/jyanken3.png" style="width:70px;"></button>
+            </div>
+        `;
+        document.body.appendChild(jOverlay);
+        
+        document.querySelectorAll('.janken-btn').forEach(btn => {
+            btn.onclick = () => {
+                const choice = parseInt(btn.dataset.hand);
+                window.socket.emit('player_action', { action: 'janken_choice', playerId: window.myId, choice });
+                document.getElementById('janken-controls').style.display = 'none';
+                document.getElementById('janken-title').innerText = "相手を待っています...";
+            };
+        });
     }
 };
 
@@ -105,7 +202,7 @@ window.SE = {
         
         let ext = 'mp3';
         if (name === 'fire' || name === 'page') ext = 'wav';
-        if (name.includes('id_20')) ext = 'mov'; 
+        if (name.includes('id_20') || name.includes('id_25') || name.includes('id_26')) ext = 'mov'; 
 
         if (!this.buffers[name]) {
             this.loadSound(name, ext).then(() => this.playSoundBuffer(name, false));
@@ -143,9 +240,9 @@ window.SE = {
 const unlockAudioContext = () => {
     if (window.SE.unlocked) return; window.SE.unlocked = true; window.SE.initContext();
     if (window.SE.audioCtx.state === 'suspended') window.SE.audioCtx.resume();
-    ['win', 'draw', 'uno_message', 'buttonclick', 'uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6', 'frieze', 'rock'].forEach(name => window.SE.loadSound(name, 'mp3'));
+    ['win', 'win2', 'setting', 'draw', 'uno_message', 'buttonclick', 'uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6', 'frieze', 'rock', 'Distribute', 'mvp_1', 'mvp_2'].forEach(name => window.SE.loadSound(name, 'mp3'));
     ['fire', 'page'].forEach(name => window.SE.loadSound(name, 'wav'));
-    ['hv/id_20(1)', 'hv/id_20(2)'].forEach(name => window.SE.loadSound(name, 'mov')); 
+    ['hv/id_20(1)', 'hv/id_20(2)', 'hv/id_25', 'hv/id_26'].forEach(name => window.SE.loadSound(name, 'mov')); 
     document.removeEventListener('click', unlockAudioContext);
     document.removeEventListener('touchstart', unlockAudioContext);
 };
@@ -181,9 +278,65 @@ window.checkFinalSprint = function() {
     if (hasUno) window.SE.startLoop('final_sprint'); else window.SE.stopLoop('final_sprint');
 };
 
+// ★ フェーズUI（防御やじゃんけん）の同期を行うための関数
+window.updatePhaseUI = function(state) {
+    if (state.defensePhase) {
+        const { attackerId, cardValue, targets } = state.defensePhase;
+        if (targets && targets.includes(window.myId) && window.myId !== attackerId) {
+            if (!window.isDefending) {
+                window.isDefending = true;
+                if (typeof window.showDefenseModal === 'function') window.showDefenseModal(cardValue);
+            }
+            const timerText = document.getElementById('defense-timer-text');
+            if (timerText) timerText.innerText = state.defenseTimer;
+        }
+    } else {
+        window.isDefending = false;
+        const modal = document.getElementById('defense-modal');
+        const discModal = document.getElementById('discard-modal');
+        if (modal) modal.classList.add('hidden');
+        if (discModal) discModal.classList.add('hidden');
+    }
+
+    if (state.jankenPhase) {
+        if (!window.isJankenShowing) {
+            if (typeof window.showJankenUI === 'function') window.showJankenUI(state.jankenPhase.attackerId, state.jankenPhase.targetId, state.jankenPhase.loopCount);
+            window.isJankenShowing = true;
+        }
+        const jTimer = document.getElementById('janken-timer');
+        if (jTimer) jTimer.innerText = state.jankenPhase.timer;
+
+        if (window.myId === state.jankenPhase.attackerId && state.jankenPhase.attackerHand) {
+            const controls = document.getElementById('janken-controls');
+            const title = document.getElementById('janken-title');
+            if (controls) controls.style.display = 'none';
+            if (title && !state.jankenPhase.result) title.innerText = "相手を待っています...";
+        }
+        if (window.myId === state.jankenPhase.targetId && state.jankenPhase.targetHand) {
+            const controls = document.getElementById('janken-controls');
+            const title = document.getElementById('janken-title');
+            if (controls) controls.style.display = 'none';
+            if (title && !state.jankenPhase.result) title.innerText = "相手を待っています...";
+        }
+
+        if (state.jankenPhase.result && !window.jankenResultPlayed) {
+            window.jankenResultPlayed = true;
+            if (typeof window.playJankenResult === 'function') window.playJankenResult(state.jankenPhase.attackerId, state.jankenPhase.targetId, state.jankenPhase.attackerHand, state.jankenPhase.targetHand, state.jankenPhase.result);
+        }
+    } else {
+        window.isJankenShowing = false;
+        window.jankenResultPlayed = false;
+        const jOverlay = document.getElementById('janken-overlay');
+        if (jOverlay && !jOverlay.classList.contains('result-showing')) jOverlay.classList.add('hidden');
+    }
+};
+
 window.broadcastGameState = function(skipUIUpdate = false, attackGuides = []) {
     if (!window.isHost) return;
-    const playersInfo = window.game.players.map(p => ({ id: p.id, connected: p.connected, frozen: p.frozen, burnTurns: p.burnTurns }));
+    const playersInfo = window.game.players.map(p => ({ 
+        id: p.id, connected: p.connected, frozen: p.frozen, burnTurns: p.burnTurns, 
+        invincibleTurns: p.invincibleTurns, shield: p.shield 
+    }));
     const state = {
         deck: window.game.deck, turnIndex: window.game.turnIndex, direction: window.game.direction,
         hands: window.game.hands, discardPile: window.game.discardPile, discardRotations: window.game.discardRotations,
@@ -191,10 +344,15 @@ window.broadcastGameState = function(skipUIUpdate = false, attackGuides = []) {
         hasDrawnThisTurn: window.game.hasDrawnThisTurn,
         defensePhase: window.pendingDefense ? window.pendingDefense.info : null,
         defenseTimer: window.pendingDefense ? window.pendingDefense.timer : 0,
-        attackGuides: attackGuides
+        attackGuides: attackGuides,
+        abilityGraveyard: window.game.abilityGraveyard,
+        jankenPhase: window.pendingJanken 
     };
     if (window.socket) window.socket.emit('sync_game_state', state);
     if (!skipUIUpdate) window.updateUI();
+
+    // ★ ホスト自身のUIもここで更新させる
+    window.updatePhaseUI(state);
 
     if (attackGuides && attackGuides.length > 0) {
         attackGuides.forEach(g => {
@@ -505,8 +663,17 @@ window.showAbilityCutin = function(cardValue, isHVActivated = false) {
     window.ensureModalsExist();
     const cutinEl = document.getElementById('ability-cutin');
     const cutinImg = document.getElementById('ability-cutin-img');
+    const cutinName = document.getElementById('ability-cutin-name');
+    const cutinText = document.getElementById('ability-cutin-text');
     if (!cutinEl || !cutinImg) return;
+    
     cutinImg.src = `card/custom/${cardValue}.png`;
+    
+    if (window.AbilityDef && window.AbilityDef[cardValue]) {
+        if (cutinName) cutinName.innerText = window.AbilityDef[cardValue].name;
+        if (cutinText) cutinText.innerText = window.AbilityDef[cardValue].desc;
+    }
+
     cutinEl.classList.remove('hidden', 'fade-out');
     void cutinEl.offsetWidth; 
     cutinEl.classList.add('show-cutin');
@@ -514,12 +681,20 @@ window.showAbilityCutin = function(cardValue, isHVActivated = false) {
     if (cardValue === 'id_20') {
         const rand = Math.random() < 0.5 ? 1 : 2;
         if (window.SE) window.SE.play(`hv/id_20(${rand})`);
+    } else if (cardValue === 'id_25') {
+        if (window.SE) window.SE.play(`hv/id_25`);
+    } else if (cardValue === 'id_26') {
+        if (window.SE) window.SE.play(`hv/id_26`);
+    } else {
+        const randMvp = Math.random() < 0.5 ? 1 : 2;
+        if (window.SE) window.SE.play(`mvp_${randMvp}`);
     }
 
     setTimeout(() => {
-        cutinEl.classList.remove('show-cutin'); cutinEl.classList.add('fade-out');
-        setTimeout(() => cutinEl.classList.add('hidden'), 1000); 
-    }, 1000); 
+        cutinEl.classList.remove('show-cutin'); 
+        cutinEl.classList.add('fade-out');
+        setTimeout(() => cutinEl.classList.add('hidden'), 400); 
+    }, 2000); 
 };
 
 window.openTargetSelection = function(players, callback) {
@@ -625,11 +800,54 @@ window.openMultiDiscardSelection = function(hand, validIndices, callback) {
     modal.classList.remove('hidden');
 };
 
+window.openGraveyardSelection = function(callback) {
+    window.ensureModalsExist();
+    const list = window.game.abilityGraveyard.filter(id => {
+        const def = window.AbilityDef[id];
+        return def && def.rarity !== 'UR';
+    });
+    
+    if (list.length === 0) {
+        alert("墓地にSSR以下の能力カードがありません！");
+        callback(null);
+        return;
+    }
+    
+    const modal = document.getElementById('graveyard-modal');
+    const container = document.getElementById('graveyard-list');
+    container.innerHTML = '';
+    
+    list.forEach(id => {
+        const btn = document.createElement('img');
+        btn.src = `card/custom/${id}.png`;
+        btn.style.width = '60px'; btn.style.cursor = 'pointer';
+        btn.onclick = () => {
+            modal.classList.add('hidden');
+            callback(id);
+        };
+        container.appendChild(btn);
+    });
+    modal.classList.remove('hidden');
+};
+
+window.openDebuffSelection = function(callback) {
+    window.ensureModalsExist();
+    const modal = document.getElementById('debuff-modal');
+    const btnFreeze = document.getElementById('btn-debuff-freeze');
+    const btnBurn = document.getElementById('btn-debuff-burn');
+    
+    btnFreeze.onclick = () => { modal.classList.add('hidden'); callback('frozen'); };
+    btnBurn.onclick = () => { modal.classList.add('hidden'); callback('burn'); };
+    
+    modal.classList.remove('hidden');
+};
+
 window.showDefenseModal = function(attackCardValue) {
     window.ensureModalsExist();
     const modal = document.getElementById('defense-modal');
     const list = document.getElementById('defense-modal-list');
     const title = document.getElementById('defense-title');
+    const desc = document.getElementById('defense-desc');
     const qArea = document.getElementById('defense-question-area');
     const sArea = document.getElementById('defense-select-area');
     const btnYes = document.getElementById('btn-defense-yes');
@@ -643,13 +861,27 @@ window.showDefenseModal = function(attackCardValue) {
     }
     
     let attackName = '能力';
+    let attackDesc = ''; 
+    
     if (window.AbilityDef && window.AbilityDef[attackCardValue]) {
         attackName = window.AbilityDef[attackCardValue].name;
+        attackDesc = window.AbilityDef[attackCardValue].desc; 
     } else if (attackCardValue === '+2' || attackCardValue === 'Wild+4') {
         attackName = attackCardValue;
+        attackDesc = '引かされる枚数が増加します！(防御カードで防げます)'; 
     }
     
     title.innerText = `攻撃を受けました！(${attackName})`;
+    
+    if (desc) {
+        if (attackDesc) {
+            desc.innerText = attackDesc;
+            desc.classList.remove('hidden');
+        } else {
+            desc.classList.add('hidden');
+        }
+    }
+    
     qArea.classList.remove('hidden');
     sArea.classList.add('hidden');
     
@@ -671,7 +903,12 @@ window.showDefenseModal = function(attackCardValue) {
             btn.style.width = '50px'; btn.style.height = '75px'; btn.style.margin = '5px'; btn.style.cursor = 'pointer';
             btn.onclick = () => {
                 const def = window.AbilityDef[item.card.value];
-                if (def.needsDiscard || def.needsAbilityDiscard) {
+                
+                if (typeof window.showAbilityCutin === 'function') {
+                    window.showAbilityCutin(item.card.value);
+                }
+
+                if (def && (def.needsDiscard || def.needsAbilityDiscard)) {
                     modal.classList.add('hidden'); 
                     window.openDiscardSelection(myHand, [item.idx], def, (discIdx) => {
                         window.socket.emit('player_action', { action: 'defense_response', targetId: window.game.myId, cardValue: item.card.value, discardIdx: discIdx });
@@ -714,10 +951,10 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                 const blCard = bHand[blIdx];
                 let bDiscard = null;
                 const def = window.AbilityDef[blCard.value];
-                if(def.needsDiscard) {
+                if(def && def.needsDiscard) {
                     const nonAb = bHand.findIndex((c, i) => i !== blIdx && !(c.value && String(c.value).startsWith('id_')));
                     bDiscard = nonAb > -1 ? nonAb : (bHand.length > 1 ? bHand.findIndex((c, i) => i !== blIdx) : null);
-                } else if (def.needsAbilityDiscard) {
+                } else if (def && def.needsAbilityDiscard) {
                     const ab = bHand.findIndex((c, i) => i !== blIdx && (c.value && String(c.value).startsWith('id_')));
                     bDiscard = ab > -1 ? ab : null;
                 }
@@ -769,36 +1006,50 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                     window.game.discardPile.push(playedDefCard);
                     window.game.discardRotations.push(0);
                     if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: targetId, cards: [playedDefCard] });
+                    
+                    if (targetId !== window.game.myId && typeof window.showAbilityCutin === 'function' && String(defCardId).startsWith('id_')) {
+                        window.showAbilityCutin(defCardId);
+                    }
+
                     defenseGuides.push({ from: targetId, to: targetId, text: '防ぐ!' });
                     blocked = true;
                 }
                 
-                const def = window.AbilityDef[defCardId];
-                if (defCardId === 'id_2' || defCardId === 'id_18') {
+                if (defCardId === 'id_2') {
                     window.game.players.filter(px => px.id !== targetId).forEach(px => {
-                        window.game.drawCard(px.id);
-                        if(window.isHost && window.socket) window.socket.emit('request_draw_animation', { playerId: px.id, count: 1 });
+                        window.AbilityEngine.applyDraw(window.game, px.id, 1);
                     });
+                    const targetP = window.game.players.find(p=>p.id===targetId);
+                    if(targetP) targetP.shield = { level: 1, turns: 1 };
+                    if (Math.random() < 0.6) {
+                        window.game.players.filter(px => px.id !== targetId).forEach(px => {
+                            window.AbilityEngine.applyDraw(window.game, px.id, 1);
+                        });
+                    }
                 } else if (defCardId === 'id_4') {
                     if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) {
-                        window.AbilityEngine.triggerDiscardEffect(targetId, 'id_4', false, null);
+                        window.AbilityEngine.triggerDiscardEffect(window.game, targetId, 'id_4', false, null);
                     }
                 } else if (defCardId === 'id_9') {
-                    window.game.players.forEach(px => {
-                        window.game.drawCard(px.id); window.game.drawCard(px.id);
-                        if(window.isHost && window.socket) window.socket.emit('request_draw_animation', { playerId: px.id, count: 2 });
+                    window.game.players.filter(px => px.id !== targetId).forEach(px => {
+                        window.AbilityEngine.applyDraw(window.game, px.id, 2);
                     });
+                } else if (defCardId === 'id_18') {
+                    window.game.players.filter(px => px.id !== targetId).forEach(px => {
+                        window.AbilityEngine.applyDraw(window.game, px.id, 1);
+                    });
+                    const targetP = window.game.players.find(p=>p.id===targetId);
+                    if(targetP) targetP.shield = { level: 1, turns: 2 };
                 } else if (defCardId === 'id_17' || defCardId === 'id_19') {
                     if (actualDefDiscardIdx !== null && window.game.hands[targetId] && window.game.hands[targetId].length > actualDefDiscardIdx) {
                         const discCard = window.game.hands[targetId].splice(actualDefDiscardIdx, 1)[0];
                         if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: targetId, cards: [discCard] });
                         if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) {
-                            window.AbilityEngine.triggerDiscardEffect(targetId, discCard.value, true, discCard);
+                            window.AbilityEngine.triggerDiscardEffect(window.game, targetId, discCard.value, true, discCard);
                         }
                     }
                     if (defCardId === 'id_19') {
-                        window.game.drawCard(attackerId);
-                        if(window.isHost && window.socket) window.socket.emit('request_draw_animation', { playerId: attackerId, count: 1 });
+                        window.AbilityEngine.applyDraw(window.game, attackerId, 1);
                         defenseGuides.push({ from: targetId, to: attackerId, text: 'ヴィンディ' });
                     }
                 }
@@ -823,7 +1074,7 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
     }, 1000);
 };
 
-window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, selectedColor = null, multiDiscardIndices = []) {
+window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, selectedColor = null, multiDiscardIndices = [], extraData = {}) {
     if (!window.isHost) return;
     const hand = window.game.hands[playerId];
     if (!hand || !hand[indices[0]]) return; 
@@ -850,15 +1101,26 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
     allRemoveIndices.forEach(i => hand.splice(i, 1));
 
     playedCards.forEach(c => {
-        window.game.discardPile.push(c); 
-        window.game.discardRotations.push(0);
+        const isAb = c.value && String(c.value).startsWith('id_');
+        if (isAb) {
+            if(!window.game.abilityGraveyard) window.game.abilityGraveyard = [];
+            window.game.abilityGraveyard.push(c.value);
+        } else {
+            window.game.discardPile.push(c); 
+            window.game.discardRotations.push(0);
+        }
     });
+
+    if (cardValue === 'id_26') {
+        window.startJankenPhase(playerId, 0);
+        return; 
+    }
 
     if (def.type === 'AT' || def.type === 'AT_BL' || def.type === 'HV') {
         let targets = [];
         if (def.needsTarget && targetId) targets = [targetId];
-        else if (cardValue === 'id_6' || cardValue === 'id_9' || cardValue === 'id_2') targets = window.game.players.filter(p=>p.id!==playerId).map(p=>p.id);
-        else if (cardValue === 'id_14' || cardValue === 'id_13') {
+        else if (['id_2', 'id_6', 'id_9', 'id_18'].includes(cardValue)) targets = window.game.players.filter(p=>p.id!==playerId).map(p=>p.id);
+        else if (['id_13', 'id_14', 'id_24', 'id_28'].includes(cardValue)) {
             const others = window.game.players.filter(p=>p.id!==playerId);
             if(others.length > 0) targets = [others[Math.floor(Math.random()*others.length)].id];
         } else if (cardValue === 'id_5' || cardValue === 'id_20') {
@@ -866,35 +1128,56 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
         }
         
         let responses = {};
-        targets.forEach(tid => {
-            const p = window.game.players.find(p=>p.id===tid);
-            if(p && p.type==='bot') {
-                const bHand = window.game.hands[tid];
-                let hasDef = false;
-                if(bHand && def.type !== 'HV' && cardValue !== 'id_5' && cardValue !== 'id_20') {
-                    const blIdx = bHand.findIndex(c => c.value && window.AbilityDef && window.AbilityDef[c.value] && window.AbilityDef[c.value].type.includes('BL'));
-                    if (blIdx > -1) {
-                        const blCard = bHand[blIdx];
-                        let bDiscard = null;
-                        const bDef = window.AbilityDef[blCard.value];
-                        if(bDef.needsDiscard) {
-                            const nonAb = bHand.findIndex((c, i) => i !== blIdx && !(c.value && String(c.value).startsWith('id_')));
-                            bDiscard = nonAb > -1 ? nonAb : (bHand.length > 1 ? bHand.findIndex((c, i) => i !== blIdx) : null);
-                        } else if (bDef.needsAbilityDiscard) {
-                            const ab = bHand.findIndex((c, i) => i !== blIdx && (c.value && String(c.value).startsWith('id_')));
-                            bDiscard = ab > -1 ? ab : null;
+        let needsDefense = false;
+        
+        if (cardValue !== 'id_28') { 
+            targets.forEach(tid => {
+                const p = window.game.players.find(px=>px.id===tid);
+                if(p && p.type==='bot') {
+                    const bHand = window.game.hands[tid];
+                    let hasDef = false;
+                    if(bHand && def.type !== 'HV' && cardValue !== 'id_5' && cardValue !== 'id_20') {
+                        const blIdx = bHand.findIndex(c => c.value && window.AbilityDef && window.AbilityDef[c.value] && window.AbilityDef[c.value].type.includes('BL'));
+                        if (blIdx > -1) {
+                            const blCard = bHand[blIdx];
+                            let bDiscard = null;
+                            const bDef = window.AbilityDef[blCard.value];
+                            if(bDef && bDef.needsDiscard) {
+                                const nonAb = bHand.findIndex((c, i) => i !== blIdx && !(c.value && String(c.value).startsWith('id_')));
+                                bDiscard = nonAb > -1 ? nonAb : (bHand.length > 1 ? bHand.findIndex((c, i) => i !== blIdx) : null);
+                            } else if (bDef && bDef.needsAbilityDiscard) {
+                                const ab = bHand.findIndex((c, i) => i !== blIdx && (c.value && String(c.value).startsWith('id_')));
+                                bDiscard = ab > -1 ? ab : null;
+                            }
+                            responses[tid] = { cardValue: blCard.value, discardIdx: bDiscard };
+                            hasDef = true;
                         }
-                        responses[tid] = { cardValue: blCard.value, discardIdx: bDiscard };
-                        hasDef = true;
                     }
+                    if(!hasDef) responses[tid] = { cardValue: null, discardIdx: null };
+                } else if (p && p.type === 'player' && !p.connected) {
+                    responses[tid] = { cardValue: null, discardIdx: null };
+                } else if (def.type === 'HV' || cardValue === 'id_5' || cardValue === 'id_20') {
+                    responses[tid] = { cardValue: null, discardIdx: null }; 
+                } else {
+                    needsDefense = true;
                 }
-                if(!hasDef) responses[tid] = { cardValue: null, discardIdx: null };
-            } else if (p && p.type === 'player' && !p.connected) {
-                responses[tid] = { cardValue: null, discardIdx: null };
-            } else if (def.type === 'HV' || cardValue === 'id_5' || cardValue === 'id_20') {
-                responses[tid] = { cardValue: null, discardIdx: null }; 
-            }
-        });
+            });
+        }
+
+        if (cardValue === 'id_28' || !needsDefense) {
+            let guides = [];
+            if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, responses, multiplier, selectedColor, multiCards, extraData);
+            window.broadcastGameState(false, guides);
+
+            let someoneWon = false;
+            window.game.players.forEach(p => {
+                if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) {
+                    window.checkWin(p.id); someoneWon = true;
+                }
+            });
+            if (!someoneWon) setTimeout(() => window.checkTurn(), 500);
+            return;
+        }
 
         window.pendingDefense = { 
             timer: 30, 
@@ -920,7 +1203,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                 window.pendingDefense = null;
                 
                 let guides = [];
-                if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, finalResponses, multiplier, selectedColor, multiCards);
+                if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, finalResponses, multiplier, selectedColor, multiCards, extraData);
                 window.broadcastGameState(false, guides);
 
                 let someoneWon = false;
@@ -938,7 +1221,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
         }, 1000);
     } else {
         let guides = [];
-        if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, {}, multiplier, selectedColor, multiCards);
+        if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, {}, multiplier, selectedColor, multiCards, extraData);
         window.broadcastGameState(false, guides);
 
         let someoneWon = false;
@@ -950,6 +1233,195 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
 
         if (!someoneWon) setTimeout(() => window.checkTurn(), 500);
     }
+};
+
+// ★ じゃんけんフェーズの実装
+window.startJankenPhase = function(attackerId, loopCount) {
+    const others = window.game.players.filter(p => p.id !== attackerId && p.connected);
+    if (others.length === 0) {
+        alert("じゃんけんの相手がいません！");
+        window.checkTurn();
+        return;
+    }
+    const targetId = others[Math.floor(Math.random() * others.length)].id;
+    
+    window.pendingJanken = {
+        attackerId, targetId, loopCount,
+        attackerHand: null, targetHand: null,
+        timer: 10,
+        result: null
+    };
+
+    window.broadcastGameState(); // UI表示のために同期
+
+    window.jankenInterval = setInterval(() => {
+        if (!window.pendingJanken || window.pendingJanken.result) return;
+        
+        window.pendingJanken.timer--;
+        if (window.pendingJanken.timer <= 0) {
+            // タイムアップ時はランダム
+            if (!window.pendingJanken.attackerHand) window.pendingJanken.attackerHand = Math.floor(Math.random()*3)+1;
+            if (!window.pendingJanken.targetHand) window.pendingJanken.targetHand = Math.floor(Math.random()*3)+1;
+            window.resolveJanken();
+        } else {
+            // BOTの自動選択処理
+            [attackerId, targetId].forEach(id => {
+                const p = window.game.players.find(px => px.id === id);
+                if (p && p.type === 'bot' && !window.pendingJanken[(id===attackerId?'attackerHand':'targetHand')]) {
+                    if (window.pendingJanken.timer === 8) { // 残り8秒で決める
+                        window.pendingJanken[(id===attackerId?'attackerHand':'targetHand')] = Math.floor(Math.random()*3)+1;
+                        window.checkJankenReady();
+                    }
+                }
+            });
+            window.broadcastGameState(true);
+        }
+    }, 1000);
+};
+
+window.checkJankenReady = function() {
+    if (window.pendingJanken && window.pendingJanken.attackerHand && window.pendingJanken.targetHand && !window.pendingJanken.result) {
+        window.resolveJanken();
+    }
+};
+
+window.resolveJanken = function() {
+    const pJ = window.pendingJanken;
+    const aH = pJ.attackerHand;
+    const tH = pJ.targetHand;
+    
+    let result = 'draw';
+    if (aH === tH) result = 'draw';
+    else if ((aH===1 && tH===2) || (aH===2 && tH===3) || (aH===3 && tH===1)) result = 'win';
+    else result = 'lose';
+
+    pJ.result = result;
+    window.broadcastGameState(); // 結果表示アニメーションの発動
+
+    setTimeout(() => {
+        let drawCount = 0;
+        // ★ 勝てば2ドロー、初回(0)なら負けても2ドロー
+        if (result === 'win') {
+            drawCount = 2; 
+        } else if (result === 'lose' && pJ.loopCount === 0) {
+            drawCount = 2;
+        }
+        
+        if (drawCount > 0) {
+            window.AbilityEngine.applyDraw(window.game, pJ.targetId, drawCount, false);
+            const guides = [{ from: pJ.attackerId, to: pJ.targetId, text: 'じゃんけんドロー!' }];
+            window.broadcastGameState(false, guides);
+        }
+
+        let someoneWon = false;
+        window.game.players.forEach(p => {
+            if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) {
+                window.checkWin(p.id); someoneWon = true;
+            }
+        });
+
+        if (!someoneWon) {
+            const nextLoop = pJ.loopCount + 1;
+            const aId = pJ.attackerId;
+            window.pendingJanken = null;
+            window.broadcastGameState();
+
+            // 勝てばループ、あいこは同じ回数で再戦、負けまたは4回で終了
+            if (result === 'win' && nextLoop < 4) {
+                setTimeout(() => window.startJankenPhase(aId, nextLoop), 1000);
+            } else if (result === 'draw') {
+                setTimeout(() => window.startJankenPhase(aId, pJ.loopCount), 1000);
+            } else {
+                setTimeout(() => window.checkTurn(), 1000);
+            }
+        }
+    }, 4500); 
+};
+
+// ★ じゃんけんUI描画
+window.showJankenUI = function(attackerId, targetId, loopCount) {
+    window.ensureModalsExist();
+    let overlay = document.getElementById('janken-overlay');
+    if (!overlay) return;
+
+    overlay.classList.remove('result-showing');
+    
+    const title = document.getElementById('janken-title');
+    const subtitle = document.getElementById('janken-subtitle');
+    const p1Name = document.getElementById('janken-p1-name');
+    const p2Name = document.getElementById('janken-p2-name');
+    const p1Card = document.getElementById('janken-p1-card');
+    const p2Card = document.getElementById('janken-p2-card');
+    const p1Res = document.getElementById('janken-p1-result');
+    const p2Res = document.getElementById('janken-p2-result');
+    const controls = document.getElementById('janken-controls');
+    
+    title.innerText = `じゃんけん 勝負！`;
+    subtitle.innerText = `運命の三姉妹 (Loop: ${loopCount+1}/4)`;
+    
+    const aP = window.game.players.find(p=>p.id===attackerId);
+    const tP = window.game.players.find(p=>p.id===targetId);
+    p1Name.innerText = aP ? aP.name : 'Attacker';
+    p2Name.innerText = tP ? tP.name : 'Target';
+    
+    p1Card.src = 'card/back.png'; p1Card.style.borderTop = '10px solid transparent';
+    p2Card.src = 'card/back.png'; p2Card.style.borderTop = '10px solid transparent';
+    p1Res.innerText = ''; p2Res.innerText = '';
+    
+    if (window.myId === attackerId || window.myId === targetId) {
+        controls.style.display = 'flex';
+    } else {
+        controls.style.display = 'none';
+        title.innerText = "じゃんけん観戦中...";
+    }
+    
+    overlay.classList.remove('hidden');
+};
+
+window.playJankenResult = function(attackerId, targetId, aH, tH, result) {
+    const overlay = document.getElementById('janken-overlay');
+    if (overlay) overlay.classList.add('result-showing'); 
+
+    const p1Card = document.getElementById('janken-p1-card');
+    const p2Card = document.getElementById('janken-p2-card');
+    const p1Res = document.getElementById('janken-p1-result');
+    const p2Res = document.getElementById('janken-p2-result');
+    const controls = document.getElementById('janken-controls');
+    const title = document.getElementById('janken-title');
+    
+    if (controls) controls.style.display = 'none';
+    if (title) title.innerText = "結果発表！";
+    
+    if (p1Card) p1Card.src = `card/custom/jyanken${aH}.png`;
+    if (p2Card) p2Card.src = `card/custom/jyanken${tH}.png`;
+    
+    if (result === 'win') {
+        if (p1Res) { p1Res.innerText = 'Win'; p1Res.style.color = '#fbc02d'; }
+        if (p1Card) p1Card.style.borderTop = '10px solid #fbc02d';
+        if (p2Res) { p2Res.innerText = 'Lose'; p2Res.style.color = '#7e57c2'; }
+        if (p2Card) p2Card.style.borderTop = '10px solid #7e57c2';
+        if (window.myId === attackerId) { if(window.SE) window.SE.play('win'); }
+        else if (window.myId === targetId) { if(window.SE) window.SE.play('win2'); }
+    } else if (result === 'lose') {
+        if (p1Res) { p1Res.innerText = 'Lose'; p1Res.style.color = '#7e57c2'; }
+        if (p1Card) p1Card.style.borderTop = '10px solid #7e57c2';
+        if (p2Res) { p2Res.innerText = 'Win'; p2Res.style.color = '#fbc02d'; }
+        if (p2Card) p2Card.style.borderTop = '10px solid #fbc02d';
+        if (window.myId === targetId) { if(window.SE) window.SE.play('win'); }
+        else if (window.myId === attackerId) { if(window.SE) window.SE.play('win2'); }
+    } else {
+        if (p1Res) { p1Res.innerText = 'Draw'; p1Res.style.color = '#aaa'; }
+        if (p1Card) p1Card.style.borderTop = '10px solid #aaa';
+        if (p2Res) { p2Res.innerText = 'Draw'; p2Res.style.color = '#aaa'; }
+        if (p2Card) p2Card.style.borderTop = '10px solid #aaa';
+    }
+    
+    setTimeout(() => {
+        if (overlay) {
+            overlay.classList.remove('result-showing');
+            overlay.classList.add('hidden');
+        }
+    }, 4500);
 };
 
 window.checkTurn = function() {
@@ -1013,7 +1485,19 @@ window.checkTurn = function() {
                             const others = window.game.players.filter(p=>p.id!==current.id);
                             if(others.length>0) botTargetId = others[Math.floor(Math.random()*others.length)].id;
                         }
-                        window.executeAbilityPlay(current.id, result.indices, botTargetId, botDiscardIdx, botSelectedColor, botMultiDiscardIndices);
+                        
+                        let extraData = {};
+                        if (def && def.needsGraveyard) {
+                            const gyList = window.game.abilityGraveyard.filter(id => window.AbilityDef[id] && window.AbilityDef[id].rarity !== 'UR');
+                            if (gyList.length > 0) extraData.graveyardCardId = gyList[Math.floor(Math.random() * gyList.length)];
+                        }
+                        if (def && def.needsDebuffSelect) {
+                            const p = window.game.players.find(x=>x.id===current.id);
+                            if (p && p.frozen) extraData.debuffToClear = 'frozen';
+                            else if (p && p.burnTurns > 0) extraData.debuffToClear = 'burn';
+                        }
+
+                        window.executeAbilityPlay(current.id, result.indices, botTargetId, botDiscardIdx, botSelectedColor, botMultiDiscardIndices, extraData);
                     } else {
                         window.executePlay(current.id, result.indices, true);
                     }
@@ -1079,7 +1563,19 @@ window.checkTurn = function() {
                                     const others = window.game.players.filter(p=>p.id!==current.id);
                                     if(others.length>0) botTargetId = others[Math.floor(Math.random()*others.length)].id;
                                 }
-                                window.executeAbilityPlay(current.id, result.indices, botTargetId, botDiscardIdx, botSelectedColor, botMultiDiscardIndices);
+
+                                let extraData = {};
+                                if (def && def.needsGraveyard) {
+                                    const gyList = window.game.abilityGraveyard.filter(id => window.AbilityDef[id] && window.AbilityDef[id].rarity !== 'UR');
+                                    if (gyList.length > 0) extraData.graveyardCardId = gyList[Math.floor(Math.random() * gyList.length)];
+                                }
+                                if (def && def.needsDebuffSelect) {
+                                    const p = window.game.players.find(x=>x.id===current.id);
+                                    if (p && p.frozen) extraData.debuffToClear = 'frozen';
+                                    else if (p && p.burnTurns > 0) extraData.debuffToClear = 'burn';
+                                }
+
+                                window.executeAbilityPlay(current.id, result.indices, botTargetId, botDiscardIdx, botSelectedColor, botMultiDiscardIndices, extraData);
                             } else window.executePlay(current.id, result.indices, true);
                         }, playedCards.length * 100 + 400);
                     } else {
@@ -1121,7 +1617,11 @@ window.executePlay = function(playerId, indices, isBot = false) {
 
         if (result.needsColor) {
             if (isDrawAttack) {
-                window.pendingDrawDefenseInfo = { attackerId: playerId, cardValue: attackCardVal };
+                if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length === 0) {
+                    // 何もしない
+                } else {
+                    window.pendingDrawDefenseInfo = { attackerId: playerId, cardValue: attackCardVal };
+                }
             }
             if (isBot) { 
                 window.game.currentColor = ['red', 'blue', 'green', 'yellow'][Math.floor(Math.random() * 4)]; 
@@ -1141,7 +1641,12 @@ window.executePlay = function(playerId, indices, isBot = false) {
             if (isDrawAttack) {
                 targetId = window.game.currentPlayer.id;
                 guides.push({ from: playerId, to: targetId, text: attackCardVal });
-                window.startDrawDefensePhase(playerId, targetId, attackCardVal, guides);
+                if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length > 0) {
+                    window.startDrawDefensePhase(playerId, targetId, attackCardVal, guides);
+                } else {
+                    window.broadcastGameState(false, guides);
+                    window.checkTurn(); 
+                }
             } else {
                 window.broadcastGameState(false, guides);
                 window.checkTurn(); 
@@ -1165,7 +1670,12 @@ window.executeColor = function(playerId, color) {
     if (info) {
         const targetId = window.game.currentPlayer.id;
         const guides = [{ from: info.attackerId, to: targetId, text: info.cardValue }];
-        window.startDrawDefensePhase(info.attackerId, targetId, info.cardValue, guides);
+        if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length > 0) {
+            window.startDrawDefensePhase(info.attackerId, targetId, info.cardValue, guides);
+        } else {
+            window.broadcastGameState(false, guides);
+            window.checkTurn();
+        }
     } else {
         window.checkTurn();
     }
@@ -1232,7 +1742,7 @@ window.tryDrawWithAbility = function(callback) {
 };
 
 window.handlePlayAction = function() {
-    if (!window.game.isMyTurn || window.game.selectedIndices.length === 0 || window.isGameOver || window.isInitialDealing) return;
+    if (window.game.selectedIndices.length === 0 || window.isGameOver || window.isInitialDealing) return;
     
     const me = window.game.players.find(p => p.id === window.game.myId);
     const selectedCards = window.game.selectedIndices.map(i => window.game.myHand[i]);
@@ -1243,6 +1753,10 @@ window.handlePlayAction = function() {
 
     const isAbility = selectedCards[0] && selectedCards[0].value && String(selectedCards[0].value).startsWith('id_');
     const isAction = !/^[0-9]$/.test(lastCard.value) && !isAbility;
+
+    if (!window.game.isMyTurn && !isAbility) {
+        window.game.selectedIndices = []; window.updateUI(); return;
+    }
     
     if (me.frozen && !isAbility) {
         alert("凍結中は能力カードしか使用できません！"); window.game.selectedIndices = []; window.updateUI(); return;
@@ -1251,8 +1765,10 @@ window.handlePlayAction = function() {
         alert("ロックされているカードは使用できません！"); window.game.selectedIndices = []; window.updateUI(); return;
     }
 
-    const isLegalPlay = UNORules.canPlaySelected(selectedCards, window.game.topCard, window.game.currentColor, window.game.drawStack);
-    if (!isLegalPlay) { if (window.SE) window.SE.play('Impossible'); return; }
+    if (!isAbility) {
+        const isLegalPlay = UNORules.canPlaySelected(selectedCards, window.game.topCard, window.game.currentColor, window.game.drawStack);
+        if (!isLegalPlay) { if (window.SE) window.SE.play('Impossible'); return; }
+    }
 
     const def = isAbility && window.AbilityDef ? window.AbilityDef[selectedCards[0].value] : null;
     let willDiscard = (isAbility && def && (def.needsDiscard || def.needsAbilityDiscard)) ? 1 : 0;
@@ -1261,7 +1777,7 @@ window.handlePlayAction = function() {
     const willBeActionFinishPenalty = (finalHandCount <= 0 && isAction && window.RuleSettings && !window.RuleSettings.allowActionFinish);
     const willBeAbilityFinishPenalty = (finalHandCount <= 0 && isAbility && window.RuleSettings && !window.RuleSettings.allowAbilityFinish);
     
-    if (isLegalPlay && (willBeActionFinishPenalty || willBeAbilityFinishPenalty || (finalHandCount <= 0 && !window.game.unoDeclared && window.RuleSettings && !window.RuleSettings.unoAuto))) {
+    if (willBeActionFinishPenalty || willBeAbilityFinishPenalty || (finalHandCount <= 0 && !window.game.unoDeclared && window.RuleSettings && !window.RuleSettings.unoAuto)) {
         let penaltyCount = window.RuleSettings.unoPenalty || 2;
         let penaltyMsg = "UNO宣言忘れ！";
         
@@ -1297,54 +1813,84 @@ window.handlePlayAction = function() {
 
     if (isAbility) {
         let targetId = null; let discardIdx = null; let selColor = null; let multiDiscardIndices = [];
+        let debuffToClear = null; let graveyardCardId = null;
 
-        const finishAbilityPlay = (tId = null, dIdx = null, sCol = null) => {
+        const finishAbilityPlay = () => {
             window.game.selectedIndices = []; window.updateUI();
             const indicesToSend = [...indices]; const cardsToSend = [...playedCards];
+            let extraData = {};
+            if (debuffToClear) extraData.debuffToClear = debuffToClear;
+            if (graveyardCardId) extraData.graveyardCardId = graveyardCardId;
+
             window.animateSequentialPlay(indices, window.game, () => {
-                const isHVActivated = (cardValue === 'id_20') || (def.needsAbilityDiscard && dIdx !== null);
+                const isHVActivated = (cardValue === 'id_20') || (def && def.needsAbilityDiscard && discardIdx !== null);
                 window.showAbilityCutin(cardsToSend[0].value, isHVActivated);
                 if (window.isHost) {
                     if (window.socket) window.socket.emit('request_play_animation', { playerId: window.game.myId, cards: cardsToSend, isHV: isHVActivated });
-                    window.executeAbilityPlay(window.game.myId, indicesToSend, tId, dIdx, sCol, multiDiscardIndices);
+                    window.executeAbilityPlay(window.game.myId, indicesToSend, targetId, discardIdx, selColor, multiDiscardIndices, extraData);
                 } else if (window.socket) {
-                    window.socket.emit('player_action', { action: 'play_ability', indices: indicesToSend, cards: cardsToSend, targetId: tId, discardIdx: dIdx, selectedColor: sCol, multiDiscardIndices, isHV: isHVActivated });
+                    window.socket.emit('player_action', { action: 'play_ability', indices: indicesToSend, cards: cardsToSend, targetId: targetId, discardIdx: discardIdx, selectedColor: selColor, multiDiscardIndices, isHV: isHVActivated, extraData });
                 }
             });
         };
 
-        const step4 = (tId = null, dIdx = null, sCol = null) => {
-            if (def && cardValue === 'id_20' && sCol) {
+        const step6 = () => {
+            if (def && def.needsGraveyard) {
+                window.openGraveyardSelection((selectedId) => {
+                    if (!selectedId) { window.game.selectedIndices = []; window.updateUI(); return; }
+                    graveyardCardId = selectedId;
+                    finishAbilityPlay();
+                });
+            } else { finishAbilityPlay(); }
+        }
+
+        const step5 = () => {
+            if (def && def.needsDebuffSelect && me.frozen && me.burnTurns > 0) {
+                window.openDebuffSelection((selected) => {
+                    debuffToClear = selected;
+                    step6();
+                });
+            } else if (def && def.needsDebuffSelect) {
+                if (me.frozen) debuffToClear = 'frozen';
+                else if (me.burnTurns > 0) debuffToClear = 'burn';
+                step6();
+            } else {
+                step6();
+            }
+        };
+
+        const step4 = () => {
+            if (def && cardValue === 'id_20' && selColor) {
                 const validIndices = [];
                 window.game.myHand.forEach((c, i) => {
-                    if (!indices.includes(i) && i !== dIdx && c.color === sCol) validIndices.push(i);
+                    if (!indices.includes(i) && i !== discardIdx && c.color === selColor) validIndices.push(i);
                 });
                 if (validIndices.length > 0) {
                     window.openMultiDiscardSelection(window.game.myHand, validIndices, (selectedMulti) => {
                         multiDiscardIndices = selectedMulti;
-                        finishAbilityPlay(tId, dIdx, sCol);
+                        step5();
                     });
-                } else { finishAbilityPlay(tId, dIdx, sCol); }
-            } else { finishAbilityPlay(tId, dIdx, sCol); }
+                } else { step5(); }
+            } else { step5(); }
         };
 
-        const step3 = (tId = null, dIdx = null) => {
+        const step3 = () => {
             if (def && def.needsColor) {
-                ColorUI.show((color) => { step4(tId, dIdx, color); });
-            } else { step4(tId, dIdx, null); }
+                ColorUI.show((color) => { selColor = color; step4(); });
+            } else { step4(); }
         };
 
-        const step2 = (tId = null) => {
+        const step2 = () => {
             if (def && (def.needsDiscard || def.needsAbilityDiscard)) {
                 window.openDiscardSelection(window.game.myHand, indices, def, (idx) => { 
-                    step3(tId, idx); 
+                    discardIdx = idx; step3(); 
                 });
-            } else { step3(tId, null); }
+            } else { step3(); }
         };
 
         if (def && def.needsTarget) {
-            window.openTargetSelection(window.game.players, (tid) => { step2(tid); });
-        } else { step2(null); }
+            window.openTargetSelection(window.game.players, (tid) => { targetId = tid; step2(); });
+        } else { step2(); }
 
         return; 
     }

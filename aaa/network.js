@@ -154,10 +154,14 @@ window.socket.on('room_joined', (data) => {
     document.getElementById('display-room-id').innerText = data.roomId;
 
     const cia = document.getElementById('chat-input-area');
-    const log = document.getElementById('chat-log-container');
+    if (cia) {
+        cia.style.display = 'none';
+        cia.classList.add('hidden');
+    }
+
+    const lcia = document.getElementById('lobby-chat-container');
     if (window.ChatManager && window.ChatManager.enabled) {
-        if(cia) cia.classList.remove('hidden');
-        if(log) log.classList.remove('hidden');
+        if(lcia) lcia.style.display = 'block';
     }
 
     if (window.isHost) {
@@ -177,6 +181,8 @@ window.socket.on('room_joined', (data) => {
     if(data.state && data.state.gameStarted) {
         lobbyScreen.classList.add('hidden');
         gameContainer.classList.remove('hidden');
+        const manualBtn = document.getElementById('btn-manual');
+        if (manualBtn) manualBtn.classList.add('hidden');
         if (window.game) window.game.setup(data.state.slots, window.myId);
         window.socket.emit('request_sync_state');
     } else {
@@ -280,8 +286,18 @@ function renderSlots(roomState) {
 
 btnAddSlot.addEventListener('click', () => window.socket.emit('add_slot'));
 btnReady.addEventListener('click', () => window.socket.emit('toggle_ready', { roomId: window.currentRoomState.id, userId: window.clientUserId }));
-if (closeSettingsBtn) closeSettingsBtn.onclick = () => startOverlay.classList.add('hidden');
-btnSettings.addEventListener('click', () => startOverlay.classList.remove('hidden'));
+
+btnSettings.addEventListener('click', () => {
+    if (window.SE) window.SE.play('setting');
+    startOverlay.classList.remove('hidden');
+    const lcia = document.getElementById('lobby-chat-container');
+    if (lcia) lcia.classList.add('hidden');
+});
+if (closeSettingsBtn) closeSettingsBtn.onclick = () => {
+    startOverlay.classList.add('hidden');
+    const lcia = document.getElementById('lobby-chat-container');
+    if (lcia && window.ChatManager && window.ChatManager.enabled) lcia.classList.remove('hidden');
+};
 
 window.sendSettingsUpdate = () => { if (window.isHost) window.socket.emit('update_settings', window.RuleSettings); };
 
@@ -296,6 +312,19 @@ window.socket.on('game_started', (roomState) => {
     window.currentRoomState = roomState;
     window.isInitialDealing = true; 
     lobbyScreen.classList.add('hidden'); startOverlay.classList.add('hidden'); gameContainer.classList.remove('hidden');
+    
+    const manualBtn = document.getElementById('btn-manual');
+    if (manualBtn) manualBtn.classList.add('hidden');
+
+    const cia = document.getElementById('chat-input-area');
+    if (cia && window.ChatManager && window.ChatManager.enabled) {
+        cia.style.display = 'flex';
+        cia.classList.remove('hidden');
+    }
+    
+    const lcia = document.getElementById('lobby-chat-container');
+    if (lcia) lcia.style.display = 'none';
+    
     if (window.game) window.game.setup(roomState.slots, window.myId);
     window.isGameOver = false; 
     if (window.isHost) { 
@@ -323,6 +352,7 @@ window.socket.on('update_game_state', (state) => {
     window.game.drawStack = state.drawStack; 
     window.game.currentColor = state.currentColor;
     if(state.hasDrawnThisTurn !== undefined) window.game.hasDrawnThisTurn = state.hasDrawnThisTurn;
+    if(state.abilityGraveyard) window.game.abilityGraveyard = state.abilityGraveyard;
     
     if (state.playersInfo) {
         let newPlayers = [];
@@ -332,6 +362,8 @@ window.socket.on('update_game_state', (state) => {
                 p.frozen = info.frozen; 
                 p.burnTurns = info.burnTurns; 
                 p.connected = info.connected;
+                p.invincibleTurns = info.invincibleTurns || 0;
+                p.shield = info.shield || { level: 0, turns: 0 };
                 newPlayers.push(p);
             }
         });
@@ -366,22 +398,9 @@ window.socket.on('update_game_state', (state) => {
         });
     }
 
-    if (state.defensePhase) {
-        const { attackerId, cardValue, targets } = state.defensePhase;
-        if (targets && targets.includes(window.myId) && window.myId !== attackerId) {
-            if (!window.isDefending) {
-                window.isDefending = true;
-                if (typeof window.showDefenseModal === 'function') window.showDefenseModal(cardValue);
-            }
-            const timerText = document.getElementById('defense-timer-text');
-            if (timerText) timerText.innerText = state.defenseTimer;
-        }
-    } else {
-        window.isDefending = false;
-        const modal = document.getElementById('defense-modal');
-        const discModal = document.getElementById('discard-modal');
-        if (modal) modal.classList.add('hidden');
-        if (discModal) discModal.classList.add('hidden');
+    // ★ フェーズUI（防御・じゃんけん）の更新呼び出し
+    if (typeof window.updatePhaseUI === 'function') {
+        window.updatePhaseUI(state);
     }
 });
 
@@ -397,9 +416,11 @@ window.socket.on('broadcast_uno', (data) => {
 window.socket.on('game_over', (data) => {
     window.isGameOver = true;
     if (data.isDraw) {
+        if (window.SE) window.SE.play('draw');
         setTimeout(() => document.getElementById('draw-curtain').classList.add('show'), 100);
         setTimeout(() => { const b = document.getElementById('winner-banner'); b.innerText = "DRAW"; b.classList.add('show'); }, 3000);
     } else {
+        if (window.SE) window.SE.play(Math.random() < 0.5 ? 'win' : 'win2');
         const { winnerId, winnerName } = data;
         const target = (winnerId === window.myId) ? document.getElementById('my-player-info') : document.querySelector(`.circle-player-badge[data-id="${winnerId}"]`);
         if(target) target.classList.add('winner-crown');
@@ -418,6 +439,19 @@ window.socket.on('back_to_lobby', (roomState) => {
     document.getElementById('winner-banner').classList.remove('show');
     document.getElementById('draw-curtain').classList.remove('show');
     gameContainer.classList.add('hidden'); lobbyScreen.classList.remove('hidden');
+    
+    const manualBtn = document.getElementById('btn-manual');
+    if (manualBtn) manualBtn.classList.remove('hidden');
+
+    const cia = document.getElementById('chat-input-area');
+    if (cia) {
+        cia.style.display = 'none';
+        cia.classList.add('hidden');
+    }
+    
+    const lcia = document.getElementById('lobby-chat-container');
+    if (lcia && window.ChatManager && window.ChatManager.enabled) lcia.style.display = 'block';
+    
     renderSlots(roomState);
 });
 
@@ -435,7 +469,7 @@ window.socket.on('receive_player_action', (data) => {
         window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards, isHV: data.isHV });
         const delay = data.cards.length * 100 + 400;
         setTimeout(() => {
-            if (typeof window.executeAbilityPlay === 'function') window.executeAbilityPlay(playerId, data.indices, data.targetId, data.discardIdx, data.selectedColor, data.multiDiscardIndices);
+            if (typeof window.executeAbilityPlay === 'function') window.executeAbilityPlay(playerId, data.indices, data.targetId, data.discardIdx, data.selectedColor, data.multiDiscardIndices, data.extraData);
         }, delay);
     } else if (data.action === 'defense_response') {
         if (window.pendingDefense && window.pendingDefense.responses) {
@@ -470,10 +504,16 @@ window.socket.on('receive_player_action', (data) => {
             window.game.replaceAbilityCards(playerId, data.cards);
             if (typeof window.broadcastGameState === 'function') window.broadcastGameState(true);
         }
+    } 
+    else if (data.action === 'janken_choice') {
+        if (window.pendingJanken && !window.pendingJanken.result) {
+            if (playerId === window.pendingJanken.attackerId) window.pendingJanken.attackerHand = data.choice;
+            if (playerId === window.pendingJanken.targetId) window.pendingJanken.targetHand = data.choice;
+            if (typeof window.checkJankenReady === 'function') window.checkJankenReady();
+        }
     }
 });
 
-// ★ 追加: play_animation に isHV フラグの受信対応
 window.socket.on('play_animation', (data) => {
     if (data.playerId !== window.myId) {
         if (typeof window.playOpponentAnimation === 'function') window.playOpponentAnimation(data.playerId, data.cards);
