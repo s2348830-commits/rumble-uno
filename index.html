@@ -223,8 +223,8 @@
         <div id="players-circle"></div>
 
         <div class="center-area">
-            <div class="discard-area">
-                <h3 style="color:white; text-align:center;">場</h3>
+            <div class="discard-area" id="discard-area" onclick="if(window.game && window.game.selectedIndices && window.game.selectedIndices.length > 0) window.handlePlayAction();">
+                <h3 style="color:white; text-align:center; pointer-events:none; margin-top:0;">場</h3>
                 <div id="discard-pile"></div>
             </div>
             <div class="deck-area">

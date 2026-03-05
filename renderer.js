@@ -213,6 +213,17 @@ const Renderer = {
         const unoBtn = document.getElementById('uno-btn');
         const endTurnBtn = document.getElementById('end-turn-btn');
         const btnUnoAuto = document.getElementById('btn-uno-auto'); 
+
+        // ★ 追加: 手札が選択されている時、「場」全体を緑色に光らせる
+        const discardArea = document.getElementById('discard-area');
+        if (discardArea) {
+            if (game.selectedIndices && game.selectedIndices.length > 0) {
+                discardArea.classList.add('highlight-discard');
+            } else {
+                discardArea.classList.remove('highlight-discard');
+            }
+        }
+
         if(!drawBtn || !unoBtn || !endTurnBtn) return;
 
         if (drawText) {
