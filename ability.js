@@ -2,241 +2,295 @@
  * ability.js
  */
 window.AbilityDef = {
-    'id_1': { type: 'AT', name: 'ミシェル', desc: '【AT】1人指定。1枚引かせ70%で凍結(能力のみ使用可)。', needsTarget: true },
-    'id_2': { type: 'AT_BL', name: 'ルネイユ', desc: '【AT/BL】他全員に固定で1枚引かせる。また60%確率で他全員に固定で1枚引かせる。', fixedDraw: true },
-    'id_3': { type: 'HE', name: 'ヴィオラ', desc: '【HE】手札を1枚選んで捨てる。', needsDiscard: true },
-    'id_4': { type: 'HE_BL', name: 'ヘイゼル', desc: '【BL/受動】捨てられた時・場に出た時、他ランダム1人に1枚引かせる。また15%の確率でカードが消費されず手札に残る。' },
-    'id_5': { type: 'HE', name: '瑠璃', desc: '【HE】自分の手札に+カードを2枚持ってくる。(内訳、各種+2：8割、+4：2割)' },
-    'id_6': { type: 'AT', name: 'ラン', desc: '【AT】他全員に手札を2枚ランダムに捨てさせその後に3枚ドローさせる。' },
-    'id_7': { type: 'AT', name: 'リリス', desc: '【AT】1人指定。燃焼(3T開始時固定1ドロー)を付与。', needsTarget: true },
-    'id_8': { type: 'HE', name: 'ヘラ', desc: '【HE】1人指定し1枚引かせる。手札1枚捨てる。', needsTarget: true, needsDiscard: true },
-    'id_9': { type: 'AT_BL', name: 'レナ', desc: '【AT/BL】他全員に1枚引かせる。防御時全員に固定2ドロー。' },
-    'id_10': { type: 'HE', name: 'シャミール', desc: '【HE】1人指定。数字カード3枚を次の次ターンまでロック。', needsTarget: true },
-    'id_11': { type: 'HE', name: 'レイ', desc: '【HE】1人指定。記号カード2枚を次の次ターンまでロック。', needsTarget: true },
-    'id_12': { type: 'AT', name: 'アンドロス', desc: '【AT】1人指定。2枚引かせる。', needsTarget: true },
-    'id_13': { type: 'HE', name: 'エリザベス', desc: '【HE】選ばれたランダムなプレイヤーに1枚引かせランダムな記号カードを1枚山札に戻す。無ければ追加で1枚引かせる。' },
-    'id_14': { type: 'AT', name: 'ハンナ', desc: '【AT】ランダムなプレイヤーに4枚引かせる。' },
-    'id_15': { type: 'AT', name: 'メリア', desc: '【AT】1人指定。固定で2枚引かせる。', needsTarget: true, fixedDraw: true },
-    'id_16': { type: 'HE', name: 'ユメゴト', desc: '【HE】手札1枚捨てる。自身のデバフ(凍結/燃焼)を解除。', needsDiscard: true },
-    'id_17': { type: 'BL', name: 'カシウス', desc: '【BL】防御時、手札1枚選んで捨てる。', needsDiscard: true },
-    'id_18': { type: 'BL', name: 'グレイス', desc: '【BL】防御時、他全員に1枚引かせる。' },
-    'id_19': { type: 'BL', name: 'ヴィンディ', desc: '【BL】防御時手札1枚捨てる。攻撃者に1枚引かせる。', needsDiscard: true },
-    'id_20': { type: 'HV', name: '幽艶レベッカ', desc: '【HV】トリック・オア・キャロット。色を指定し、指定色のカードを好きな枚数重ねて出す。', needsColor: true }
+    'id_1': { rarity: 'SSR', type: 'AT', name: 'ミシェル', desc: '【AT】1人指定。1枚引かせ70%で凍結(能力のみ使用可)。', needsTarget: true },
+    'id_2': { rarity: 'SSR', type: 'AT_BL', name: 'ルネイユ', desc: '【AT/BL】他全員に固定で1枚引かせる。その後自分にシールドIを1ターン付与する。また60%確率で他全員に固定で1枚引かせる。', fixedDraw: true },
+    'id_3': { rarity: 'SSR', type: 'HE', name: 'ヴィオラ', desc: '【HE】手札を1枚選んで捨てる。', needsDiscard: true },
+    'id_4': { rarity: 'SSR', type: 'HE_BL', name: 'ヘイゼル', desc: '【BL/受動】捨てられた時・場に出た時、自分にシールドIIを2ターン付与する。また15%の確率でカードが消費されず、手札に残る。' },
+    'id_5': { rarity: 'SSR', type: 'HE', name: '瑠璃', desc: '【HE】自分の手札に+カードを2枚持ってくる。(内訳、各種+2：8割、+4：2割)' },
+    'id_6': { rarity: 'SSR', type: 'AT', name: 'ラン', desc: '【AT】他全員に手札を2枚ランダムに捨てさせその後に3枚ドローさせる。' },
+    'id_7': { rarity: 'SSR', type: 'AT', name: 'リリス', desc: '【AT】1人指定。燃焼(3T開始時固定1ドロー)を付与。', needsTarget: true },
+    'id_8': { rarity: 'SSR', type: 'HE', name: 'ヘラ', desc: '【HE】1人指定し1枚引かせる。手札1枚捨てる。', needsTarget: true, needsDiscard: true },
+    'id_9': { rarity: 'SSR', type: 'AT_BL', name: 'レナ', desc: '【AT/BL】自分以外の他全員に1枚引かせる。防御時自分以外の他全員に固定2ドロー。' },
+    'id_10': { rarity: 'SSR', type: 'HE', name: 'シャミール', desc: '【HE】1人指定。数字カード3枚を次の次ターンまでロック。', needsTarget: true },
+    'id_11': { rarity: 'SSR', type: 'HE', name: 'レイ', desc: '【HE】1人指定。記号カード2枚を次の次ターンまでロック。', needsTarget: true },
+    'id_12': { rarity: 'SR', type: 'AT', name: 'アンドロス', desc: '【AT】1人指定。2枚引かせる。', needsTarget: true },
+    'id_13': { rarity: 'SSR', type: 'HE', name: 'エリザベス', desc: '【HE】選ばれたランダムなプレイヤーに1枚引かせランダムな記号カードを1枚山札に戻す。無ければ追加で1枚引かせる。' },
+    'id_14': { rarity: 'SSR', type: 'AT', name: 'ハンナ', desc: '【AT】ランダムなプレイヤーに4枚引かせる。' },
+    'id_15': { rarity: 'SSR', type: 'AT', name: 'メリア', desc: '【AT】1人指定。固定で2枚引かせる。', needsTarget: true, fixedDraw: true },
+    'id_16': { rarity: 'SSR', type: 'HE', name: 'ユメゴト', desc: '【HE】手札1枚捨てる。自身のデバフ(凍結/燃焼)を全て解除。', needsDiscard: true },
+    'id_17': { rarity: 'SR', type: 'BL', name: 'カシウス', desc: '【BL】防御時、手札1枚選んで捨てる。', needsDiscard: true },
+    'id_18': { rarity: 'SR', type: 'AT_BL', name: 'グレイス', desc: '【AT/BL】他全員に1枚引かせる。その後自分にシールドIを2ターン付与する。' },
+    'id_19': { rarity: 'SR', type: 'BL', name: 'ヴィンディ', desc: '【BL】防御時手札1枚捨てる。攻撃者に1枚引かせる。', needsDiscard: true },
+    'id_20': { rarity: 'UR', type: 'HV', name: '幽艶レベッカ', desc: '【HV】トリック・オア・キャロット。色を指定でき、指定した色のカードを好きな枚数重ねて場に出す。(記号効果は適用されない)', needsColor: true },
+    'id_21': { rarity: 'SR', type: 'AT', name: 'アヤメ', desc: '【AT】自分以外のプレイヤーを一人指定し、そのプレイヤーにカードを3枚引かせる。', needsTarget: true },
+    'id_22': { rarity: 'SSR', type: 'HE', name: '遊鈴', desc: '【HE】自分のデバフ(凍結/燃焼)を1つ解除し、全員に1枚カードを引かせる。', needsDebuffSelect: true },
+    'id_23': { rarity: 'SSR', type: 'HE', name: 'ダンタ', desc: '【HE】自分を1ターン無敵状態にし、デバフを1つランダムに解除する。' },
+    'id_24': { rarity: 'R', type: 'AT', name: 'アクアヘッド', desc: '【AT】自分以外のランダムなプレイヤーに燃焼を1ターン付与する。' },
+    'id_25': { rarity: 'UR', type: 'HE', name: 'ミサ', desc: '【HE】自分のカード1枚をワイルドにし、使用されたSSR以下の能力カードを1枚手札に戻す。', needsGraveyard: true },
+    'id_26': { rarity: 'UR', type: 'AT', name: '運命の三姉妹', desc: '【AT】ランダム他1人とじゃんけん。初回は結果によらず相手2ドロー。勝てば相手2ドローし再戦(最大4回)。', needsJanken: true },
+    'id_27': { rarity: 'SR', type: 'HE', name: 'クララ', desc: '【HE】自分の手札をランダムに2枚捨てる。' },
+    'id_28': { rarity: 'SSR', type: 'AT', name: 'リナ', desc: '【AT】ランダムなプレイヤーに2ターン燃焼を付与する。その後そのプレイヤーに1枚引かせる(防御不可)。' }
 };
 
 window.AbilityEngine = {
-    resolve: function(game, attackerId, abilityId, selectedTargetId, discCard, defenseResponses, multiplier = 1, selectedColor = null, multiCards = []) {
-        const def = window.AbilityDef[abilityId];
-        let guides = []; 
+    applyDraw: function(game, targetId, count, blockable = true) {
+        const t = game.players.find(p => p.id === targetId);
+        if (!t) return 0;
+        if (t.invincibleTurns > 0) return 0; 
+        
+        let finalCount = count;
+        if (t.shield && t.shield.turns > 0 && t.shield.level > 0) {
+            let reduce = Math.min(finalCount, t.shield.level);
+            finalCount -= reduce;
+            t.shield.level -= reduce; 
+        }
+        
+        for (let i = 0; i < finalCount; i++) {
+            game.drawCard(targetId);
+        }
+        if (finalCount > 0 && window.isHost && window.socket) {
+            window.socket.emit('request_draw_animation', { playerId: targetId, count: finalCount });
+        }
+        return finalCount;
+    },
 
-        if (!def) return guides;
+    applyBurn: function(game, targetId, turns) {
+        const t = game.players.find(p => p.id === targetId);
+        if (!t || t.invincibleTurns > 0 || t.frozenBurnImmune) return;
+        t.burnTurns += turns;
+    },
 
-        const triggerDiscardEffect = (pId, cVal, isCost = false, originalCard = null) => {
-            if (cVal === 'id_4') {
-                const others = game.players.filter(p => p.id !== pId);
-                if (others.length > 0) {
-                    const tid = others[Math.floor(Math.random() * others.length)].id;
-                    game.drawCard(tid);
-                    if (window.isHost && window.socket) window.socket.emit('request_draw_animation', { playerId: tid, count: 1 });
-                    guides.push({ from: pId, to: tid, text: 'ヘイゼル' });
-                }
-                
+    applyFreeze: function(game, targetId) {
+        const t = game.players.find(p => p.id === targetId);
+        if (!t || t.invincibleTurns > 0 || t.frozenBurnImmune) return;
+        t.frozen = true;
+    },
+
+    triggerDiscardEffect: function(game, attackerId, abilityId, isManualDiscard, discCard) {
+        if (abilityId === 'id_4') {
+            const self = game.players.find(p=>p.id===attackerId);
+            if(self) {
+                self.shield = { level: 2, turns: 2 };
+            }
+            if (isManualDiscard && discCard) {
                 if (Math.random() < 0.15) {
-                    guides.push({ from: pId, to: pId, text: '手札回帰' });
-                    if (isCost && originalCard) {
-                        game.hands[pId].push(originalCard);
-                    } else if (!isCost && game.discardPile.length > 0 && game.discardPile[game.discardPile.length - 1].value === 'id_4') {
-                        const returned = game.discardPile.pop();
-                        game.discardRotations.pop();
-                        game.hands[pId].push(returned);
-                    }
+                    if (game.hands[attackerId]) game.hands[attackerId].push(discCard);
                 }
             }
-        };
+        }
+    },
 
-        if (abilityId === 'id_4') triggerDiscardEffect(attackerId, 'id_4', false, null);
+    resolve: function(game, attackerId, abilityId, selectedTargetId, discCard, defenseResponses, multiplier = 1, selectedColor = null, multiCards = [], extraData = {}) {
+        let guides = [];
+        const def = window.AbilityDef[abilityId];
+        if (!def) return guides;
+
+        const others = game.players.filter(p => p.id !== attackerId && p.connected);
+
+        if (abilityId === 'id_4') this.triggerDiscardEffect(game, attackerId, 'id_4', false, null);
 
         let costPaid = false; 
         if ((def.needsDiscard || def.needsAbilityDiscard) && discCard) {
-            game.discardPile.push(discCard);
-            game.discardRotations.push(0);
             if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: attackerId, cards: [discCard] });
-            triggerDiscardEffect(attackerId, discCard.value, true, discCard);
+            this.triggerDiscardEffect(game, attackerId, discCard.value, true, discCard);
             costPaid = true;
         }
 
-        if (def.needsAbilityDiscard && !costPaid) {
-            guides.push({ from: attackerId, to: attackerId, text: '不発(コストなし)' });
-            return guides;
-        }
-
         if (abilityId === 'id_20') {
-            if (costPaid && multiCards && multiCards.length > 0) {
-                game.discardPile.push(...multiCards);
-                multiCards.forEach(() => game.discardRotations.push(0));
+            if (multiCards && multiCards.length > 0) {
                 if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: attackerId, cards: multiCards });
-                guides.push({ from: attackerId, to: attackerId, text: `${selectedColor}を${multiCards.length}枚放出` });
+                guides.push({ from: attackerId, to: attackerId, text: `${selectedColor}を${multiCards.length}枚消費` });
             }
             return guides; 
         }
 
-        // 重ね出し（multiplier）の回数分ループして能力を発動
         for (let m = 0; m < multiplier; m++) {
-            let actualTargets = [];
-            if (def.needsTarget && selectedTargetId) actualTargets = [selectedTargetId];
-            else if (abilityId === 'id_6' || abilityId === 'id_2' || abilityId === 'id_9') actualTargets = game.players.filter(p => p.id !== attackerId).map(p=>p.id);
-            else if (abilityId === 'id_13') actualTargets = ['random_other'];
-            else if (abilityId === 'id_14') actualTargets = ['random_other'];
-            else if (abilityId === 'id_5') actualTargets = [attackerId];
-
-            actualTargets.forEach(t => {
-                let targetId = t;
-                if (t === 'random_other') {
-                    const others = game.players.filter(p => p.id !== attackerId);
-                    targetId = others.length > 0 ? others[Math.floor(Math.random() * others.length)].id : attackerId;
-                }
-                if (!targetId) return;
-
-                if (targetId !== attackerId && abilityId !== 'id_4') {
-                    guides.push({ from: attackerId, to: targetId, text: (multiplier > 1 ? `${def.name} x${m+1}` : def.name) });
+            
+            // --- 攻撃・妨害系の能力処理 ---
+            if (def.type === 'AT' || def.type === 'AT_BL') {
+                let actualTargets = [];
+                if (def.needsTarget && selectedTargetId) actualTargets = [selectedTargetId];
+                else if (['id_2', 'id_6', 'id_9', 'id_18'].includes(abilityId)) actualTargets = others.map(p => p.id);
+                else if (['id_14', 'id_24', 'id_28'].includes(abilityId)) {
+                    if (others.length > 0) actualTargets = [others[Math.floor(Math.random() * others.length)].id];
                 }
 
-                let reduceDraw = false;
-
-                // 防御効果は1回目の発動時のみ判定し、防がれたらドロー数が半減する
-                if (m === 0 && defenseResponses && defenseResponses[targetId] && defenseResponses[targetId].cardValue) {
+                actualTargets.forEach(t => {
+                    let targetId = t;
                     const resp = defenseResponses[targetId];
-                    const defCardId = resp.cardValue;
-                    const tHand = game.hands[targetId];
-                    const cIdx = tHand.findIndex(c => c.value === defCardId);
+                    if (resp && resp.cardValue) return; // 防御成功時はスキップ
+
+                    let reduceDraw = false;
+                    let drawCount = 0;
                     
-                    let actualDefDiscardIdx = resp.discardIdx;
-                    if (cIdx > -1) {
-                        if (actualDefDiscardIdx !== null && cIdx < actualDefDiscardIdx) actualDefDiscardIdx--;
-                        const playedDefCard = tHand.splice(cIdx, 1)[0];
-                        game.discardPile.push(playedDefCard);
-                        game.discardRotations.push(0);
-                        if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: targetId, cards: [playedDefCard] });
-                        guides.push({ from: targetId, to: targetId, text: '防ぐ!(半減)' });
-                    }
-                    
-                    if (defCardId === 'id_2' || defCardId === 'id_18') {
-                        game.players.filter(p => p.id !== targetId).forEach(p => {
-                            game.drawCard(p.id);
-                            if(window.isHost && window.socket) window.socket.emit('request_draw_animation', { playerId: p.id, count: 1 });
-                        });
-                    } else if (defCardId === 'id_4') {
-                        triggerDiscardEffect(targetId, 'id_4', false, null);
-                    } else if (defCardId === 'id_9') {
-                        game.players.forEach(p => {
-                            game.drawCard(p.id); game.drawCard(p.id);
-                            if(window.isHost && window.socket) window.socket.emit('request_draw_animation', { playerId: p.id, count: 2 });
-                        });
-                    } else if (defCardId === 'id_17' || defCardId === 'id_19') {
-                        if (actualDefDiscardIdx !== null && game.hands[targetId] && game.hands[targetId].length > actualDefDiscardIdx) {
-                            const discardC = game.hands[targetId].splice(actualDefDiscardIdx, 1)[0];
-                            if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: targetId, cards: [discardC] });
-                            triggerDiscardEffect(targetId, discardC.value, true, discardC);
+                    if (abilityId === 'id_1') {
+                        drawCount = 1;
+                        if (Math.random() < 0.70) {
+                            this.applyFreeze(game, targetId);
+                            guides.push({ from: targetId, to: targetId, text: '❄凍結', se: 'frieze' });
                         }
-                        if (defCardId === 'id_19') {
-                            game.drawCard(attackerId);
-                            if(window.isHost && window.socket) window.socket.emit('request_draw_animation', { playerId: attackerId, count: 1 });
-                            guides.push({ from: targetId, to: attackerId, text: 'ヴィンディ' });
+                    } else if (abilityId === 'id_2') {
+                        drawCount = 1;
+                        if (Math.random() < 0.60) {
+                            drawCount += 1;
+                            guides.push({ from: attackerId, to: targetId, text: '追加1ドロー' });
                         }
+                    } else if (abilityId === 'id_6') {
+                        const tHand = game.hands[targetId];
+                        let discCount = 0;
+                        while(tHand && tHand.length > 0 && discCount < 2) {
+                            const rIdx = Math.floor(Math.random() * tHand.length);
+                            const discarded = tHand.splice(rIdx, 1)[0];
+                            game.discardPile.push(discarded);
+                            game.discardRotations.push(0);
+                            discCount++;
+                        }
+                        drawCount = 3;
+                    } else if (abilityId === 'id_7') {
+                        this.applyBurn(game, targetId, 3);
+                        guides.push({ from: attackerId, to: targetId, text: '🔥燃焼(3T)', se: 'fire' });
+                    } else if (abilityId === 'id_9') {
+                        drawCount = 1;
+                    } else if (abilityId === 'id_12') {
+                        drawCount = 2;
+                    } else if (abilityId === 'id_14') {
+                        drawCount = 4;
+                    } else if (abilityId === 'id_15') {
+                        drawCount = 2;
+                    } else if (abilityId === 'id_18') {
+                        drawCount = 1;
+                    } else if (abilityId === 'id_21') {
+                        drawCount = 3;
+                    } else if (abilityId === 'id_24') {
+                        this.applyBurn(game, targetId, 1);
+                        guides.push({ from: attackerId, to: targetId, text: '🔥燃焼(1T)', se: 'fire' });
+                    } else if (abilityId === 'id_28') {
+                        this.applyBurn(game, targetId, 2);
+                        drawCount = 1;
+                        guides.push({ from: attackerId, to: targetId, text: '🔥燃焼+1枚(貫通)' });
                     }
-                    if (!def.fixedDraw) reduceDraw = true;
+
+                    if (drawCount > 0) {
+                        const actualDrawn = this.applyDraw(game, targetId, drawCount, abilityId !== 'id_28');
+                        if(actualDrawn > 0) guides.push({ from: attackerId, to: targetId, text: `${actualDrawn}枚` });
+                        else guides.push({ from: attackerId, to: targetId, text: `無効化!` });
+                    }
+                });
+
+                // 攻撃者の自己バフ付与など
+                if (abilityId === 'id_2') {
+                    const self = game.players.find(p=>p.id===attackerId);
+                    if(self) self.shield = { level: 1, turns: 1 };
+                } else if (abilityId === 'id_18') {
+                    const self = game.players.find(p=>p.id===attackerId);
+                    if(self) self.shield = { level: 1, turns: 2 };
                 }
-
-                let drawCount = 0;
-
-                if (abilityId === 'id_1') {
-                    drawCount = 1;
-                    if (!reduceDraw && Math.random() < 0.70) {
-                        const p = game.players.find(px=>px.id === targetId);
-                        if(p) { p.frozen = true; guides.push({ from: targetId, to: targetId, text: '❄凍結', se: 'frieze' }); }
-                    }
-                } else if (abilityId === 'id_2') {
-                    drawCount = 1;
-                    if (Math.random() < 0.60) {
-                        drawCount += 1;
-                        guides.push({ from: attackerId, to: targetId, text: 'ルネイユ追撃' });
-                    }
-                } else if (abilityId === 'id_5') {
-                    const ruriCards = [];
-                    for(let i=0; i<2; i++) {
-                        if (Math.random() < 0.8) ruriCards.push({ color: ['red','blue','green','yellow'][Math.floor(Math.random()*4)], value: '+2' });
-                        else ruriCards.push({ color: 'black', value: 'Wild+4' });
-                    }
-                    game.hands[targetId].push(...ruriCards);
-                    guides.push({ from: targetId, to: targetId, text: '+補充' });
-                } else if (abilityId === 'id_6') {
-                    const tHand = game.hands[targetId];
-                    let discCount = 0;
-                    while(tHand && tHand.length > 0 && discCount < 2) {
-                        const rIdx = Math.floor(Math.random() * tHand.length);
-                        const discarded = tHand.splice(rIdx, 1)[0];
-                        game.discardPile.push(discarded);
-                        game.discardRotations.push(0);
-                        if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: targetId, cards: [discarded] });
-                        discCount++;
-                    }
-                    drawCount = 3;
-                } else if (abilityId === 'id_7' && !reduceDraw) {
-                    const p = game.players.find(px=>px.id === targetId);
-                    if(p) { p.burnTurns += 3; guides.push({ from: targetId, to: targetId, text: '🔥燃焼', se: 'fire' }); }
-                } else if (abilityId === 'id_8') {
-                    drawCount = 1;
-                } else if (abilityId === 'id_9') {
-                    drawCount = 1;
-                } else if (abilityId === 'id_10' && !reduceDraw) {
-                    if (game.lockRandomCard) game.lockRandomCard(attackerId, targetId, 'number', 3, 2); 
-                    guides.push({ from: targetId, to: targetId, text: '🔒ロック', se: 'rock' });
-                } else if (abilityId === 'id_11' && !reduceDraw) {
-                    if (game.lockRandomCard) game.lockRandomCard(attackerId, targetId, 'symbol', 2, 2); 
-                    guides.push({ from: targetId, to: targetId, text: '🔒ロック', se: 'rock' });
-                } else if (abilityId === 'id_12') {
-                    drawCount = 2;
-                } else if (abilityId === 'id_13') {
-                    drawCount = 1;
-                    const tHand = game.hands[targetId];
-                    let symbolIndices = [];
-                    if (tHand) {
-                        for (let i = 0; i < tHand.length; i++) {
-                            const c = tHand[i];
-                            if (!(c.value && String(c.value).startsWith('id_')) && !/^[0-9]$/.test(c.value)) symbolIndices.push(i);
-                        }
-                    }
-                    if (symbolIndices.length > 0) {
-                        const rIdx = symbolIndices[Math.floor(Math.random() * symbolIndices.length)];
-                        const returnedCard = tHand.splice(rIdx, 1)[0];
-                        if (game.deck) {
-                            const insertPos = Math.floor(Math.random() * (game.deck.length + 1));
-                            game.deck.splice(insertPos, 0, returnedCard);
-                        }
-                        guides.push({ from: targetId, to: targetId, text: '山札へ戻す' });
-                    } else {
-                        drawCount += 1;
-                        guides.push({ from: targetId, to: targetId, text: '追加ドロー' });
-                    }
-                } else if (abilityId === 'id_14') {
-                    drawCount = 4;
-                } else if (abilityId === 'id_15') {
-                    drawCount = 2;
-                }
-
-                if (drawCount > 0) {
-                    if (reduceDraw && !def.fixedDraw) drawCount = Math.max(1, Math.floor(drawCount / 2));
-                    for(let i=0; i<drawCount; i++) game.drawCard(targetId);
-                    if (window.isHost && window.socket) window.socket.emit('request_draw_animation', { playerId: targetId, count: drawCount });
-                }
-            });
-
-            if (abilityId === 'id_16') {
-                const self = game.players.find(p=>p.id === attackerId);
-                if(self) { self.frozen = false; self.burnTurns = 0; guides.push({ from: attackerId, to: attackerId, text: '✨解除' }); }
             }
-        } 
 
+            // --- 回復・特殊系の能力処理 ---
+            if (def.type === 'HE' || def.type === 'HE_BL') {
+                if (abilityId === 'id_3' && costPaid) {
+                    guides.push({ from: attackerId, to: attackerId, text: '1枚捨てる' });
+                } else if (abilityId === 'id_5') {
+                    const hand = game.hands[attackerId];
+                    if (hand) {
+                        for(let i=0; i<2; i++) {
+                            const val = Math.random() < 0.8 ? '+2' : 'Wild+4';
+                            const col = val === 'Wild+4' ? 'black' : ['red','blue','green','yellow'][Math.floor(Math.random()*4)];
+                            hand.push({ color: col, value: val });
+                        }
+                        guides.push({ from: attackerId, to: attackerId, text: '+補充' });
+                        if (window.isHost && window.socket) window.socket.emit('request_draw_animation', { playerId: attackerId, count: 2 });
+                    }
+                } else if (abilityId === 'id_8') {
+                    this.applyDraw(game, selectedTargetId, 1);
+                    guides.push({ from: attackerId, to: selectedTargetId, text: '1枚引かせる' });
+                } else if (abilityId === 'id_10') {
+                    if (game.lockRandomCard) game.lockRandomCard(attackerId, selectedTargetId, 'number', 3, 2);
+                    guides.push({ from: attackerId, to: selectedTargetId, text: '数字3枚ロック', se: 'rock' });
+                } else if (abilityId === 'id_11') {
+                    if (game.lockRandomCard) game.lockRandomCard(attackerId, selectedTargetId, 'symbol', 2, 2);
+                    guides.push({ from: attackerId, to: selectedTargetId, text: '記号2枚ロック', se: 'rock' });
+                } else if (abilityId === 'id_13') {
+                    const othersList = game.players.filter(p=>p.id!==attackerId && p.connected);
+                    if (othersList.length > 0) {
+                        const tid = othersList[Math.floor(Math.random() * othersList.length)].id;
+                        this.applyDraw(game, tid, 1);
+                        const tHand = game.hands[tid];
+                        let symbolIndices = [];
+                        if (tHand) {
+                            for (let i = 0; i < tHand.length; i++) {
+                                const c = tHand[i];
+                                if (!(c.value && String(c.value).startsWith('id_')) && !/^[0-9]$/.test(c.value)) symbolIndices.push(i);
+                            }
+                        }
+                        if (symbolIndices.length > 0) {
+                            const rIdx = symbolIndices[Math.floor(Math.random() * symbolIndices.length)];
+                            const returnedCard = tHand.splice(rIdx, 1)[0];
+                            if (game.deck) {
+                                const insertPos = Math.floor(Math.random() * (game.deck.length + 1));
+                                game.deck.splice(insertPos, 0, returnedCard);
+                            }
+                            guides.push({ from: attackerId, to: tid, text: '記号戻し' });
+                        } else {
+                            this.applyDraw(game, tid, 1);
+                            guides.push({ from: attackerId, to: tid, text: '追加1ドロー' });
+                        }
+                    }
+                } else if (abilityId === 'id_16') {
+                    const self = game.players.find(p=>p.id === attackerId);
+                    if(self) { self.frozen = false; self.burnTurns = 0; guides.push({ from: attackerId, to: attackerId, text: '✨解除' }); }
+                } else if (abilityId === 'id_22') {
+                    const self = game.players.find(p=>p.id === attackerId);
+                    if (self) {
+                        if (extraData.debuffToClear === 'frozen') self.frozen = false;
+                        else if (extraData.debuffToClear === 'burn') self.burnTurns = 0;
+                    }
+                    game.players.forEach(p => {
+                        if(p.connected) this.applyDraw(game, p.id, 1);
+                    });
+                    guides.push({ from: attackerId, to: attackerId, text: 'デバフ解除＆全員1枚' });
+                } else if (abilityId === 'id_23') {
+                    const self = game.players.find(p=>p.id === attackerId);
+                    if(self) {
+                        self.invincibleTurns = 1;
+                        let dbfs = [];
+                        if (self.frozen) dbfs.push('frozen');
+                        if (self.burnTurns > 0) dbfs.push('burn');
+                        if (dbfs.length > 0) {
+                            const r = dbfs[Math.floor(Math.random()*dbfs.length)];
+                            if (r === 'frozen') self.frozen = false;
+                            else self.burnTurns = 0;
+                        }
+                    }
+                    guides.push({ from: attackerId, to: attackerId, text: '無敵化＆デバフ解除' });
+                } else if (abilityId === 'id_25') {
+                    const hand = game.hands[attackerId];
+                    if (hand && hand.length > 0) {
+                        const rIdx = Math.floor(Math.random() * hand.length);
+                        hand[rIdx] = { color: 'black', value: 'Wild' };
+                    }
+                    if (extraData.graveyardCardId) {
+                        if (hand) hand.push({ color: 'black', value: extraData.graveyardCardId });
+                        const gIdx = game.abilityGraveyard.indexOf(extraData.graveyardCardId);
+                        if (gIdx > -1) game.abilityGraveyard.splice(gIdx, 1);
+                    }
+                    guides.push({ from: attackerId, to: attackerId, text: 'ワイルド化＆回収' });
+                } else if (abilityId === 'id_27') {
+                    const tHand = game.hands[attackerId];
+                    if (tHand && tHand.length > 0) {
+                        let dropCount = Math.min(2, tHand.length);
+                        for (let i = 0; i < dropCount; i++) {
+                            const rIdx = Math.floor(Math.random() * tHand.length);
+                            const dropCard = tHand.splice(rIdx, 1)[0];
+                            game.discardPile.push(dropCard);
+                            game.discardRotations.push(0);
+                        }
+                        guides.push({ from: attackerId, to: attackerId, text: `2枚破棄` });
+                    }
+                }
+            }
+        }
         return guides;
     }
 };

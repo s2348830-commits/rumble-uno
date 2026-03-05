@@ -147,7 +147,6 @@ window.SE = {
         
         let ext = 'mp3';
         if (name === 'fire' || name === 'page') ext = 'wav';
-        // ★ 修正: id_25, id_26 も .mov として扱うように追加
         if (name.includes('id_20') || name.includes('id_25') || name.includes('id_26')) ext = 'mov'; 
 
         if (!this.buffers[name]) {
@@ -188,7 +187,6 @@ const unlockAudioContext = () => {
     if (window.SE.audioCtx.state === 'suspended') window.SE.audioCtx.resume();
     ['win', 'win2', 'setting', 'draw', 'uno_message', 'buttonclick', 'uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6', 'frieze', 'rock', 'Distribute', 'mvp_1', 'mvp_2'].forEach(name => window.SE.loadSound(name, 'mp3'));
     ['fire', 'page'].forEach(name => window.SE.loadSound(name, 'wav'));
-    // ★ 修正: id_25 と id_26 を追加
     ['hv/id_20(1)', 'hv/id_20(2)', 'hv/id_25', 'hv/id_26'].forEach(name => window.SE.loadSound(name, 'mov')); 
     document.removeEventListener('click', unlockAudioContext);
     document.removeEventListener('touchstart', unlockAudioContext);
@@ -568,7 +566,6 @@ window.showAbilityCutin = function(cardValue, isHVActivated = false) {
     void cutinEl.offsetWidth; 
     cutinEl.classList.add('show-cutin');
     
-    // ★ 修正: id_25, id_26 の専用音声を再生する分岐を追加
     if (cardValue === 'id_20') {
         const rand = Math.random() < 0.5 ? 1 : 2;
         if (window.SE) window.SE.play(`hv/id_20(${rand})`);
@@ -799,7 +796,8 @@ window.showDefenseModal = function(attackCardValue) {
                     window.showAbilityCutin(item.card.value);
                 }
 
-                if (def.needsDiscard || def.needsAbilityDiscard) {
+                // ★ nullチェックを追加
+                if (def && (def.needsDiscard || def.needsAbilityDiscard)) {
                     modal.classList.add('hidden'); 
                     window.openDiscardSelection(myHand, [item.idx], def, (discIdx) => {
                         window.socket.emit('player_action', { action: 'defense_response', targetId: window.game.myId, cardValue: item.card.value, discardIdx: discIdx });
@@ -842,10 +840,10 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                 const blCard = bHand[blIdx];
                 let bDiscard = null;
                 const def = window.AbilityDef[blCard.value];
-                if(def.needsDiscard) {
+                if(def && def.needsDiscard) {
                     const nonAb = bHand.findIndex((c, i) => i !== blIdx && !(c.value && String(c.value).startsWith('id_')));
                     bDiscard = nonAb > -1 ? nonAb : (bHand.length > 1 ? bHand.findIndex((c, i) => i !== blIdx) : null);
-                } else if (def.needsAbilityDiscard) {
+                } else if (def && def.needsAbilityDiscard) {
                     const ab = bHand.findIndex((c, i) => i !== blIdx && (c.value && String(c.value).startsWith('id_')));
                     bDiscard = ab > -1 ? ab : null;
                 }
@@ -898,7 +896,7 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                     window.game.discardRotations.push(0);
                     if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: targetId, cards: [playedDefCard] });
                     
-                    if (typeof window.showAbilityCutin === 'function' && String(defCardId).startsWith('id_')) {
+                    if (targetId !== window.game.myId && typeof window.showAbilityCutin === 'function' && String(defCardId).startsWith('id_')) {
                         window.showAbilityCutin(defCardId);
                     }
 
@@ -906,11 +904,17 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                     blocked = true;
                 }
                 
-                const def = window.AbilityDef[defCardId];
-                if (defCardId === 'id_2' || defCardId === 'id_18') {
+                if (defCardId === 'id_2') {
                     window.game.players.filter(px => px.id !== targetId).forEach(px => {
                         window.AbilityEngine.applyDraw(window.game, px.id, 1);
                     });
+                    const targetP = window.game.players.find(p=>p.id===targetId);
+                    if(targetP) targetP.shield = { level: 1, turns: 1 };
+                    if (Math.random() < 0.6) {
+                        window.game.players.filter(px => px.id !== targetId).forEach(px => {
+                            window.AbilityEngine.applyDraw(window.game, px.id, 1);
+                        });
+                    }
                 } else if (defCardId === 'id_4') {
                     if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) {
                         window.AbilityEngine.triggerDiscardEffect(window.game, targetId, 'id_4', false, null);
@@ -919,6 +923,12 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                     window.game.players.filter(px => px.id !== targetId).forEach(px => {
                         window.AbilityEngine.applyDraw(window.game, px.id, 2);
                     });
+                } else if (defCardId === 'id_18') {
+                    window.game.players.filter(px => px.id !== targetId).forEach(px => {
+                        window.AbilityEngine.applyDraw(window.game, px.id, 1);
+                    });
+                    const targetP = window.game.players.find(p=>p.id===targetId);
+                    if(targetP) targetP.shield = { level: 1, turns: 2 };
                 } else if (defCardId === 'id_17' || defCardId === 'id_19') {
                     if (actualDefDiscardIdx !== null && window.game.hands[targetId] && window.game.hands[targetId].length > actualDefDiscardIdx) {
                         const discCard = window.game.hands[targetId].splice(actualDefDiscardIdx, 1)[0];
@@ -998,7 +1008,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
     if (def.type === 'AT' || def.type === 'AT_BL' || def.type === 'HV') {
         let targets = [];
         if (def.needsTarget && targetId) targets = [targetId];
-        else if (['id_2', 'id_6', 'id_9', 'id_11'].includes(cardValue)) targets = window.game.players.filter(p=>p.id!==playerId).map(p=>p.id);
+        else if (['id_2', 'id_6', 'id_9', 'id_18'].includes(cardValue)) targets = window.game.players.filter(p=>p.id!==playerId).map(p=>p.id);
         else if (['id_13', 'id_14', 'id_24', 'id_28'].includes(cardValue)) {
             const others = window.game.players.filter(p=>p.id!==playerId);
             if(others.length > 0) targets = [others[Math.floor(Math.random()*others.length)].id];
@@ -1021,10 +1031,10 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                             const blCard = bHand[blIdx];
                             let bDiscard = null;
                             const bDef = window.AbilityDef[blCard.value];
-                            if(bDef.needsDiscard) {
+                            if(bDef && bDef.needsDiscard) {
                                 const nonAb = bHand.findIndex((c, i) => i !== blIdx && !(c.value && String(c.value).startsWith('id_')));
                                 bDiscard = nonAb > -1 ? nonAb : (bHand.length > 1 ? bHand.findIndex((c, i) => i !== blIdx) : null);
-                            } else if (bDef.needsAbilityDiscard) {
+                            } else if (bDef && bDef.needsAbilityDiscard) {
                                 const ab = bHand.findIndex((c, i) => i !== blIdx && (c.value && String(c.value).startsWith('id_')));
                                 bDiscard = ab > -1 ? ab : null;
                             }
@@ -1373,11 +1383,11 @@ window.checkTurn = function() {
                         }
                         
                         let extraData = {};
-                        if (def.needsGraveyard) {
+                        if (def && def.needsGraveyard) {
                             const gyList = window.game.abilityGraveyard.filter(id => window.AbilityDef[id] && window.AbilityDef[id].rarity !== 'UR');
                             if (gyList.length > 0) extraData.graveyardCardId = gyList[Math.floor(Math.random() * gyList.length)];
                         }
-                        if (def.needsDebuffSelect) {
+                        if (def && def.needsDebuffSelect) {
                             const p = window.game.players.find(x=>x.id===current.id);
                             if (p && p.frozen) extraData.debuffToClear = 'frozen';
                             else if (p && p.burnTurns > 0) extraData.debuffToClear = 'burn';
@@ -1451,11 +1461,11 @@ window.checkTurn = function() {
                                 }
 
                                 let extraData = {};
-                                if (def.needsGraveyard) {
+                                if (def && def.needsGraveyard) {
                                     const gyList = window.game.abilityGraveyard.filter(id => window.AbilityDef[id] && window.AbilityDef[id].rarity !== 'UR');
                                     if (gyList.length > 0) extraData.graveyardCardId = gyList[Math.floor(Math.random() * gyList.length)];
                                 }
-                                if (def.needsDebuffSelect) {
+                                if (def && def.needsDebuffSelect) {
                                     const p = window.game.players.find(x=>x.id===current.id);
                                     if (p && p.frozen) extraData.debuffToClear = 'frozen';
                                     else if (p && p.burnTurns > 0) extraData.debuffToClear = 'burn';
@@ -1709,7 +1719,7 @@ window.handlePlayAction = function() {
             if (graveyardCardId) extraData.graveyardCardId = graveyardCardId;
 
             window.animateSequentialPlay(indices, window.game, () => {
-                const isHVActivated = (cardValue === 'id_20') || (def.needsAbilityDiscard && discardIdx !== null);
+                const isHVActivated = (cardValue === 'id_20') || (def && def.needsAbilityDiscard && discardIdx !== null);
                 window.showAbilityCutin(cardsToSend[0].value, isHVActivated);
                 if (window.isHost) {
                     if (window.socket) window.socket.emit('request_play_animation', { playerId: window.game.myId, cards: cardsToSend, isHV: isHVActivated });
@@ -1721,7 +1731,8 @@ window.handlePlayAction = function() {
         };
 
         const step6 = () => {
-            if (def.needsGraveyard) {
+            // ★ 安全対策 (def && def.needs...) を徹底
+            if (def && def.needsGraveyard) {
                 window.openGraveyardSelection((selectedId) => {
                     if (!selectedId) { window.game.selectedIndices = []; window.updateUI(); return; }
                     graveyardCardId = selectedId;
@@ -1731,12 +1742,12 @@ window.handlePlayAction = function() {
         }
 
         const step5 = () => {
-            if (def.needsDebuffSelect && me.frozen && me.burnTurns > 0) {
+            if (def && def.needsDebuffSelect && me.frozen && me.burnTurns > 0) {
                 window.openDebuffSelection((selected) => {
                     debuffToClear = selected;
                     step6();
                 });
-            } else if (def.needsDebuffSelect) {
+            } else if (def && def.needsDebuffSelect) {
                 if (me.frozen) debuffToClear = 'frozen';
                 else if (me.burnTurns > 0) debuffToClear = 'burn';
                 step6();
