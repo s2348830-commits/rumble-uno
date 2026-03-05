@@ -71,10 +71,15 @@ window.ensureModalsExist = function() {
         const cutin = document.createElement('div');
         cutin.id = 'ability-cutin';
         cutin.className = 'hidden';
+        // ★ HTMLと同じく構造を変更
         cutin.innerHTML = `
-            <div style="position: relative; display: inline-block; text-align: center;">
+            <div class="cutin-background"></div>
+            <div class="cutin-content">
                 <img id="ability-cutin-img" src="" alt="Ability">
-                <div id="ability-cutin-text" style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 8px 12px; border-radius: 8px; font-size: 14px; white-space: pre-wrap; width: 120%; text-align: center; border: 2px solid #4caf50;"></div>
+                <div class="cutin-text-container">
+                    <h2 id="ability-cutin-name"></h2>
+                    <p id="ability-cutin-text"></p>
+                </div>
             </div>`;
         document.body.appendChild(cutin);
     }
@@ -153,8 +158,8 @@ window.SE = {
 const unlockAudioContext = () => {
     if (window.SE.unlocked) return; window.SE.unlocked = true; window.SE.initContext();
     if (window.SE.audioCtx.state === 'suspended') window.SE.audioCtx.resume();
-    // ★ draw.mp3の代わりに正しく Distribute.mp3 をロードする
-    ['win', 'draw', 'uno_message', 'buttonclick', 'uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6', 'frieze', 'rock', 'Distribute'].forEach(name => window.SE.loadSound(name, 'mp3'));
+    // ★ 'mvp_1', 'mvp_2' を追加
+    ['win', 'draw', 'uno_message', 'buttonclick', 'uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6', 'frieze', 'rock', 'Distribute', 'mvp_1', 'mvp_2'].forEach(name => window.SE.loadSound(name, 'mp3'));
     ['fire', 'page'].forEach(name => window.SE.loadSound(name, 'wav'));
     ['hv/id_20(1)', 'hv/id_20(2)'].forEach(name => window.SE.loadSound(name, 'mov')); 
     document.removeEventListener('click', unlockAudioContext);
@@ -518,13 +523,16 @@ window.showAbilityCutin = function(cardValue, isHVActivated = false) {
     window.ensureModalsExist();
     const cutinEl = document.getElementById('ability-cutin');
     const cutinImg = document.getElementById('ability-cutin-img');
+    const cutinName = document.getElementById('ability-cutin-name'); // ★ 追加
     const cutinText = document.getElementById('ability-cutin-text');
     if (!cutinEl || !cutinImg) return;
     
     cutinImg.src = `card/custom/${cardValue}.png`;
     
-    if (cutinText && window.AbilityDef && window.AbilityDef[cardValue]) {
-        cutinText.innerText = window.AbilityDef[cardValue].desc;
+    // ★ 名前と説明を両方セットする
+    if (window.AbilityDef && window.AbilityDef[cardValue]) {
+        if (cutinName) cutinName.innerText = window.AbilityDef[cardValue].name;
+        if (cutinText) cutinText.innerText = window.AbilityDef[cardValue].desc;
     }
 
     cutinEl.classList.remove('hidden', 'fade-out');
@@ -534,12 +542,17 @@ window.showAbilityCutin = function(cardValue, isHVActivated = false) {
     if (cardValue === 'id_20') {
         const rand = Math.random() < 0.5 ? 1 : 2;
         if (window.SE) window.SE.play(`hv/id_20(${rand})`);
+    } else {
+        const randMvp = Math.random() < 0.5 ? 1 : 2;
+        if (window.SE) window.SE.play(`mvp_${randMvp}`);
     }
 
+    // ★ 表示時間を1秒(1000)から2秒(2000)に延長し、アニメーション待機時間を調整
     setTimeout(() => {
-        cutinEl.classList.remove('show-cutin'); cutinEl.classList.add('fade-out');
-        setTimeout(() => cutinEl.classList.add('hidden'), 1000); 
-    }, 1000); 
+        cutinEl.classList.remove('show-cutin'); 
+        cutinEl.classList.add('fade-out');
+        setTimeout(() => cutinEl.classList.add('hidden'), 400); 
+    }, 2000); 
 };
 
 window.openTargetSelection = function(players, callback) {
@@ -820,7 +833,8 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                         window.AbilityEngine.triggerDiscardEffect(targetId, 'id_4', false, null);
                     }
                 } else if (defCardId === 'id_9') {
-                    window.game.players.forEach(px => {
+                    // ★修正：防御者（targetId）以外のプレイヤーに2ドローさせる
+                    window.game.players.filter(px => px.id !== targetId).forEach(px => {
                         window.game.drawCard(px.id); window.game.drawCard(px.id);
                         if(window.isHost && window.socket) window.socket.emit('request_draw_animation', { playerId: px.id, count: 2 });
                     });

@@ -10,6 +10,7 @@
 @media screen and (max-width: 500px), screen and (max-height: 600px) {
     :root { --card-w: 32px; --card-h: 48px; --card-ml: -12px; --font-center: 18px; --font-corner: 8px; --ui-gap: 20px; --deck-offset: 1px; --sel-transform: -8px; }
     
+    /* スマホ用に全体を少し上に詰め、下部に入力欄用の余白を確保 */
     #game-container { padding-top: 30px; padding-bottom: 70px; justify-content: flex-start; }
     #circle-table { max-width: 320px; margin-top: 10px; }
     .circle-player-badge { width: 35px; height: 35px; }
@@ -100,6 +101,7 @@ body {
 #uno-btn { background: linear-gradient(135deg, #f1c40f, #e67e22); color: white; border: 1.5px solid white; border-radius: 30px; padding: 5px 10px; font-size: 11px; font-weight: bold; cursor: pointer; animation: bounce 1s infinite; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
 
 /* ★ ボタン類が重ならないように画面左端中央に固定配置（縦並び） */
+/* 今は index.html 内でインラインスタイルで配置していますが、クラス定義を残しておきます */
 .left-side-buttons {
     position: fixed;
     top: 50%;
@@ -135,12 +137,12 @@ body {
 #niconico-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 8000; overflow: hidden; }
 .niconico-msg { position: absolute; white-space: nowrap; font-size: 20px; font-weight: bold; color: white; text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000; background: rgba(0, 0, 0, 0.6); padding: 2px 10px; border-radius: 4px; will-change: transform; }
 
-/* ログが邪魔にならないように透明度アップ ＆ pointer-events: none でタップ貫通！ */
+/* ★ ログが邪魔にならないように透明度アップ ＆ pointer-events: none でタップ貫通！ */
 #chat-log-container { 
     position: fixed; top: 75px; left: 5px; width: 180px; max-height: 25vh; 
     background: transparent; color: white; font-size: 11px; overflow-y: hidden; 
     padding: 6px; z-index: 8500; border: none;
-    pointer-events: none; 
+    pointer-events: none; /* ★ これでログの下にあるアイコンをタップできます */
     display: flex; flex-direction: column; gap: 4px; 
     text-shadow: 1px 1px 2px #000, -1px -1px 2px #000, 1px -1px 2px #000, -1px 1px 2px #000; 
 }
@@ -177,6 +179,7 @@ body {
 .card-corner.top-left { top: 2px; left: 2px; } .card-corner.bottom-right { bottom: 2px; right: 2px; transform: rotate(180deg); }
 .card-img { width: 90%; height: 90%; object-fit: contain; pointer-events: none; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3)); }
 
+/* ★ 手札エリアに入力欄と被らないための余白を追加 */
 .section { background: rgba(255, 255, 255, 0.02); margin: 2px 0; padding: 3px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05); }
 .hand-section { margin-bottom: 70px; position: relative; z-index: 50; } 
 
@@ -202,7 +205,7 @@ body {
 #draw-btn { background: #222; color: #ccc; border: 1px solid #444; border-radius: 4px; padding: 2px 8px; font-size: 10px; cursor: pointer; }
 
 .screen-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; background: transparent; z-index: 5000; }
-
+/* ★ ロビーの被り対策 */
 .login-box, .lobby-box { 
     background: #2a0808; padding: 20px; border-radius: 12px; border: 1px solid #551111; 
     width: 90%; max-width: 400px; text-align: center; color: white; 
@@ -266,7 +269,7 @@ button.disabled-btn { opacity: 0.5; cursor: not-allowed; }
 .volume-icon { font-size: 14px; user-select: none; }
 .volume-slider { width: 60px; height: 4px; accent-color: #fbc02d; cursor: pointer; }
 .lobby-volume { position: absolute; top: 85px; right: 20px; }
-.game-volume { position: fixed; bottom: 55px; left: 10px; z-index: 1000; }
+.game-volume { position: fixed; bottom: 65px; left: 10px; z-index: 1000; }
 
 .bot-difficulty-btn { display: inline-flex; align-items: center; justify-content: center; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: bold; margin-left: 8px; background-color: #000; user-select: none; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
 .bot-difficulty-btn:active { transform: scale(0.95); }
@@ -284,12 +287,65 @@ button.disabled-btn { opacity: 0.5; cursor: not-allowed; }
 .manual-indicators { font-size: 14px; letter-spacing: 2px; margin: 15px 0 5px 0; text-align: center; }
 .manual-close-btn { background: #d32f2f; color: white; border: 2px solid white; padding: 6px 20px; font-size: 14px; font-weight: bold; border-radius: 20px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.5); margin-top: 10px; }
 
-#ability-cutin { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center; z-index: 100000; pointer-events: none; opacity: 0; }
-#ability-cutin.show-cutin { opacity: 1; }
-#ability-cutin.fade-out { opacity: 0; transition: opacity 1s ease-out; }
-#ability-cutin-img { max-width: 80vw; max-height: 80vh; object-fit: contain; filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.5)); }
-#ability-cutin.show-cutin .cutin-wrapper { animation: zoomIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-@keyframes zoomIn { 0% { transform: scale(0.5) translateY(50px); opacity: 0; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
+/* ★ スタイリッシュなカットイン用のアニメーション */
+#ability-cutin {
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    z-index: 100000; pointer-events: none;
+    display: flex; justify-content: center; align-items: center;
+    overflow: hidden;
+}
+
+/* 背景の斜め帯 */
+.cutin-background {
+    position: absolute; top: 50%; left: 0; width: 200%; height: 300px;
+    background: linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(20,20,20,0.9) 20%, rgba(20,20,20,0.9) 80%, rgba(0,0,0,0) 100%);
+    transform: translateY(-50%) rotate(-10deg) translateX(-100%);
+    z-index: 1;
+}
+#ability-cutin.show-cutin .cutin-background { animation: slideBg 0.3s forwards; }
+@keyframes slideBg { to { transform: translateY(-50%) rotate(-10deg) translateX(-25%); } }
+
+/* 画像とテキストのコンテナ（斜めにスライドイン） */
+.cutin-content {
+    position: relative; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 30px;
+    transform: translateX(100vw) skewX(-15deg); opacity: 0; width: 90vw; max-width: 800px;
+}
+#ability-cutin.show-cutin .cutin-content {
+    animation: slideContent 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+@keyframes slideContent { to { transform: translateX(0) skewX(0); opacity: 1; } }
+
+/* カード画像 */
+#ability-cutin-img {
+    max-height: 60vh; max-width: 40vw; object-fit: contain;
+    filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.6));
+}
+
+/* テキストエリア */
+.cutin-text-container {
+    background: rgba(0, 0, 0, 0.75); border-left: 6px solid #4caf50;
+    padding: 20px 30px; color: white; text-shadow: 2px 2px 4px #000; flex: 1;
+}
+#ability-cutin-name {
+    margin: 0 0 10px 0; font-size: 36px; font-weight: 900; color: #fbc02d;
+    font-style: italic; letter-spacing: 3px;
+}
+#ability-cutin-text { margin: 0; font-size: 16px; line-height: 1.6; white-space: pre-wrap; font-weight: bold; }
+
+/* 消える時（スライドアウト） */
+#ability-cutin.fade-out .cutin-content { animation: slideOutContent 0.3s ease-in forwards; }
+#ability-cutin.fade-out .cutin-background { animation: slideOutBg 0.3s ease-in forwards; }
+@keyframes slideOutContent { to { transform: translateX(-100vw) skewX(15deg); opacity: 0; } }
+@keyframes slideOutBg { to { transform: translateY(-50%) rotate(-10deg) translateX(-100%); } }
+
+/* スマホ用のレイアウト調整 */
+@media screen and (max-width: 600px) {
+    .cutin-content { flex-direction: column; text-align: center; gap: 15px; }
+    #ability-cutin-img { max-height: 45vh; max-width: 70vw; }
+    .cutin-text-container { border-left: none; border-top: 4px solid #4caf50; padding: 15px; width: 100%; box-sizing: border-box; }
+    #ability-cutin-name { font-size: 24px; }
+    #ability-cutin-text { font-size: 13px; line-height: 1.4; }
+}
 
 .action-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(20, 20, 20, 0.95); padding: 20px; border-radius: 12px; border: 2px solid #4caf50; color: white; z-index: 100000; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
 .action-popup-grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 15px; }
