@@ -12,7 +12,9 @@ window.isDefending = false;
 window.pendingDrawDefenseInfo = null; 
 window.pendingJanken = null;
 
-// ★ 全てのモーダル（じゃんけん画面含む）をはじめからDOMにセットしておく
+// ★ じゃんけん待機中用の裏面カード（画像ファイルがなくても表示できるデータ）
+window.JANKEN_BACK_IMG = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 60'%3E%3Crect width='40' height='60' rx='6' fill='%23222' stroke='%23444' stroke-width='2'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23fff' font-size='24' font-family='sans-serif' font-weight='bold'%3E?%3C/text%3E%3C/svg%3E";
+
 window.ensureModalsExist = function() {
     if (!document.getElementById('target-modal')) {
         const targetModal = document.createElement('div');
@@ -125,12 +127,13 @@ window.ensureModalsExist = function() {
         `;
         document.body.appendChild(resOver);
     }
-    // ★ じゃんけんのHTMLを最初から作っておく
+    
     if (!document.getElementById('janken-overlay')) {
         const jOverlay = document.createElement('div');
         jOverlay.id = 'janken-overlay';
         jOverlay.className = 'hidden';
         jOverlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.95); z-index:110000; display:flex; flex-direction:column; justify-content:center; align-items:center;";
+        // ★ エラー回避のため、画像を使わずプログラム内のダミーデータを使用
         jOverlay.innerHTML = `
             <h2 id="janken-title" style="color:white; font-style:italic; margin-bottom: 5px;">じゃんけん 勝負！</h2>
             <div id="janken-subtitle" style="color:#aaa; font-size:14px; margin-bottom:15px;">Loop: 1/4</div>
@@ -139,13 +142,13 @@ window.ensureModalsExist = function() {
                 <div id="janken-player1" style="text-align:center; color:white; flex: 1;">
                     <div id="janken-p1-result" style="font-size:24px; font-weight:bold; height:35px; text-shadow: 2px 2px 4px #000;"></div>
                     <div id="janken-p1-name" style="margin-bottom:10px; font-weight:bold; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Player1</div>
-                    <img id="janken-p1-card" src="card/back.png" style="width:80px; max-width: 100%; border-radius:10px; transition:0.3s; border-top: 10px solid transparent;">
+                    <img id="janken-p1-card" src="${window.JANKEN_BACK_IMG}" style="width:80px; max-width: 100%; border-radius:10px; transition:0.3s; border-top: 10px solid transparent;">
                 </div>
                 <div style="color:white; font-size:30px; font-weight:bold; font-style:italic;">VS</div>
                 <div id="janken-player2" style="text-align:center; color:white; flex: 1;">
                     <div id="janken-p2-result" style="font-size:24px; font-weight:bold; height:35px; text-shadow: 2px 2px 4px #000;"></div>
                     <div id="janken-p2-name" style="margin-bottom:10px; font-weight:bold; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Player2</div>
-                    <img id="janken-p2-card" src="card/back.png" style="width:80px; max-width: 100%; border-radius:10px; transition:0.3s; border-top: 10px solid transparent;">
+                    <img id="janken-p2-card" src="${window.JANKEN_BACK_IMG}" style="width:80px; max-width: 100%; border-radius:10px; transition:0.3s; border-top: 10px solid transparent;">
                 </div>
             </div>
             <div id="janken-controls" style="display:flex; gap:15px;">
@@ -278,6 +281,58 @@ window.checkFinalSprint = function() {
     if (hasUno) window.SE.startLoop('final_sprint'); else window.SE.stopLoop('final_sprint');
 };
 
+window.updatePhaseUI = function(state) {
+    if (state.defensePhase) {
+        const { attackerId, cardValue, targets } = state.defensePhase;
+        if (targets && targets.includes(window.myId) && window.myId !== attackerId) {
+            if (!window.isDefending) {
+                window.isDefending = true;
+                if (typeof window.showDefenseModal === 'function') window.showDefenseModal(cardValue);
+            }
+            const timerText = document.getElementById('defense-timer-text');
+            if (timerText) timerText.innerText = state.defenseTimer;
+        }
+    } else {
+        window.isDefending = false;
+        const modal = document.getElementById('defense-modal');
+        const discModal = document.getElementById('discard-modal');
+        if (modal) modal.classList.add('hidden');
+        if (discModal) discModal.classList.add('hidden');
+    }
+
+    if (state.jankenPhase) {
+        if (!window.isJankenShowing) {
+            if (typeof window.showJankenUI === 'function') window.showJankenUI(state.jankenPhase.attackerId, state.jankenPhase.targetId, state.jankenPhase.loopCount);
+            window.isJankenShowing = true;
+        }
+        const jTimer = document.getElementById('janken-timer');
+        if (jTimer) jTimer.innerText = state.jankenPhase.timer;
+
+        if (window.myId === state.jankenPhase.attackerId && state.jankenPhase.attackerHand) {
+            const controls = document.getElementById('janken-controls');
+            const title = document.getElementById('janken-title');
+            if (controls) controls.style.display = 'none';
+            if (title && !state.jankenPhase.result) title.innerText = "相手を待っています...";
+        }
+        if (window.myId === state.jankenPhase.targetId && state.jankenPhase.targetHand) {
+            const controls = document.getElementById('janken-controls');
+            const title = document.getElementById('janken-title');
+            if (controls) controls.style.display = 'none';
+            if (title && !state.jankenPhase.result) title.innerText = "相手を待っています...";
+        }
+
+        if (state.jankenPhase.result && !window.jankenResultPlayed) {
+            window.jankenResultPlayed = true;
+            if (typeof window.playJankenResult === 'function') window.playJankenResult(state.jankenPhase.attackerId, state.jankenPhase.targetId, state.jankenPhase.attackerHand, state.jankenPhase.targetHand, state.jankenPhase.result);
+        }
+    } else {
+        window.isJankenShowing = false;
+        window.jankenResultPlayed = false;
+        const jOverlay = document.getElementById('janken-overlay');
+        if (jOverlay && !jOverlay.classList.contains('result-showing')) jOverlay.classList.add('hidden');
+    }
+};
+
 window.broadcastGameState = function(skipUIUpdate = false, attackGuides = []) {
     if (!window.isHost) return;
     const playersInfo = window.game.players.map(p => ({ 
@@ -297,6 +352,8 @@ window.broadcastGameState = function(skipUIUpdate = false, attackGuides = []) {
     };
     if (window.socket) window.socket.emit('sync_game_state', state);
     if (!skipUIUpdate) window.updateUI();
+
+    window.updatePhaseUI(state);
 
     if (attackGuides && attackGuides.length > 0) {
         attackGuides.forEach(g => {
@@ -433,6 +490,75 @@ window.showAttackGuide = function(fromId, toId, labelText, seName) {
     ], { duration: 1500, easing: 'ease-out', fill: 'forwards' });
 
     setTimeout(() => { if (document.body.contains(svg)) document.body.removeChild(svg); }, 2000);
+};
+
+window.showAbilityResetUI = function(maxCount) {
+    const overlay = document.getElementById('ability-reset-overlay');
+    const resetArea = document.getElementById('reset-area');
+    const handArea = document.getElementById('reset-hand-area');
+    const btnConfirm = document.getElementById('btn-reset-confirm');
+    const timerSpan = document.getElementById('reset-timer');
+    const maxSpan = document.getElementById('reset-max');
+    
+    if(!overlay) return;
+    
+    let timeLeft = 10;
+    maxSpan.innerText = maxCount;
+    resetArea.innerHTML = '';
+    handArea.innerHTML = '';
+    let selectedCards = [];
+    let myAbilities = window.game.myHand.filter(c => c.value && String(c.value).startsWith('id_'));
+    
+    const renderCards = () => {
+        resetArea.innerHTML = '';
+        selectedCards.forEach((c, idx) => {
+            const el = Renderer.createCardElement(c);
+            el.style.transform = 'none'; el.style.position = 'static'; el.style.margin = '0';
+            el.onclick = () => {
+                selectedCards.splice(idx, 1);
+                myAbilities.push(c);
+                renderCards();
+            };
+            resetArea.appendChild(el);
+        });
+        
+        handArea.innerHTML = '';
+        myAbilities.forEach((c, idx) => {
+            const el = Renderer.createCardElement(c);
+            el.style.transform = 'none'; el.style.position = 'static'; el.style.margin = '0';
+            el.onclick = () => {
+                if (selectedCards.length < maxCount) {
+                    myAbilities.splice(idx, 1);
+                    selectedCards.push(c);
+                    renderCards();
+                }
+            };
+            handArea.appendChild(el);
+        });
+    };
+    renderCards();
+    overlay.classList.remove('hidden');
+    
+    const finish = () => {
+        clearInterval(timerInt);
+        overlay.classList.add('hidden');
+        if (selectedCards.length > 0) {
+            const vals = selectedCards.map(c => c.value);
+            if (window.isHost) {
+                window.game.replaceAbilityCards(window.game.myId, vals);
+                window.updateUI();
+            } else {
+                if(window.socket) window.socket.emit('player_action', { action: 'ability_reset', cards: vals });
+            }
+        }
+    };
+    
+    btnConfirm.onclick = finish;
+    const timerInt = setInterval(() => {
+        timeLeft--;
+        timerSpan.innerText = timeLeft;
+        if (timeLeft <= 0) finish();
+    }, 1000);
 };
 
 window.animateInitialDeal = function(targetHands, callback) {
@@ -1110,6 +1236,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
     }
 };
 
+// ★ じゃんけんフェーズの実装
 window.startJankenPhase = function(attackerId, loopCount) {
     const others = window.game.players.filter(p => p.id !== attackerId && p.connected);
     if (others.length === 0) {
@@ -1126,8 +1253,7 @@ window.startJankenPhase = function(attackerId, loopCount) {
         result: null
     };
 
-    window.socket.emit('player_action', { action: 'start_janken', attackerId, targetId, loopCount });
-    window.broadcastGameState();
+    window.broadcastGameState(); 
 
     window.jankenInterval = setInterval(() => {
         if (!window.pendingJanken || window.pendingJanken.result) return;
@@ -1173,10 +1299,10 @@ window.resolveJanken = function() {
 
     setTimeout(() => {
         let drawCount = 0;
-        if (pJ.loopCount === 0 && result === 'lose') {
-            drawCount = 2;
-        } else if (result === 'win') {
+        if (result === 'win') {
             drawCount = 2; 
+        } else if (result === 'lose' && pJ.loopCount === 0) {
+            drawCount = 2;
         }
         
         if (drawCount > 0) {
@@ -1234,8 +1360,8 @@ window.showJankenUI = function(attackerId, targetId, loopCount) {
     p1Name.innerText = aP ? aP.name : 'Attacker';
     p2Name.innerText = tP ? tP.name : 'Target';
     
-    p1Card.src = 'card/back.png'; p1Card.style.borderTop = '10px solid transparent';
-    p2Card.src = 'card/back.png'; p2Card.style.borderTop = '10px solid transparent';
+    p1Card.src = window.JANKEN_BACK_IMG; p1Card.style.borderTop = '10px solid transparent';
+    p2Card.src = window.JANKEN_BACK_IMG; p2Card.style.borderTop = '10px solid transparent';
     p1Res.innerText = ''; p2Res.innerText = '';
     
     if (window.myId === attackerId || window.myId === targetId) {
