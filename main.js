@@ -47,7 +47,6 @@ window.ensureModalsExist = function() {
         defModal.style.maxWidth = '400px';
         defModal.style.maxHeight = '80vh';
         defModal.style.boxSizing = 'border-box';
-        // ★ 動的生成時にも defense-desc を追加
         defModal.innerHTML = `
             <h3 id="defense-title" style="color:#ff5252; margin-top: 0;">攻撃を受けました！</h3>
             <div id="defense-desc" style="font-size: 12px; color: #ddd; background: rgba(0,0,0,0.5); padding: 8px; border-radius: 6px; margin-bottom: 10px; line-height: 1.4; text-align: left; white-space: pre-wrap;" class="hidden"></div>
@@ -67,11 +66,11 @@ window.ensureModalsExist = function() {
         `;
         document.body.appendChild(defModal);
     }
+    // ★ ペルソナ風のHTML構造で動的生成するように修正
     if (!document.getElementById('ability-cutin')) {
         const cutin = document.createElement('div');
         cutin.id = 'ability-cutin';
         cutin.className = 'hidden';
-        // ★ HTMLと同じく構造を変更
         cutin.innerHTML = `
             <div class="cutin-background"></div>
             <div class="cutin-content">
@@ -158,7 +157,6 @@ window.SE = {
 const unlockAudioContext = () => {
     if (window.SE.unlocked) return; window.SE.unlocked = true; window.SE.initContext();
     if (window.SE.audioCtx.state === 'suspended') window.SE.audioCtx.resume();
-    // ★ 'mvp_1', 'mvp_2' を追加
     ['win', 'draw', 'uno_message', 'buttonclick', 'uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6', 'frieze', 'rock', 'Distribute', 'mvp_1', 'mvp_2'].forEach(name => window.SE.loadSound(name, 'mp3'));
     ['fire', 'page'].forEach(name => window.SE.loadSound(name, 'wav'));
     ['hv/id_20(1)', 'hv/id_20(2)'].forEach(name => window.SE.loadSound(name, 'mov')); 
@@ -236,7 +234,6 @@ window.playOpponentAnimation = function(playerId, cards, callback) {
 };
 
 window.drawOpponentAnimation = function(playerId, count, callback) {
-    // ★ ここを Distribute に戻す
     if (window.SE) window.SE.playMultiple('Distribute', count, 500);
     const badge = document.querySelector(`.other-player-badge[data-id="${playerId}"]`);
     const deckEl = document.getElementById('deck-visual');
@@ -470,7 +467,6 @@ window.animateInitialDeal = function(targetHands, callback) {
         const round = Math.floor(dealIndex / playerIds.length);
         const pId = playerIds[pIdx];
 
-        // ★ 'draw' ではなく 'Distribute'
         if (window.SE) window.SE.play('Distribute'); 
 
         const dummyCard = document.createElement('div');
@@ -523,13 +519,13 @@ window.showAbilityCutin = function(cardValue, isHVActivated = false) {
     window.ensureModalsExist();
     const cutinEl = document.getElementById('ability-cutin');
     const cutinImg = document.getElementById('ability-cutin-img');
-    const cutinName = document.getElementById('ability-cutin-name'); // ★ 追加
+    const cutinName = document.getElementById('ability-cutin-name');
     const cutinText = document.getElementById('ability-cutin-text');
     if (!cutinEl || !cutinImg) return;
     
     cutinImg.src = `card/custom/${cardValue}.png`;
     
-    // ★ 名前と説明を両方セットする
+    // ★ 名前と説明をセット
     if (window.AbilityDef && window.AbilityDef[cardValue]) {
         if (cutinName) cutinName.innerText = window.AbilityDef[cardValue].name;
         if (cutinText) cutinText.innerText = window.AbilityDef[cardValue].desc;
@@ -547,7 +543,7 @@ window.showAbilityCutin = function(cardValue, isHVActivated = false) {
         if (window.SE) window.SE.play(`mvp_${randMvp}`);
     }
 
-    // ★ 表示時間を1秒(1000)から2秒(2000)に延長し、アニメーション待機時間を調整
+    // ★ 表示時間を2秒に延長してスライドアウト
     setTimeout(() => {
         cutinEl.classList.remove('show-cutin'); 
         cutinEl.classList.add('fade-out');
@@ -663,7 +659,7 @@ window.showDefenseModal = function(attackCardValue) {
     const modal = document.getElementById('defense-modal');
     const list = document.getElementById('defense-modal-list');
     const title = document.getElementById('defense-title');
-    const desc = document.getElementById('defense-desc'); // ★ 追加した要素
+    const desc = document.getElementById('defense-desc');
     const qArea = document.getElementById('defense-question-area');
     const sArea = document.getElementById('defense-select-area');
     const btnYes = document.getElementById('btn-defense-yes');
@@ -689,7 +685,6 @@ window.showDefenseModal = function(attackCardValue) {
     
     title.innerText = `攻撃を受けました！(${attackName})`;
     
-    // ★ 説明文をセットして表示
     if (desc) {
         if (attackDesc) {
             desc.innerText = attackDesc;
@@ -833,8 +828,7 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                         window.AbilityEngine.triggerDiscardEffect(targetId, 'id_4', false, null);
                     }
                 } else if (defCardId === 'id_9') {
-                    // ★修正：防御者（targetId）以外のプレイヤーに2ドローさせる
-                    window.game.players.filter(px => px.id !== targetId).forEach(px => {
+                    window.game.players.forEach(px => {
                         window.game.drawCard(px.id); window.game.drawCard(px.id);
                         if(window.isHost && window.socket) window.socket.emit('request_draw_animation', { playerId: px.id, count: 2 });
                     });
@@ -1349,7 +1343,6 @@ window.handlePlayAction = function() {
         alert(`${penaltyMsg} ペナルティとして ${penaltyCount}枚ドローします！`); 
         
         window.tryDrawWithAbility(() => {
-            // ★ エラー修正：'Distribute' を使用
             if (window.SE) window.SE.playMultiple('Distribute', penaltyCount, 500);
             CardAnimation.animateMultiDraw(penaltyCount, 'player-hand', () => {
                 window.game.selectedIndices = []; window.updateUI();
@@ -1391,7 +1384,7 @@ window.handlePlayAction = function() {
             if (def && cardValue === 'id_20' && sCol) {
                 const validIndices = [];
                 window.game.myHand.forEach((c, i) => {
-                    if (!indices.includes(i) && c.color === sCol) validIndices.push(i);
+                    if (!indices.includes(i) && i !== dIdx && c.color === sCol) validIndices.push(i);
                 });
                 if (validIndices.length > 0) {
                     window.openMultiDiscardSelection(window.game.myHand, validIndices, (selectedMulti) => {
@@ -1453,7 +1446,6 @@ document.getElementById('draw-btn').onclick = () => {
         window.isDrawing = true; window.game.hasDrawnThisTurn = true; window.updateUI();                    
         setTimeout(() => { window.isDrawing = false; }, 3000);
         const s = window.game.drawStack; const count = s > 0 ? s : 1;
-        // ★ エラー修正：'Distribute' を使用
         if (window.SE) window.SE.playMultiple('Distribute', count, 500);
         if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
             CardAnimation.animateMultiDraw(count, 'player-hand', () => {

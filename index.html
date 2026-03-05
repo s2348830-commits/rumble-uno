@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>自作UNO</title>
-    <link rel="stylesheet" href="style.css?v=20">
+    <link rel="stylesheet" href="style.css?v=21">
     <link rel="icon" href="data:,">
 </head>
 <body>
@@ -182,7 +182,7 @@
     <div class="ui-layout-top">
         <div id="status-message" style="font-size: 18px;">準備完了</div>
     </div>
-    
+
     <div id="circle-table">
         <svg id="direction-arrows" class="direction-arrows normal" viewBox="0 0 200 200">
             <defs>
@@ -241,7 +241,9 @@
                 </div>
             </div>
         </div>
-    </div> <div class="section hand-section" style="padding-top: 15px; margin-top: 15px; position: relative;">
+    </div>
+    
+    <div class="section hand-section" style="padding-top: 15px; margin-top: 15px; position: relative;">
         
         <div style="position: absolute; top: -15px; left: 5px; display: flex; flex-direction: row; gap: 10px; z-index: 10000;">
             <div id="btn-uno-auto" class="btn-chat-toggle" style="position: relative; padding: 4px 10px;">UNOオート: OFF</div>
@@ -279,9 +281,13 @@
 <div id="winner-banner"></div>
 
 <div id="ability-cutin" class="hidden">
-    <div style="position: relative; display: inline-block; text-align: center;">
+    <div class="cutin-background"></div>
+    <div class="cutin-content">
         <img id="ability-cutin-img" src="" alt="Ability">
-        <div id="ability-cutin-text" style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 8px 12px; border-radius: 8px; font-size: 14px; white-space: pre-wrap; width: 120%; text-align: center; border: 2px solid #4caf50;"></div>
+        <div class="cutin-text-container">
+            <h2 id="ability-cutin-name"></h2>
+            <p id="ability-cutin-text"></p>
+        </div>
     </div>
 </div>
 
@@ -320,15 +326,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <script src="https://unpkg.com/canvas-confetti@1.6.0/dist/confetti.browser.js"></script>
 <script src="/socket.io/socket.io.js"></script>
-<script src="rule.js?v=20"></script>
-<script src="ability.js?v=20"></script>
-<script src="animation.js?v=20"></script>
-<script src="renderer.js?v=20"></script>
-<script src="ruleui.js?v=20"></script>
-<script src="game.js?v=20"></script>
-<script src="bot.js?v=20"></script>
-<script src="chat.js?v=20"></script>
-<script src="main.js?v=20"></script>
-<script src="network.js?v=20"></script>
+<script src="rule.js?v=21"></script>
+<script src="ability.js?v=21"></script>
+<script src="animation.js?v=21"></script>
+<script src="renderer.js?v=21"></script>
+<script src="ruleui.js?v=21"></script>
+<script src="game.js?v=21"></script>
+<script src="bot.js?v=21"></script>
+<script src="chat.js?v=21"></script>
+<script src="main.js?v=21"></script>
+<script src="network.js?v=21"></script>
 </body>
 </html>
