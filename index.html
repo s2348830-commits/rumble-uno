@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>自作UNO</title>
-    <link rel="stylesheet" href="style.css?v=15">
+    <link rel="stylesheet" href="style.css?v=17">
     <link rel="icon" href="data:,">
 </head>
 <body>
@@ -49,7 +49,7 @@
 </div>
 
 <div id="lobby-screen" class="screen-container hidden">
-    <div id="btn-lobby-chat-toggle" class="floating-ui btn-chat-toggle chat-toggle-btn is-on" style="top: 20px; left: 20px;">Chat: ON</div>
+    <div id="btn-lobby-chat-toggle" class="btn-chat-toggle chat-toggle-btn is-on" style="position:fixed; top: 15px; left: 15px; z-index: 10000;">Chat: ON</div>
 
     <div class="lobby-box">
         <div class="volume-container lobby-volume">
@@ -73,6 +73,13 @@
             <button id="btn-ready" class="ready-btn hidden">準備完了</button>
             <button id="btn-start" class="start-btn hidden" disabled>開始</button>
             <button id="btn-disband-room" class="control-btn hidden" style="background:#d32f2f;">ルーム解散</button>
+            
+            <div id="lobby-chat-container" style="margin-top: 15px;">
+                <div style="display: flex; gap: 5px; justify-content: center;">
+                    <input type="text" id="lobby-chat-input" placeholder="チャットを入力..." maxlength="50" style="flex-grow: 1; padding: 8px 12px; border-radius: 15px; border: 1px solid #555; background: rgba(255,255,255,0.9); font-size: 13px; color: #000; pointer-events: auto;">
+                    <button id="btn-lobby-chat-send" style="background: #4caf50; color: white; border: none; border-radius: 15px; padding: 8px 16px; cursor: pointer; font-weight: bold; font-size: 13px; white-space: nowrap; pointer-events: auto;">送信</button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -172,6 +179,11 @@
     <div class="ui-layout-top">
         <div id="status-message" style="font-size: 18px;">準備完了</div>
     </div>
+
+    <div class="left-side-buttons" style="position: fixed; top: 50%; left: 5px; transform: translateY(-50%); display: flex; flex-direction: column; gap: 15px; z-index: 10000;">
+        <div id="btn-uno-auto" class="btn-chat-toggle" style="position: relative; top: 0; left: 0;">UNOオート: OFF</div>
+        <div id="btn-game-chat-toggle" class="btn-chat-toggle chat-toggle-btn is-on" style="position: relative; top: 0; left: 0;">Chat: ON</div>
+    </div>
     
     <div id="circle-table">
         <svg id="direction-arrows" class="direction-arrows normal" viewBox="0 0 200 200">
@@ -205,9 +217,6 @@
                 <path d="M 190 100 A 90 90 0 0 0 100 10" fill="none" stroke="#03a9f4" stroke-width="4" marker-end="url(#arrow-blue)" />
             </g>
         </svg>
-
-        <div id="btn-uno-auto" class="floating-ui btn-uno-auto">UNOオート: OFF</div>
-        <div id="btn-game-chat-toggle" class="floating-ui btn-chat-toggle chat-toggle-btn is-on" style="top: 35px; left: -10px;">Chat: ON</div>
 
         <div id="uno-area" class="floating-ui">
             <button id="uno-btn" class="hidden">UNO!!</button>
@@ -247,6 +256,7 @@
 </div>
 
 <div id="chat-log-container" class="hidden"></div>
+
 <div id="chat-input-area" class="chat-input-area hidden">
     <input type="text" id="chat-input" placeholder="チャットを入力..." maxlength="50">
     <button id="btn-chat-send">送信</button>
@@ -273,17 +283,48 @@
 
 <div id="ability-info" class="hidden"></div>
 
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const lInput = document.getElementById('lobby-chat-input');
+    const lBtn = document.getElementById('btn-lobby-chat-send');
+    const sendLobbyMsg = () => {
+        if (!lInput) return;
+        const msg = lInput.value.trim();
+        if (msg && window.socket && window.currentRoomState) {
+            window.socket.emit('send_chat', { roomId: window.currentRoomState.id, message: msg, senderName: window.myData ? window.myData.name : 'Unknown' });
+            lInput.value = '';
+        }
+    };
+    if (lBtn) lBtn.onclick = sendLobbyMsg;
+    if (lInput) lInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendLobbyMsg(); });
+
+    const lobbyToggle = document.getElementById('btn-lobby-chat-toggle');
+    const lobbyChatContainer = document.getElementById('lobby-chat-container');
+    if (lobbyToggle && lobbyChatContainer) {
+        lobbyToggle.addEventListener('click', () => {
+            setTimeout(() => {
+                if (window.ChatManager && window.ChatManager.enabled) {
+                    lobbyChatContainer.style.display = 'block';
+                } else {
+                    lobbyChatContainer.style.display = 'none';
+                }
+            }, 50);
+        });
+    }
+});
+</script>
+
 <script src="https://unpkg.com/canvas-confetti@1.6.0/dist/confetti.browser.js"></script>
 <script src="/socket.io/socket.io.js"></script>
-<script src="rule.js?v=15"></script>
-<script src="ability.js?v=15"></script>
-<script src="animation.js?v=15"></script>
-<script src="renderer.js?v=15"></script>
-<script src="ruleui.js?v=15"></script>
-<script src="game.js?v=15"></script>
-<script src="bot.js?v=15"></script>
-<script src="chat.js?v=15"></script>
-<script src="main.js?v=15"></script>
-<script src="network.js?v=15"></script>
+<script src="rule.js?v=17"></script>
+<script src="ability.js?v=17"></script>
+<script src="animation.js?v=17"></script>
+<script src="renderer.js?v=17"></script>
+<script src="ruleui.js?v=17"></script>
+<script src="game.js?v=17"></script>
+<script src="bot.js?v=17"></script>
+<script src="chat.js?v=17"></script>
+<script src="main.js?v=17"></script>
+<script src="network.js?v=17"></script>
 </body>
 </html>

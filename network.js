@@ -177,6 +177,8 @@ window.socket.on('room_joined', (data) => {
     if(data.state && data.state.gameStarted) {
         lobbyScreen.classList.add('hidden');
         gameContainer.classList.remove('hidden');
+        const manualBtn = document.getElementById('btn-manual');
+        if (manualBtn) manualBtn.classList.add('hidden');
         if (window.game) window.game.setup(data.state.slots, window.myId);
         window.socket.emit('request_sync_state');
     } else {
@@ -280,8 +282,18 @@ function renderSlots(roomState) {
 
 btnAddSlot.addEventListener('click', () => window.socket.emit('add_slot'));
 btnReady.addEventListener('click', () => window.socket.emit('toggle_ready', { roomId: window.currentRoomState.id, userId: window.clientUserId }));
-if (closeSettingsBtn) closeSettingsBtn.onclick = () => startOverlay.classList.add('hidden');
-btnSettings.addEventListener('click', () => startOverlay.classList.remove('hidden'));
+
+// ★ ゲーム設定を開いている時はチャット入力欄を隠す
+btnSettings.addEventListener('click', () => {
+    startOverlay.classList.remove('hidden');
+    const cia = document.getElementById('chat-input-area');
+    if (cia) cia.classList.add('hidden');
+});
+if (closeSettingsBtn) closeSettingsBtn.onclick = () => {
+    startOverlay.classList.add('hidden');
+    const cia = document.getElementById('chat-input-area');
+    if (cia && window.ChatManager && window.ChatManager.enabled) cia.classList.remove('hidden');
+};
 
 window.sendSettingsUpdate = () => { if (window.isHost) window.socket.emit('update_settings', window.RuleSettings); };
 
@@ -296,6 +308,14 @@ window.socket.on('game_started', (roomState) => {
     window.currentRoomState = roomState;
     window.isInitialDealing = true; 
     lobbyScreen.classList.add('hidden'); startOverlay.classList.add('hidden'); gameContainer.classList.remove('hidden');
+    
+    // ★ 説明書ボタンを隠す
+    const manualBtn = document.getElementById('btn-manual');
+    if (manualBtn) manualBtn.classList.add('hidden');
+
+    const cia = document.getElementById('chat-input-area');
+    if (cia && window.ChatManager && window.ChatManager.enabled) cia.classList.remove('hidden');
+    
     if (window.game) window.game.setup(roomState.slots, window.myId);
     window.isGameOver = false; 
     if (window.isHost) { 
@@ -418,6 +438,13 @@ window.socket.on('back_to_lobby', (roomState) => {
     document.getElementById('winner-banner').classList.remove('show');
     document.getElementById('draw-curtain').classList.remove('show');
     gameContainer.classList.add('hidden'); lobbyScreen.classList.remove('hidden');
+    
+    // ★ 説明書ボタンを再表示
+    const manualBtn = document.getElementById('btn-manual');
+    if (manualBtn) manualBtn.classList.remove('hidden');
+
+    const cia = document.getElementById('chat-input-area');
+    if (cia && window.ChatManager && window.ChatManager.enabled) cia.classList.remove('hidden');
     renderSlots(roomState);
 });
 
@@ -473,7 +500,6 @@ window.socket.on('receive_player_action', (data) => {
     }
 });
 
-// ★ 追加: play_animation に isHV フラグの受信対応
 window.socket.on('play_animation', (data) => {
     if (data.playerId !== window.myId) {
         if (typeof window.playOpponentAnimation === 'function') window.playOpponentAnimation(data.playerId, data.cards);

@@ -86,9 +86,7 @@ class UNOGame {
         oldCardValues.forEach(val => {
             const idx = hand.findIndex(c => c.value === val);
             if (idx > -1) {
-                // ★能力カードは山札に戻さず捨てるだけに変更
                 hand.splice(idx, 1);
-                
                 const available = window.RuleSettings.customCards;
                 if (available && available.length > 0) {
                     const newVal = available[Math.floor(Math.random() * available.length)];
@@ -108,7 +106,7 @@ class UNOGame {
             }
         }
 
-        this.turnIndex = (this.turnIndex + (this.direction * skipCount) + this.players.length) % this.players.length;
+        this.turnIndex = (this.turnIndex + (this.direction * skipCount) + this.players.length * 10) % this.players.length;
         this.hasDrawnThisTurn = false;
         this.selectedIndices = [];
 
@@ -182,11 +180,15 @@ class UNOGame {
             const actionCount = selectedCards.length;
 
             if (lastCard.value === 'Skip') {
-                this.nextTurn(1 + actionCount);
+                if (this.players.length === 2) {
+                    this.nextTurn(actionCount * 2); // 2人プレイなら何枚出しても自分のターン
+                } else {
+                    this.nextTurn(1 + actionCount);
+                }
             }
             else if (lastCard.value === 'Reverse') {
                 if (this.players.length === 2) {
-                    this.nextTurn(1 + actionCount);
+                    this.nextTurn(actionCount * 2); // 2人プレイのReverseはSkip扱い
                 } else {
                     if (actionCount % 2 !== 0) this.direction *= -1;
                     this.nextTurn(1);
@@ -211,7 +213,6 @@ class UNOGame {
             const top = this.discardPile.pop();
             const topRot = this.discardRotations.pop();
 
-            // ★能力カードを捨て札に残し、通常カードだけを山札に戻す処理
             const newDeck = [];
             const newDiscardPile = [];
             const newDiscardRotations = [];

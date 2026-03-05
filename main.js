@@ -1121,7 +1121,12 @@ window.executePlay = function(playerId, indices, isBot = false) {
 
         if (result.needsColor) {
             if (isDrawAttack) {
-                window.pendingDrawDefenseInfo = { attackerId: playerId, cardValue: attackCardVal };
+                // ★ 能力カードなし設定のときは防御フェーズをスキップして即処理
+                if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length === 0) {
+                    // 何もしない（防御フェーズを経由せず、直接次のターンへ）
+                } else {
+                    window.pendingDrawDefenseInfo = { attackerId: playerId, cardValue: attackCardVal };
+                }
             }
             if (isBot) { 
                 window.game.currentColor = ['red', 'blue', 'green', 'yellow'][Math.floor(Math.random() * 4)]; 
@@ -1141,7 +1146,12 @@ window.executePlay = function(playerId, indices, isBot = false) {
             if (isDrawAttack) {
                 targetId = window.game.currentPlayer.id;
                 guides.push({ from: playerId, to: targetId, text: attackCardVal });
-                window.startDrawDefensePhase(playerId, targetId, attackCardVal, guides);
+                if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length > 0) {
+                    window.startDrawDefensePhase(playerId, targetId, attackCardVal, guides);
+                } else {
+                    window.broadcastGameState(false, guides);
+                    window.checkTurn(); 
+                }
             } else {
                 window.broadcastGameState(false, guides);
                 window.checkTurn(); 
@@ -1165,7 +1175,12 @@ window.executeColor = function(playerId, color) {
     if (info) {
         const targetId = window.game.currentPlayer.id;
         const guides = [{ from: info.attackerId, to: targetId, text: info.cardValue }];
-        window.startDrawDefensePhase(info.attackerId, targetId, info.cardValue, guides);
+        if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length > 0) {
+            window.startDrawDefensePhase(info.attackerId, targetId, info.cardValue, guides);
+        } else {
+            window.broadcastGameState(false, guides);
+            window.checkTurn();
+        }
     } else {
         window.checkTurn();
     }

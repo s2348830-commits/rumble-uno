@@ -120,7 +120,6 @@ const Renderer = {
     },
 
     applyFanStyle: function(element, index, total) {
-        // ★ 15枚を超えたら扇状を解除し、横並び（スクロール）にする
         if (total > 15) { 
             element.style.setProperty('--fan-rot', `0deg`); 
             element.style.setProperty('--fan-y', `0px`); 
@@ -155,7 +154,6 @@ const Renderer = {
             if (game.selectedIndices.includes(i)) div.classList.add('selected');
             else if (canSuggest && card.value === selectedValue) div.classList.add('suggested');
 
-            // ★ 自分のターン以外でもカードをタップして浮かせる(選択状態にする)ことは可能にする
             div.onclick = (e) => {
                 e.stopPropagation();
                 game.toggleSelect(i); this.updateAll(game); 
@@ -275,7 +273,19 @@ const Renderer = {
         const imgMap = { 'Wild': 'card/wild.png', 'Wild+4': 'card/+4.png', 'Reverse': 'card/reverse.png', 'Skip': 'card/skip.png' };
         const displayValue = this.getDisplayValue(card.value);
 
-        if (card.lockedTurns && card.lockedTurns > 0) div.classList.add('locked');
+        if (card.lockedTurns && card.lockedTurns > 0) {
+            div.classList.add('locked');
+            // ★ 追加：ロックの黄色エフェクト
+            const lockOverlay = document.createElement('div');
+            lockOverlay.style.position = 'absolute';
+            lockOverlay.style.top = '0'; lockOverlay.style.left = '0';
+            lockOverlay.style.width = '100%'; lockOverlay.style.height = '100%';
+            lockOverlay.style.background = 'rgba(255, 215, 0, 0.4)';
+            lockOverlay.style.boxShadow = 'inset 0 0 10px #ffd700';
+            lockOverlay.style.zIndex = '40';
+            lockOverlay.style.pointerEvents = 'none';
+            div.appendChild(lockOverlay);
+        }
 
         const me = window.game ? window.game.players.find(p => p.id === window.game.myId) : null;
         const isFrozen = me && me.frozen;
