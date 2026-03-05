@@ -153,9 +153,12 @@ window.socket.on('room_joined', (data) => {
     lobbyScreen.classList.remove('hidden');
     document.getElementById('display-room-id').innerText = data.roomId;
 
-    // ★ チャットの二重表示対策：ロビー時はバトルチャットを隠す
+    // ★ チャットの二重表示対策：ロビー時はバトルチャットを強制非表示
     const cia = document.getElementById('chat-input-area');
-    if (cia) cia.classList.add('hidden'); 
+    if (cia) {
+        cia.style.display = 'none';
+        cia.classList.add('hidden');
+    }
 
     const lcia = document.getElementById('lobby-chat-container');
     if (window.ChatManager && window.ChatManager.enabled) {
@@ -314,8 +317,12 @@ window.socket.on('game_started', (roomState) => {
     const manualBtn = document.getElementById('btn-manual');
     if (manualBtn) manualBtn.classList.add('hidden');
 
+    // ★ ゲーム開始時にバトルチャットを表示する
     const cia = document.getElementById('chat-input-area');
-    if (cia && window.ChatManager && window.ChatManager.enabled) cia.classList.remove('hidden');
+    if (cia && window.ChatManager && window.ChatManager.enabled) {
+        cia.style.display = 'flex';
+        cia.classList.remove('hidden');
+    }
     
     const lcia = document.getElementById('lobby-chat-container');
     if (lcia) lcia.style.display = 'none';
@@ -337,6 +344,7 @@ window.socket.on('request_ability_reset', (data) => {
     window.broadcastGameState(true);
 });
 
+// ★ サーバーからの通信でじゃんけんのUIを同期する処理
 window.socket.on('update_game_state', (state) => {
     if (!window.game) return;
     window.game.deck = state.deck; 
@@ -411,7 +419,7 @@ window.socket.on('update_game_state', (state) => {
         if (discModal) discModal.classList.add('hidden');
     }
 
-    // ★ じゃんけんの同期（他のプレイヤーにも見えるように）
+    // ★ じゃんけんの同期処理
     if (state.jankenPhase) {
         if (!window.isJankenShowing) {
             window.showJankenUI(state.jankenPhase.attackerId, state.jankenPhase.targetId, state.jankenPhase.loopCount);
@@ -485,7 +493,10 @@ window.socket.on('back_to_lobby', (roomState) => {
     if (manualBtn) manualBtn.classList.remove('hidden');
 
     const cia = document.getElementById('chat-input-area');
-    if (cia) cia.classList.add('hidden');
+    if (cia) {
+        cia.style.display = 'none';
+        cia.classList.add('hidden');
+    }
     
     const lcia = document.getElementById('lobby-chat-container');
     if (lcia && window.ChatManager && window.ChatManager.enabled) lcia.style.display = 'block';
