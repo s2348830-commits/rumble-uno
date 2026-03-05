@@ -10,6 +10,7 @@ window.isInitialDealing = false;
 window.isDefending = false; 
 
 window.pendingDrawDefenseInfo = null; 
+window.pendingJanken = null;
 
 window.ensureModalsExist = function() {
     if (!document.getElementById('target-modal')) {
@@ -36,6 +37,33 @@ window.ensureModalsExist = function() {
             <button id="btn-multi-discard-confirm" style="margin-top:15px; padding:8px 15px; background:#4caf50; color:white; border:none; border-radius:8px; cursor:pointer;">確定</button>
         `;
         document.body.appendChild(multiDiscardModal);
+    }
+    if (!document.getElementById('graveyard-modal')) {
+        const gyModal = document.createElement('div');
+        gyModal.id = 'graveyard-modal';
+        gyModal.className = 'action-popup hidden';
+        gyModal.innerHTML = `
+            <h3 style="margin-top:0;">墓地からカードを1枚回収(SSR以下)</h3>
+            <div id="graveyard-list" class="action-popup-grid" style="overflow-x:auto; flex-wrap:nowrap; max-width:90vw; gap:5px;"></div>
+            <button id="btn-cancel-graveyard" style="margin-top:15px; padding:8px 15px; background:#777; color:white; border:none; border-radius:8px; cursor:pointer;">キャンセル</button>
+        `;
+        document.body.appendChild(gyModal);
+        document.getElementById('btn-cancel-graveyard').onclick = () => {
+            gyModal.classList.add('hidden');
+        };
+    }
+    if (!document.getElementById('debuff-modal')) {
+        const dbModal = document.createElement('div');
+        dbModal.id = 'debuff-modal';
+        dbModal.className = 'action-popup hidden';
+        dbModal.innerHTML = `
+            <h3 style="margin-top:0;">解除するデバフを選択</h3>
+            <div style="display:flex; justify-content:center; gap:20px;">
+                <button id="btn-debuff-freeze" style="font-size:24px; padding:10px; border-radius:10px; background:#00bfff; cursor:pointer;">❄️凍結</button>
+                <button id="btn-debuff-burn" style="font-size:24px; padding:10px; border-radius:10px; background:#ff4500; cursor:pointer;">🔥燃焼</button>
+            </div>
+        `;
+        document.body.appendChild(dbModal);
     }
     let defModal = document.getElementById('defense-modal');
     if (!defModal || !document.getElementById('defense-question-area')) {
@@ -197,7 +225,10 @@ window.checkFinalSprint = function() {
 
 window.broadcastGameState = function(skipUIUpdate = false, attackGuides = []) {
     if (!window.isHost) return;
-    const playersInfo = window.game.players.map(p => ({ id: p.id, connected: p.connected, frozen: p.frozen, burnTurns: p.burnTurns }));
+    const playersInfo = window.game.players.map(p => ({ 
+        id: p.id, connected: p.connected, frozen: p.frozen, burnTurns: p.burnTurns, 
+        invincibleTurns: p.invincibleTurns, shield: p.shield 
+    }));
     const state = {
         deck: window.game.deck, turnIndex: window.game.turnIndex, direction: window.game.direction,
         hands: window.game.hands, discardPile: window.game.discardPile, discardRotations: window.game.discardRotations,
@@ -205,7 +236,8 @@ window.broadcastGameState = function(skipUIUpdate = false, attackGuides = []) {
         hasDrawnThisTurn: window.game.hasDrawnThisTurn,
         defensePhase: window.pendingDefense ? window.pendingDefense.info : null,
         defenseTimer: window.pendingDefense ? window.pendingDefense.timer : 0,
-        attackGuides: attackGuides
+        attackGuides: attackGuides,
+        abilityGraveyard: window.game.abilityGraveyard
     };
     if (window.socket) window.socket.emit('sync_game_state', state);
     if (!skipUIUpdate) window.updateUI();
@@ -652,6 +684,48 @@ window.openMultiDiscardSelection = function(hand, validIndices, callback) {
     modal.classList.remove('hidden');
 };
 
+window.openGraveyardSelection = function(callback) {
+    window.ensureModalsExist();
+    const list = window.game.abilityGraveyard.filter(id => {
+        const def = window.AbilityDef[id];
+        return def && def.rarity !== 'UR';
+    });
+    
+    if (list.length === 0) {
+        alert("墓地にSSR以下の能力カードがありません！");
+        callback(null);
+        return;
+    }
+    
+    const modal = document.getElementById('graveyard-modal');
+    const container = document.getElementById('graveyard-list');
+    container.innerHTML = '';
+    
+    list.forEach(id => {
+        const btn = document.createElement('img');
+        btn.src = `card/custom/${id}.png`;
+        btn.style.width = '60px'; btn.style.cursor = 'pointer';
+        btn.onclick = () => {
+            modal.classList.add('hidden');
+            callback(id);
+        };
+        container.appendChild(btn);
+    });
+    modal.classList.remove('hidden');
+};
+
+window.openDebuffSelection = function(callback) {
+    window.ensureModalsExist();
+    const modal = document.getElementById('debuff-modal');
+    const btnFreeze = document.getElementById('btn-debuff-freeze');
+    const btnBurn = document.getElementById('btn-debuff-burn');
+    
+    btnFreeze.onclick = () => { modal.classList.add('hidden'); callback('frozen'); };
+    btnBurn.onclick = () => { modal.classList.add('hidden'); callback('burn'); };
+    
+    modal.classList.remove('hidden');
+};
+
 window.showDefenseModal = function(attackCardValue) {
     window.ensureModalsExist();
     const modal = document.getElementById('defense-modal');
@@ -817,7 +891,7 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                     window.game.discardRotations.push(0);
                     if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: targetId, cards: [playedDefCard] });
                     
-                    if (targetId !== window.game.myId && typeof window.showAbilityCutin === 'function' && String(defCardId).startsWith('id_')) {
+                    if (typeof window.showAbilityCutin === 'function' && String(defCardId).startsWith('id_')) {
                         window.showAbilityCutin(defCardId);
                     }
 
@@ -828,29 +902,26 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                 const def = window.AbilityDef[defCardId];
                 if (defCardId === 'id_2' || defCardId === 'id_18') {
                     window.game.players.filter(px => px.id !== targetId).forEach(px => {
-                        window.game.drawCard(px.id);
-                        if(window.isHost && window.socket) window.socket.emit('request_draw_animation', { playerId: px.id, count: 1 });
+                        window.AbilityEngine.applyDraw(window.game, px.id, 1);
                     });
                 } else if (defCardId === 'id_4') {
                     if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) {
-                        window.AbilityEngine.triggerDiscardEffect(targetId, 'id_4', false, null);
+                        window.AbilityEngine.triggerDiscardEffect(window.game, targetId, 'id_4', false, null);
                     }
                 } else if (defCardId === 'id_9') {
                     window.game.players.filter(px => px.id !== targetId).forEach(px => {
-                        window.game.drawCard(px.id); window.game.drawCard(px.id);
-                        if(window.isHost && window.socket) window.socket.emit('request_draw_animation', { playerId: px.id, count: 2 });
+                        window.AbilityEngine.applyDraw(window.game, px.id, 2);
                     });
                 } else if (defCardId === 'id_17' || defCardId === 'id_19') {
                     if (actualDefDiscardIdx !== null && window.game.hands[targetId] && window.game.hands[targetId].length > actualDefDiscardIdx) {
                         const discCard = window.game.hands[targetId].splice(actualDefDiscardIdx, 1)[0];
                         if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: targetId, cards: [discCard] });
                         if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) {
-                            window.AbilityEngine.triggerDiscardEffect(targetId, discCard.value, true, discCard);
+                            window.AbilityEngine.triggerDiscardEffect(window.game, targetId, discCard.value, true, discCard);
                         }
                     }
                     if (defCardId === 'id_19') {
-                        window.game.drawCard(attackerId);
-                        if(window.isHost && window.socket) window.socket.emit('request_draw_animation', { playerId: attackerId, count: 1 });
+                        window.AbilityEngine.applyDraw(window.game, attackerId, 1);
                         defenseGuides.push({ from: targetId, to: attackerId, text: 'ヴィンディ' });
                     }
                 }
@@ -875,7 +946,7 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
     }, 1000);
 };
 
-window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, selectedColor = null, multiDiscardIndices = []) {
+window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, selectedColor = null, multiDiscardIndices = [], extraData = {}) {
     if (!window.isHost) return;
     const hand = window.game.hands[playerId];
     if (!hand || !hand[indices[0]]) return; 
@@ -887,6 +958,11 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
 
     if (!def) {
         window.executePlay(playerId, indices, false);
+        return;
+    }
+
+    if (cardValue === 'id_26') {
+        window.startJankenPhase(playerId, 0);
         return;
     }
 
@@ -903,7 +979,10 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
 
     playedCards.forEach(c => {
         const isAb = c.value && String(c.value).startsWith('id_');
-        if (!isAb) {
+        if (isAb) {
+            if(!window.game.abilityGraveyard) window.game.abilityGraveyard = [];
+            window.game.abilityGraveyard.push(c.value);
+        } else {
             window.game.discardPile.push(c); 
             window.game.discardRotations.push(0);
         }
@@ -912,8 +991,8 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
     if (def.type === 'AT' || def.type === 'AT_BL' || def.type === 'HV') {
         let targets = [];
         if (def.needsTarget && targetId) targets = [targetId];
-        else if (cardValue === 'id_6' || cardValue === 'id_9' || cardValue === 'id_2') targets = window.game.players.filter(p=>p.id!==playerId).map(p=>p.id);
-        else if (cardValue === 'id_14' || cardValue === 'id_13') {
+        else if (['id_2', 'id_6', 'id_9', 'id_11'].includes(cardValue)) targets = window.game.players.filter(p=>p.id!==playerId).map(p=>p.id);
+        else if (['id_13', 'id_14', 'id_24', 'id_28'].includes(cardValue)) {
             const others = window.game.players.filter(p=>p.id!==playerId);
             if(others.length > 0) targets = [others[Math.floor(Math.random()*others.length)].id];
         } else if (cardValue === 'id_5' || cardValue === 'id_20') {
@@ -921,35 +1000,56 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
         }
         
         let responses = {};
-        targets.forEach(tid => {
-            const p = window.game.players.find(p=>p.id===tid);
-            if(p && p.type==='bot') {
-                const bHand = window.game.hands[tid];
-                let hasDef = false;
-                if(bHand && def.type !== 'HV' && cardValue !== 'id_5' && cardValue !== 'id_20') {
-                    const blIdx = bHand.findIndex(c => c.value && window.AbilityDef && window.AbilityDef[c.value] && window.AbilityDef[c.value].type.includes('BL'));
-                    if (blIdx > -1) {
-                        const blCard = bHand[blIdx];
-                        let bDiscard = null;
-                        const bDef = window.AbilityDef[blCard.value];
-                        if(bDef.needsDiscard) {
-                            const nonAb = bHand.findIndex((c, i) => i !== blIdx && !(c.value && String(c.value).startsWith('id_')));
-                            bDiscard = nonAb > -1 ? nonAb : (bHand.length > 1 ? bHand.findIndex((c, i) => i !== blIdx) : null);
-                        } else if (bDef.needsAbilityDiscard) {
-                            const ab = bHand.findIndex((c, i) => i !== blIdx && (c.value && String(c.value).startsWith('id_')));
-                            bDiscard = ab > -1 ? ab : null;
+        let needsDefense = false;
+        
+        if (cardValue !== 'id_28') { 
+            targets.forEach(tid => {
+                const p = window.game.players.find(px=>px.id===tid);
+                if(p && p.type==='bot') {
+                    const bHand = window.game.hands[tid];
+                    let hasDef = false;
+                    if(bHand && def.type !== 'HV' && cardValue !== 'id_5' && cardValue !== 'id_20') {
+                        const blIdx = bHand.findIndex(c => c.value && window.AbilityDef && window.AbilityDef[c.value] && window.AbilityDef[c.value].type.includes('BL'));
+                        if (blIdx > -1) {
+                            const blCard = bHand[blIdx];
+                            let bDiscard = null;
+                            const bDef = window.AbilityDef[blCard.value];
+                            if(bDef.needsDiscard) {
+                                const nonAb = bHand.findIndex((c, i) => i !== blIdx && !(c.value && String(c.value).startsWith('id_')));
+                                bDiscard = nonAb > -1 ? nonAb : (bHand.length > 1 ? bHand.findIndex((c, i) => i !== blIdx) : null);
+                            } else if (bDef.needsAbilityDiscard) {
+                                const ab = bHand.findIndex((c, i) => i !== blIdx && (c.value && String(c.value).startsWith('id_')));
+                                bDiscard = ab > -1 ? ab : null;
+                            }
+                            responses[tid] = { cardValue: blCard.value, discardIdx: bDiscard };
+                            hasDef = true;
                         }
-                        responses[tid] = { cardValue: blCard.value, discardIdx: bDiscard };
-                        hasDef = true;
                     }
+                    if(!hasDef) responses[tid] = { cardValue: null, discardIdx: null };
+                } else if (p && p.type === 'player' && !p.connected) {
+                    responses[tid] = { cardValue: null, discardIdx: null };
+                } else if (def.type === 'HV' || cardValue === 'id_5' || cardValue === 'id_20') {
+                    responses[tid] = { cardValue: null, discardIdx: null }; 
+                } else {
+                    needsDefense = true;
                 }
-                if(!hasDef) responses[tid] = { cardValue: null, discardIdx: null };
-            } else if (p && p.type === 'player' && !p.connected) {
-                responses[tid] = { cardValue: null, discardIdx: null };
-            } else if (def.type === 'HV' || cardValue === 'id_5' || cardValue === 'id_20') {
-                responses[tid] = { cardValue: null, discardIdx: null }; 
-            }
-        });
+            });
+        }
+
+        if (cardValue === 'id_28' || !needsDefense) {
+            let guides = [];
+            if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, responses, multiplier, selectedColor, multiCards, extraData);
+            window.broadcastGameState(false, guides);
+
+            let someoneWon = false;
+            window.game.players.forEach(p => {
+                if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) {
+                    window.checkWin(p.id); someoneWon = true;
+                }
+            });
+            if (!someoneWon) setTimeout(() => window.checkTurn(), 500);
+            return;
+        }
 
         window.pendingDefense = { 
             timer: 30, 
@@ -975,7 +1075,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                 window.pendingDefense = null;
                 
                 let guides = [];
-                if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, finalResponses, multiplier, selectedColor, multiCards);
+                if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, finalResponses, multiplier, selectedColor, multiCards, extraData);
                 window.broadcastGameState(false, guides);
 
                 let someoneWon = false;
@@ -993,7 +1093,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
         }, 1000);
     } else {
         let guides = [];
-        if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, {}, multiplier, selectedColor, multiCards);
+        if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, {}, multiplier, selectedColor, multiCards, extraData);
         window.broadcastGameState(false, guides);
 
         let someoneWon = false;
@@ -1006,6 +1106,202 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
         if (!someoneWon) setTimeout(() => window.checkTurn(), 500);
     }
 };
+
+window.startJankenPhase = function(attackerId, loopCount) {
+    const others = window.game.players.filter(p => p.id !== attackerId && p.connected);
+    if (others.length === 0) {
+        window.checkTurn();
+        return;
+    }
+    const targetId = others[Math.floor(Math.random() * others.length)].id;
+    
+    window.pendingJanken = {
+        attackerId, targetId, loopCount,
+        attackerHand: null, targetHand: null,
+        timer: 10
+    };
+
+    window.socket.emit('player_action', { action: 'start_janken', attackerId, targetId, loopCount });
+
+    window.jankenInterval = setInterval(() => {
+        if (!window.pendingJanken) {
+            clearInterval(window.jankenInterval);
+            return;
+        }
+        window.pendingJanken.timer--;
+        if (window.pendingJanken.timer <= 0) {
+            clearInterval(window.jankenInterval);
+            if (!window.pendingJanken.attackerHand) window.pendingJanken.attackerHand = Math.floor(Math.random()*3)+1;
+            if (!window.pendingJanken.targetHand) window.pendingJanken.targetHand = Math.floor(Math.random()*3)+1;
+            window.resolveJanken();
+        } else {
+            [attackerId, targetId].forEach(id => {
+                const p = window.game.players.find(px => px.id === id);
+                if (p && p.type === 'bot' && !window.pendingJanken[(id===attackerId?'attackerHand':'targetHand')]) {
+                    if (window.pendingJanken.timer === 8) {
+                        window.pendingJanken[(id===attackerId?'attackerHand':'targetHand')] = Math.floor(Math.random()*3)+1;
+                        window.checkJankenReady();
+                    }
+                }
+            });
+        }
+    }, 1000);
+};
+
+window.checkJankenReady = function() {
+    if (window.pendingJanken && window.pendingJanken.attackerHand && window.pendingJanken.targetHand) {
+        clearInterval(window.jankenInterval);
+        window.resolveJanken();
+    }
+};
+
+window.resolveJanken = function() {
+    const pJ = window.pendingJanken;
+    window.pendingJanken = null;
+    const aH = pJ.attackerHand;
+    const tH = pJ.targetHand;
+    
+    let result = 'draw';
+    if (aH === tH) result = 'draw';
+    else if ((aH===1 && tH===2) || (aH===2 && tH===3) || (aH===3 && tH===1)) result = 'win';
+    else result = 'lose';
+
+    window.socket.emit('player_action', { action: 'janken_result', attackerId: pJ.attackerId, targetId: pJ.targetId, aH, tH, result, loopCount: pJ.loopCount });
+    
+    setTimeout(() => {
+        let drawCount = 0;
+        if (pJ.loopCount === 0) {
+            drawCount = 2; 
+        } else if (result === 'win') {
+            drawCount = 2; 
+        }
+        
+        if (drawCount > 0) {
+            window.AbilityEngine.applyDraw(window.game, pJ.targetId, drawCount, false);
+            window.broadcastGameState();
+        }
+
+        if (result === 'win' && pJ.loopCount < 3) {
+            window.startJankenPhase(pJ.attackerId, pJ.loopCount + 1);
+        } else {
+            window.checkTurn();
+        }
+    }, 5000); 
+};
+
+window.showJankenUI = function(attackerId, targetId, loopCount) {
+    if (!document.getElementById('janken-overlay')) {
+        const div = document.createElement('div');
+        div.id = 'janken-overlay';
+        div.className = 'hidden';
+        div.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); z-index:110000; display:flex; flex-direction:column; justify-content:center; align-items:center;";
+        div.innerHTML = `
+            <h2 id="janken-title" style="color:white; font-style:italic;">じゃんけん 勝負！</h2>
+            <div style="color:#fbc02d; font-size:24px; font-weight:bold; margin-bottom:20px;"><span id="janken-timer">10</span>秒</div>
+            <div style="display:flex; gap:50px; align-items:center; margin-bottom:30px;">
+                <div id="janken-player1" style="text-align:center; color:white;">
+                    <div id="janken-p1-result" style="font-size:24px; font-weight:bold; height:35px; text-shadow: 2px 2px 4px #000;"></div>
+                    <div id="janken-p1-name" style="margin-bottom:10px; font-weight:bold;">Player1</div>
+                    <img id="janken-p1-card" src="card/back.png" style="width:80px; border-radius:10px; transition:0.3s;">
+                </div>
+                <div style="color:white; font-size:30px; font-weight:bold; font-style:italic;">VS</div>
+                <div id="janken-player2" style="text-align:center; color:white;">
+                    <div id="janken-p2-result" style="font-size:24px; font-weight:bold; height:35px; text-shadow: 2px 2px 4px #000;"></div>
+                    <div id="janken-p2-name" style="margin-bottom:10px; font-weight:bold;">Player2</div>
+                    <img id="janken-p2-card" src="card/back.png" style="width:80px; border-radius:10px; transition:0.3s;">
+                </div>
+            </div>
+            <div id="janken-controls" style="display:flex; gap:15px;">
+                <button class="janken-btn" data-hand="1" style="background:none; border:none; cursor:pointer; transition:transform 0.2s;"><img src="card/custom/jyanken1.png" style="width:70px;"></button>
+                <button class="janken-btn" data-hand="2" style="background:none; border:none; cursor:pointer; transition:transform 0.2s;"><img src="card/custom/jyanken2.png" style="width:70px;"></button>
+                <button class="janken-btn" data-hand="3" style="background:none; border:none; cursor:pointer; transition:transform 0.2s;"><img src="card/custom/jyanken3.png" style="width:70px;"></button>
+            </div>
+        `;
+        document.body.appendChild(div);
+        
+        document.querySelectorAll('.janken-btn').forEach(btn => {
+            btn.onclick = () => {
+                const choice = parseInt(btn.dataset.hand);
+                window.socket.emit('player_action', { action: 'janken_choice', playerId: window.myId, choice });
+                document.getElementById('janken-controls').style.display = 'none';
+            };
+        });
+    }
+
+    const overlay = document.getElementById('janken-overlay');
+    const title = document.getElementById('janken-title');
+    const p1Name = document.getElementById('janken-p1-name');
+    const p2Name = document.getElementById('janken-p2-name');
+    const p1Card = document.getElementById('janken-p1-card');
+    const p2Card = document.getElementById('janken-p2-card');
+    const p1Res = document.getElementById('janken-p1-result');
+    const p2Res = document.getElementById('janken-p2-result');
+    const controls = document.getElementById('janken-controls');
+    const timer = document.getElementById('janken-timer');
+    
+    title.innerText = `運命の三姉妹 (Loop: ${loopCount+1}/4)`;
+    
+    const aP = window.game.players.find(p=>p.id===attackerId);
+    const tP = window.game.players.find(p=>p.id===targetId);
+    p1Name.innerText = aP ? aP.name : 'Attacker';
+    p2Name.innerText = tP ? tP.name : 'Target';
+    
+    p1Card.src = 'card/back.png'; p1Card.style.borderTop = 'none';
+    p2Card.src = 'card/back.png'; p2Card.style.borderTop = 'none';
+    p1Res.innerText = ''; p2Res.innerText = '';
+    
+    let timeLeft = 10;
+    timer.innerText = timeLeft;
+    
+    if (window.myId === attackerId || window.myId === targetId) {
+        controls.style.display = 'flex';
+    } else {
+        controls.style.display = 'none';
+    }
+    
+    overlay.classList.remove('hidden');
+    
+    if (window.localJankenTimer) clearInterval(window.localJankenTimer);
+    window.localJankenTimer = setInterval(() => {
+        timeLeft--;
+        timer.innerText = timeLeft;
+        if(timeLeft <= 0) clearInterval(window.localJankenTimer);
+    }, 1000);
+};
+
+window.playJankenResult = function(attackerId, targetId, aH, tH, result) {
+    if (window.localJankenTimer) clearInterval(window.localJankenTimer);
+    const p1Card = document.getElementById('janken-p1-card');
+    const p2Card = document.getElementById('janken-p2-card');
+    const p1Res = document.getElementById('janken-p1-result');
+    const p2Res = document.getElementById('janken-p2-result');
+    
+    p1Card.src = `card/custom/jyanken${aH}.png`;
+    p2Card.src = `card/custom/jyanken${tH}.png`;
+    
+    if (result === 'win') {
+        p1Res.innerText = 'Win'; p1Res.style.color = '#fbc02d';
+        p1Card.style.borderTop = '10px solid #fbc02d';
+        p2Res.innerText = 'Lose'; p2Res.style.color = '#7e57c2';
+        p2Card.style.borderTop = '10px solid #7e57c2';
+        if (window.SE) window.SE.play('win'); 
+    } else if (result === 'lose') {
+        p1Res.innerText = 'Lose'; p1Res.style.color = '#7e57c2';
+        p1Card.style.borderTop = '10px solid #7e57c2';
+        p2Res.innerText = 'Win'; p2Res.style.color = '#fbc02d';
+        p2Card.style.borderTop = '10px solid #fbc02d';
+        if (window.SE) window.SE.play('win2'); 
+    } else {
+        p1Res.innerText = 'Draw'; p1Res.style.color = '#aaa';
+        p2Res.innerText = 'Draw'; p2Res.style.color = '#aaa';
+    }
+    
+    setTimeout(() => {
+        const overlay = document.getElementById('janken-overlay');
+        if (overlay) overlay.classList.add('hidden');
+    }, 4500);
+};
+
 
 window.checkTurn = function() {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return; 
@@ -1068,7 +1364,19 @@ window.checkTurn = function() {
                             const others = window.game.players.filter(p=>p.id!==current.id);
                             if(others.length>0) botTargetId = others[Math.floor(Math.random()*others.length)].id;
                         }
-                        window.executeAbilityPlay(current.id, result.indices, botTargetId, botDiscardIdx, botSelectedColor, botMultiDiscardIndices);
+                        
+                        let extraData = {};
+                        if (def.needsGraveyard) {
+                            const gyList = window.game.abilityGraveyard.filter(id => window.AbilityDef[id] && window.AbilityDef[id].rarity !== 'UR');
+                            if (gyList.length > 0) extraData.graveyardCardId = gyList[Math.floor(Math.random() * gyList.length)];
+                        }
+                        if (def.needsDebuffSelect) {
+                            const p = window.game.players.find(x=>x.id===current.id);
+                            if (p && p.frozen) extraData.debuffToClear = 'frozen';
+                            else if (p && p.burnTurns > 0) extraData.debuffToClear = 'burn';
+                        }
+
+                        window.executeAbilityPlay(current.id, result.indices, botTargetId, botDiscardIdx, botSelectedColor, botMultiDiscardIndices, extraData);
                     } else {
                         window.executePlay(current.id, result.indices, true);
                     }
@@ -1134,7 +1442,19 @@ window.checkTurn = function() {
                                     const others = window.game.players.filter(p=>p.id!==current.id);
                                     if(others.length>0) botTargetId = others[Math.floor(Math.random()*others.length)].id;
                                 }
-                                window.executeAbilityPlay(current.id, result.indices, botTargetId, botDiscardIdx, botSelectedColor, botMultiDiscardIndices);
+
+                                let extraData = {};
+                                if (def.needsGraveyard) {
+                                    const gyList = window.game.abilityGraveyard.filter(id => window.AbilityDef[id] && window.AbilityDef[id].rarity !== 'UR');
+                                    if (gyList.length > 0) extraData.graveyardCardId = gyList[Math.floor(Math.random() * gyList.length)];
+                                }
+                                if (def.needsDebuffSelect) {
+                                    const p = window.game.players.find(x=>x.id===current.id);
+                                    if (p && p.frozen) extraData.debuffToClear = 'frozen';
+                                    else if (p && p.burnTurns > 0) extraData.debuffToClear = 'burn';
+                                }
+
+                                window.executeAbilityPlay(current.id, result.indices, botTargetId, botDiscardIdx, botSelectedColor, botMultiDiscardIndices, extraData);
                             } else window.executePlay(current.id, result.indices, true);
                         }, playedCards.length * 100 + 400);
                     } else {
@@ -1372,54 +1692,84 @@ window.handlePlayAction = function() {
 
     if (isAbility) {
         let targetId = null; let discardIdx = null; let selColor = null; let multiDiscardIndices = [];
+        let debuffToClear = null; let graveyardCardId = null;
 
-        const finishAbilityPlay = (tId = null, dIdx = null, sCol = null) => {
+        const finishAbilityPlay = () => {
             window.game.selectedIndices = []; window.updateUI();
             const indicesToSend = [...indices]; const cardsToSend = [...playedCards];
+            let extraData = {};
+            if (debuffToClear) extraData.debuffToClear = debuffToClear;
+            if (graveyardCardId) extraData.graveyardCardId = graveyardCardId;
+
             window.animateSequentialPlay(indices, window.game, () => {
-                const isHVActivated = (cardValue === 'id_20') || (def.needsAbilityDiscard && dIdx !== null);
+                const isHVActivated = (cardValue === 'id_20') || (def.needsAbilityDiscard && discardIdx !== null);
                 window.showAbilityCutin(cardsToSend[0].value, isHVActivated);
                 if (window.isHost) {
                     if (window.socket) window.socket.emit('request_play_animation', { playerId: window.game.myId, cards: cardsToSend, isHV: isHVActivated });
-                    window.executeAbilityPlay(window.game.myId, indicesToSend, tId, dIdx, sCol, multiDiscardIndices);
+                    window.executeAbilityPlay(window.game.myId, indicesToSend, targetId, discardIdx, selColor, multiDiscardIndices, extraData);
                 } else if (window.socket) {
-                    window.socket.emit('player_action', { action: 'play_ability', indices: indicesToSend, cards: cardsToSend, targetId: tId, discardIdx: dIdx, selectedColor: sCol, multiDiscardIndices, isHV: isHVActivated });
+                    window.socket.emit('player_action', { action: 'play_ability', indices: indicesToSend, cards: cardsToSend, targetId: targetId, discardIdx: discardIdx, selectedColor: selColor, multiDiscardIndices, isHV: isHVActivated, extraData });
                 }
             });
         };
 
-        const step4 = (tId = null, dIdx = null, sCol = null) => {
-            if (def && cardValue === 'id_20' && sCol) {
+        const step6 = () => {
+            if (def.needsGraveyard) {
+                window.openGraveyardSelection((selectedId) => {
+                    if (!selectedId) { window.game.selectedIndices = []; window.updateUI(); return; }
+                    graveyardCardId = selectedId;
+                    finishAbilityPlay();
+                });
+            } else { finishAbilityPlay(); }
+        }
+
+        const step5 = () => {
+            if (def.needsDebuffSelect && me.frozen && me.burnTurns > 0) {
+                window.openDebuffSelection((selected) => {
+                    debuffToClear = selected;
+                    step6();
+                });
+            } else if (def.needsDebuffSelect) {
+                if (me.frozen) debuffToClear = 'frozen';
+                else if (me.burnTurns > 0) debuffToClear = 'burn';
+                step6();
+            } else {
+                step6();
+            }
+        };
+
+        const step4 = () => {
+            if (def && cardValue === 'id_20' && selColor) {
                 const validIndices = [];
                 window.game.myHand.forEach((c, i) => {
-                    if (!indices.includes(i) && i !== dIdx && c.color === sCol) validIndices.push(i);
+                    if (!indices.includes(i) && i !== discardIdx && c.color === selColor) validIndices.push(i);
                 });
                 if (validIndices.length > 0) {
                     window.openMultiDiscardSelection(window.game.myHand, validIndices, (selectedMulti) => {
                         multiDiscardIndices = selectedMulti;
-                        finishAbilityPlay(tId, dIdx, sCol);
+                        step5();
                     });
-                } else { finishAbilityPlay(tId, dIdx, sCol); }
-            } else { finishAbilityPlay(tId, dIdx, sCol); }
+                } else { step5(); }
+            } else { step5(); }
         };
 
-        const step3 = (tId = null, dIdx = null) => {
+        const step3 = () => {
             if (def && def.needsColor) {
-                ColorUI.show((color) => { step4(tId, dIdx, color); });
-            } else { step4(tId, dIdx, null); }
+                ColorUI.show((color) => { selColor = color; step4(); });
+            } else { step4(); }
         };
 
-        const step2 = (tId = null) => {
+        const step2 = () => {
             if (def && (def.needsDiscard || def.needsAbilityDiscard)) {
                 window.openDiscardSelection(window.game.myHand, indices, def, (idx) => { 
-                    step3(tId, idx); 
+                    discardIdx = idx; step3(); 
                 });
-            } else { step3(tId, null); }
+            } else { step3(); }
         };
 
         if (def && def.needsTarget) {
-            window.openTargetSelection(window.game.players, (tid) => { step2(tid); });
-        } else { step2(null); }
+            window.openTargetSelection(window.game.players, (tid) => { targetId = tid; step2(); });
+        } else { step2(); }
 
         return; 
     }

@@ -16,6 +16,7 @@ class UNOGame {
         this.selectedIndices = [];
         this.unoDeclared = false;
         this.hasDrawnThisTurn = false;
+        this.abilityGraveyard = []; // ★ 墓地追加
     }
 
     get isMyTurn() { return this.currentPlayer && this.currentPlayer.id === this.myId; }
@@ -28,12 +29,16 @@ class UNOGame {
         this.players.forEach(p => {
             p.frozen = false;
             p.burnTurns = 0;
+            p.invincibleTurns = 0; // ★ 無敵ターン
+            p.shield = { level: 0, turns: 0 }; // ★ シールド
+            p.frozenBurnImmune = false; 
         });
         this.myId = myId;
     }
 
     start() {
         this.deck = UNORules.createDeck();
+        this.abilityGraveyard = [];
         
         if (window.RuleSettings && window.RuleSettings.randomTurnOrder) {
             for (let i = this.players.length - 1; i > 0; i--) {
@@ -99,6 +104,15 @@ class UNOGame {
     nextTurn(skipCount = 1) {
         if (this.currentPlayer) {
             this.currentPlayer.frozen = false;
+            this.currentPlayer.frozenBurnImmune = false;
+            
+            // ★ 無敵とシールドのターン消費
+            if (this.currentPlayer.invincibleTurns > 0) this.currentPlayer.invincibleTurns--;
+            if (this.currentPlayer.shield && this.currentPlayer.shield.turns > 0) {
+                this.currentPlayer.shield.turns--;
+                if (this.currentPlayer.shield.turns <= 0) this.currentPlayer.shield.level = 0;
+            }
+
             if (this.hands[this.currentPlayer.id]) {
                 this.hands[this.currentPlayer.id].forEach(c => {
                     if (c.lockedTurns && c.lockedTurns > 0) c.lockedTurns--;
@@ -110,10 +124,13 @@ class UNOGame {
         this.hasDrawnThisTurn = false;
         this.selectedIndices = [];
 
+        // ★ 燃焼ドローの処理（無敵時は無効）
         if (this.currentPlayer && this.currentPlayer.burnTurns > 0) {
-            this.drawCard(this.currentPlayer.id);
-            if (window.isHost && window.socket) {
-                window.socket.emit('request_draw_animation', { playerId: this.currentPlayer.id, count: 1 });
+            if (this.currentPlayer.invincibleTurns <= 0 && !this.currentPlayer.frozenBurnImmune) {
+                this.drawCard(this.currentPlayer.id);
+                if (window.isHost && window.socket) {
+                    window.socket.emit('request_draw_animation', { playerId: this.currentPlayer.id, count: 1 });
+                }
             }
             this.currentPlayer.burnTurns--;
         }
@@ -158,15 +175,19 @@ class UNOGame {
                 this.drawStack = 0;
             }
 
-            // ★ 能力カードは場(discardPile)に出さずに消費するだけにする
-            if (!isAbility) {
-                selectedCards.forEach(c => {
+            selectedCards.forEach(c => {
+                const isAb = c.value && String(c.value).startsWith('id_');
+                if (!isAb) {
                     this.discardPile.push(c);
                     this.discardRotations.push(Math.floor(Math.random() * 21) - 10);
-                    if (c.value === '+2') this.drawStack += 2;
-                    if (c.value === 'Wild+4') this.drawStack += 4;
-                });
-            }
+                } else {
+                    // ★ 墓地に追加
+                    this.abilityGraveyard.push(c.value);
+                }
+                
+                if (c.value === '+2') this.drawStack += 2;
+                if (c.value === 'Wild+4') this.drawStack += 4;
+            });
 
             const sortedIndices = [...indices].sort((a, b) => b - a);
             sortedIndices.forEach(i => hand.splice(i, 1));
@@ -182,7 +203,6 @@ class UNOGame {
 
             const actionCount = selectedCards.length;
 
-            // ★ スキップ・リバースの重ね出しバグ修正
             if (lastCard.value === 'Skip') {
                 if (this.players.length === 2) {
                     this.nextTurn(actionCount * 2); 

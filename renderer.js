@@ -25,8 +25,8 @@ const Renderer = {
 
         const currentDir = game.direction;
         
-        arrowSvg.classList.remove('normal', 'reverse', 'predict-normal', 'predict-reverse');
-        
+        // ★ 矢印クラスのリセットと再設定を確実にする
+        arrowSvg.setAttribute('class', 'direction-arrows');
         if (reverseCount > 0) {
             const predictedDir = currentDir * Math.pow(-1, reverseCount);
             if (predictedDir === 1) arrowSvg.classList.add('predict-normal');
@@ -93,7 +93,10 @@ const Renderer = {
             if (p.frozen) overlayHtml += '<div class="status-overlay status-frozen"></div>';
             if (p.burnTurns > 0) overlayHtml += `<div class="status-overlay status-burned"><span style="position:absolute; bottom:0; left:50%; transform:translateX(-50%); font-size:12px; font-weight:bold; color:white;">${p.burnTurns}</span></div>`;
 
+            // ★ シールドと無敵のアイコン表示追加
             let statusIcons = '';
+            if (p.invincibleTurns > 0) statusIcons += '⭐';
+            if (p.shield && p.shield.turns > 0 && p.shield.level > 0) statusIcons += `🔰${p.shield.level}`;
             if (p.frozen) statusIcons += '❄';
             if (p.burnTurns > 0) statusIcons += '🔥';
             const hand = game.hands[p.id] || [];

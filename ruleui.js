@@ -4,25 +4,33 @@
 
 window.CUSTOM_CARDS_DEF = [
     { id: 'id_1', name: 'ミシェル', desc: '【AT】1人指定。1枚引かせ70%で凍結(能力のみ使用可)。' }, 
-    { id: 'id_2', name: 'ルネイユ', desc: '【AT/BL】他全員に固定で1枚引かせる。また60%確率で他全員に固定で1枚引かせる。' }, 
+    { id: 'id_2', name: 'ルネイユ', desc: '【AT/BL】他全員に固定で1枚引かせる。その後自分にシールドIを1ターン付与する。また60%確率で他全員に固定で1枚引かせる。' }, 
     { id: 'id_3', name: 'ヴィオラ', desc: '【HE】手札を1枚選んで捨てる。' },
-    { id: 'id_4', name: 'ヘイゼル', desc: '【BL/受動】捨てられた時・場に出た時、他ランダム1人に1枚引かせる。また15%の確率でカードが消費されず、手札に残る。' }, 
+    { id: 'id_4', name: 'ヘイゼル', desc: '【BL/受動】捨てられた時・場に出た時、自分にシールドIIを2ターン付与する。また15%の確率でカードが消費されず、手札に残る。' }, 
     { id: 'id_5', name: '瑠璃', desc: '【HE】自分の手札に+カードを2枚持ってくる。(内訳、各種+2：8割、+4：2割)' }, 
     { id: 'id_6', name: 'ラン', desc: '【AT】他全員に手札を2枚ランダムに捨てさせその後に3枚ドローさせる。' },
     { id: 'id_7', name: 'リリス', desc: '【AT】1人指定。燃焼(3T開始時固定1ドロー)を付与。' }, 
     { id: 'id_8', name: 'ヘラ', desc: '【HE】1人指定し1枚引かせる。手札1枚捨てる。' }, 
-    { id: 'id_9', name: 'レナ', desc: '【AT/BL】他全員に1枚引かせる。防御時全員に固定2ドロー。' },
+    { id: 'id_9', name: 'レナ', desc: '【AT/BL】自分以外の他全員に1枚引かせる。防御時自分以外の他全員に固定2ドロー。' },
     { id: 'id_10', name: 'シャミール', desc: '【HE】1人指定。数字カード3枚を次の次ターンまでロック。' }, 
     { id: 'id_11', name: 'レイ', desc: '【HE】1人指定。記号カード2枚を次の次ターンまでロック。' }, 
     { id: 'id_12', name: 'アンドロス', desc: '【AT】1人指定。2枚引かせる。' },
     { id: 'id_13', name: 'エリザベス', desc: '【HE】選ばれたランダムなプレイヤーに1枚引かせランダムな記号カードを1枚山札に戻す。無ければ追加で1枚引かせる。' }, 
     { id: 'id_14', name: 'ハンナ', desc: '【AT】ランダムなプレイヤーに4枚引かせる。' }, 
     { id: 'id_15', name: 'メリア', desc: '【AT】1人指定。固定で2枚引かせる。' },
-    { id: 'id_16', name: 'ユメゴト', desc: '【HE】手札1枚捨てる。自身のデバフ(凍結/燃焼)を解除。' }, 
+    { id: 'id_16', name: 'ユメゴト', desc: '【HE】手札1枚捨てる。自身のデバフ(凍結/燃焼)を全て解除。' }, 
     { id: 'id_17', name: 'カシウス', desc: '【BL】防御時、手札1枚選んで捨てる。' }, 
-    { id: 'id_18', name: 'グレイス', desc: '【BL】防御時、他全員に1枚引かせる。' },
+    { id: 'id_18', name: 'グレイス', desc: '【AT/BL】他全員に1枚引かせる。その後自分にシールドIを2ターン付与する。' },
     { id: 'id_19', name: 'ヴィンディ', desc: '【BL】防御時手札1枚捨てる。攻撃者に1枚引かせる。' },
-    { id: 'id_20', name: '幽艶レベッカ', desc: '【HV】トリック・オア・キャロット。色を指定でき、指定した色のカードを好きな枚数重ねて場に出す。(記号効果は適用されない)', type: 'HV' }
+    { id: 'id_20', name: '幽艶レベッカ', desc: '【HV】トリック・オア・キャロット。色を指定でき、指定した色のカードを好きな枚数重ねて場に出す。(記号効果は適用されない)', type: 'HV' },
+    { id: 'id_21', name: 'アヤメ', desc: '【AT】自分以外のプレイヤーを一人指定し、そのプレイヤーにカードを3枚引かせる。' },
+    { id: 'id_22', name: '遊鈴', desc: '【HE】自分のデバフ(凍結/燃焼)を1つ解除し、全員に1枚カードを引かせる。' },
+    { id: 'id_23', name: 'ダンタ', desc: '【HE】自分を1ターン無敵状態にし、デバフを1つランダムに解除する。' },
+    { id: 'id_24', name: 'アクアヘッド', desc: '【AT】自分以外のランダムなプレイヤーに燃焼を1ターン付与する。' },
+    { id: 'id_25', name: 'ミサ', desc: '【HE】自分のカード1枚をワイルドにし、使用されたSSR以下の能力カードを1枚手札に戻す。' },
+    { id: 'id_26', name: '運命の三姉妹', desc: '【AT】ランダム他1人とじゃんけん。初回は結果によらず相手2ドロー。勝てば相手2ドローし再戦(最大4回)。' },
+    { id: 'id_27', name: 'クララ', desc: '【HE】自分の手札をランダムに2枚捨てる。' },
+    { id: 'id_28', name: 'リナ', desc: '【AT】ランダムなプレイヤーに2ターン燃焼を付与する。その後そのプレイヤーに1枚引かせる(防御不可)。' }
 ];
 
 if (typeof window.AbilityDef === 'undefined') {
@@ -169,7 +177,15 @@ if (typeof window.RuleSettings === 'undefined') {
                     div.dataset.count = 0;
                     
                     const descSafe = c.desc.replace(/\n/g, '\\n').replace(/'/g, "\\'");
-                    const maxCount = (c.type === 'HV') ? 1 : 4; 
+                    
+                    // ★ レアリティと最大枚数の判定
+                    const maxCount = (c.id === 'id_20' || c.id === 'id_25' || c.id === 'id_26') ? 1 : 4; 
+                    
+                    let rarityColor = '#ccc';
+                    let rarityText = 'SSR';
+                    if (['id_20','id_25','id_26'].includes(c.id)) { rarityColor = '#ff4081'; rarityText = 'UR'; }
+                    else if (['id_12','id_17','id_18','id_19','id_21','id_27'].includes(c.id)) { rarityColor = '#fbc02d'; rarityText = 'SR'; }
+                    else if (['id_24'].includes(c.id)) { rarityColor = '#2196f3'; rarityText = 'R'; }
                     
                     div.innerHTML = `
                         <div class="card-controls">
@@ -177,6 +193,7 @@ if (typeof window.RuleSettings === 'undefined') {
                             <img class="custom-card-img" src="card/custom/${c.id}.png" alt="${c.name}" onerror="this.src='data:image/svg+xml;charset=utf-8,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 24 24\\' fill=\\'%23ccc\\'%3E%3Crect width=\\'24\\' height=\\'24\\' fill=\\'none\\'/%3E%3Ctext x=\\'12\\' y=\\'14\\' font-size=\\'8\\' text-anchor=\\'middle\\' fill=\\'%23fff\\'%3E?%3C/text%3E%3C/svg%3E'">
                             <button class="count-btn plus">+</button>
                         </div>
+                        <span style="font-size:9px; font-weight:bold; color:${rarityColor}; margin-top:2px;">${rarityText}</span>
                         <div class="custom-card-name">${c.name} <span class="info-icon" onclick="event.stopPropagation(); alert('${descSafe}');">?</span></div>
                         <span class="custom-card-count">0/${maxCount}</span>
                     `;
@@ -262,8 +279,8 @@ if (typeof window.RuleSettings === 'undefined') {
             const items = grid.querySelectorAll('.custom-card-item');
             items.forEach(item => {
                 const id = item.dataset.id;
-                const def = window.AbilityDef[id];
-                const maxCount = (def && def.type === 'HV') ? 1 : 4;
+                // ★ レアリティによる上限枚数判定
+                const maxCount = (id === 'id_20' || id === 'id_25' || id === 'id_26') ? 1 : 4;
                 const count = this.customCards.filter(c => c === id).length;
                 item.dataset.count = count;
                 const countSpan = item.querySelector('.custom-card-count');
