@@ -43,8 +43,13 @@ window.ensureModalsExist = function() {
         defModal = document.createElement('div');
         defModal.id = 'defense-modal';
         defModal.className = 'action-popup hidden';
+        defModal.style.width = '90vw';
+        defModal.style.maxWidth = '400px';
+        defModal.style.maxHeight = '80vh';
+        defModal.style.boxSizing = 'border-box';
         defModal.innerHTML = `
-            <h3 id="defense-title" style="color:#ff5252;">攻撃を受けました！</h3>
+            <h3 id="defense-title" style="color:#ff5252; margin-top: 0;">攻撃を受けました！</h3>
+            <div id="defense-desc" style="font-size: 12px; color: #ddd; background: rgba(0,0,0,0.5); padding: 8px; border-radius: 6px; margin-bottom: 10px; line-height: 1.4; text-align: left; white-space: pre-wrap;"></div>
             <div style="font-size:24px; color:#fbc02d; font-weight:bold; margin: 10px 0;"><span id="defense-timer-text">30</span>秒</div>
             <div id="defense-question-area">
                 <p>防御カード(BL)を使用しますか？</p>
@@ -55,11 +60,22 @@ window.ensureModalsExist = function() {
             </div>
             <div id="defense-select-area" class="hidden">
                 <p>使用する防御カードを選んでください</p>
-                <div id="defense-modal-list" class="action-popup-grid" style="overflow-x:auto; flex-wrap:nowrap; max-width:90vw;"></div>
-                <button id="btn-cancel-defense" style="margin-top:15px; padding:8px 15px; background:#777; color:white; border:none; border-radius:8px; cursor:pointer;">キャンセル</button>
+                <div id="defense-modal-list" class="action-popup-grid" style="overflow-x:auto; flex-wrap:nowrap; max-width:100%; padding-bottom: 10px;"></div>
+                <button id="btn-cancel-defense" style="margin-top:15px; padding:8px 15px; background:#777; color:white; border:none; border-radius:8px; cursor:pointer; width: 100%;">キャンセル</button>
             </div>
         `;
         document.body.appendChild(defModal);
+    }
+    if (!document.getElementById('ability-cutin')) {
+        const cutin = document.createElement('div');
+        cutin.id = 'ability-cutin';
+        cutin.className = 'hidden';
+        cutin.innerHTML = `
+            <div style="position: relative; display: inline-block; text-align: center;">
+                <img id="ability-cutin-img" src="" alt="Ability">
+                <div id="ability-cutin-text" style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 8px 12px; border-radius: 8px; font-size: 14px; white-space: pre-wrap; width: 120%; text-align: center; border: 2px solid #4caf50;"></div>
+            </div>`;
+        document.body.appendChild(cutin);
     }
 };
 
@@ -213,7 +229,8 @@ window.playOpponentAnimation = function(playerId, cards, callback) {
 };
 
 window.drawOpponentAnimation = function(playerId, count, callback) {
-    if (window.SE) window.SE.playMultiple('Distribute', count, 500);
+    // ★ エラー修正：'Distribute' ではなく 'draw' を使用
+    if (window.SE) window.SE.playMultiple('draw', count, 500);
     const badge = document.querySelector(`.other-player-badge[data-id="${playerId}"]`);
     const deckEl = document.getElementById('deck-visual');
     if (!badge || !deckEl || count <= 0) { if(callback) callback(); return; }
@@ -446,7 +463,8 @@ window.animateInitialDeal = function(targetHands, callback) {
         const round = Math.floor(dealIndex / playerIds.length);
         const pId = playerIds[pIdx];
 
-        if (window.SE) window.SE.play('Distribute'); 
+        // ★ エラー修正：'Distribute' ではなく 'draw' を使用
+        if (window.SE) window.SE.play('draw'); 
 
         const dummyCard = document.createElement('div');
         dummyCard.className = 'card back';
@@ -498,14 +516,13 @@ window.showAbilityCutin = function(cardValue, isHVActivated = false) {
     window.ensureModalsExist();
     const cutinEl = document.getElementById('ability-cutin');
     const cutinImg = document.getElementById('ability-cutin-img');
-    const textEl = document.getElementById('ability-cutin-text');
+    const cutinText = document.getElementById('ability-cutin-text');
     if (!cutinEl || !cutinImg) return;
     
     cutinImg.src = `card/custom/${cardValue}.png`;
     
-    // ★ カットインのカードの下部余白に説明テキストを表示
-    if (textEl && window.AbilityDef && window.AbilityDef[cardValue]) {
-        textEl.innerText = window.AbilityDef[cardValue].desc;
+    if (cutinText && window.AbilityDef && window.AbilityDef[cardValue]) {
+        cutinText.innerText = window.AbilityDef[cardValue].desc;
     }
 
     cutinEl.classList.remove('hidden', 'fade-out');
@@ -532,7 +549,6 @@ window.openTargetSelection = function(players, callback) {
     const targets = validPlayers.filter(p => p.id !== window.game.myId);
 
     if (targets.length === 0) { callback(window.game.myId); return; }
-    // ★ 相手が1人しかいない時はダイアログを出さずに自動選択する
     if (targets.length === 1) { callback(targets[0].id); return; }
 
     list.innerHTML = '';
@@ -632,6 +648,7 @@ window.showDefenseModal = function(attackCardValue) {
     const modal = document.getElementById('defense-modal');
     const list = document.getElementById('defense-modal-list');
     const title = document.getElementById('defense-title');
+    const desc = document.getElementById('defense-desc');
     const qArea = document.getElementById('defense-question-area');
     const sArea = document.getElementById('defense-select-area');
     const btnYes = document.getElementById('btn-defense-yes');
@@ -645,13 +662,23 @@ window.showDefenseModal = function(attackCardValue) {
     }
     
     let attackName = '能力';
+    let attackDesc = ''; 
+    
     if (window.AbilityDef && window.AbilityDef[attackCardValue]) {
         attackName = window.AbilityDef[attackCardValue].name;
+        attackDesc = window.AbilityDef[attackCardValue].desc; 
     } else if (attackCardValue === '+2' || attackCardValue === 'Wild+4') {
         attackName = attackCardValue;
+        attackDesc = '引かされる枚数が増加します！(防御カードで防げます)'; 
     }
     
     title.innerText = `攻撃を受けました！(${attackName})`;
+    
+    if (desc) {
+        desc.innerText = attackDesc;
+        desc.classList.toggle('hidden', !attackDesc);
+    }
+    
     qArea.classList.remove('hidden');
     sArea.classList.add('hidden');
     
@@ -851,11 +878,13 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
     allRemoveIndices = [...new Set(allRemoveIndices)].sort((a,b) => b - a);
     allRemoveIndices.forEach(i => hand.splice(i, 1));
 
-    // ★ 能力カードは discardPile に出さない処理に変更（消費するだけ）
-    // playedCards.forEach(c => {
-    //     window.game.discardPile.push(c); 
-    //     window.game.discardRotations.push(0);
-    // });
+    playedCards.forEach(c => {
+        const isAb = c.value && String(c.value).startsWith('id_');
+        if (!isAb) {
+            window.game.discardPile.push(c); 
+            window.game.discardRotations.push(0);
+        }
+    });
 
     if (def.type === 'AT' || def.type === 'AT_BL' || def.type === 'HV') {
         let targets = [];
@@ -1124,9 +1153,8 @@ window.executePlay = function(playerId, indices, isBot = false) {
 
         if (result.needsColor) {
             if (isDrawAttack) {
-                // ★ 能力カード未設定(通常UNO)の場合は防御フェーズをスキップ
-                if (window.currentRoomState && window.currentRoomState.settings && window.currentRoomState.settings.customCards && window.currentRoomState.settings.customCards.length === 0) {
-                    // 何もしない（直接次のターンへ）
+                if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length === 0) {
+                    // 何もしない
                 } else {
                     window.pendingDrawDefenseInfo = { attackerId: playerId, cardValue: attackCardVal };
                 }
@@ -1149,8 +1177,7 @@ window.executePlay = function(playerId, indices, isBot = false) {
             if (isDrawAttack) {
                 targetId = window.game.currentPlayer.id;
                 guides.push({ from: playerId, to: targetId, text: attackCardVal });
-                // ★ ここも能力カード未設定の場合は防御フェーズをスキップ
-                if (window.currentRoomState && window.currentRoomState.settings && window.currentRoomState.settings.customCards && window.currentRoomState.settings.customCards.length > 0) {
+                if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length > 0) {
                     window.startDrawDefensePhase(playerId, targetId, attackCardVal, guides);
                 } else {
                     window.broadcastGameState(false, guides);
@@ -1179,7 +1206,7 @@ window.executeColor = function(playerId, color) {
     if (info) {
         const targetId = window.game.currentPlayer.id;
         const guides = [{ from: info.attackerId, to: targetId, text: info.cardValue }];
-        if (window.currentRoomState && window.currentRoomState.settings && window.currentRoomState.settings.customCards && window.currentRoomState.settings.customCards.length > 0) {
+        if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length > 0) {
             window.startDrawDefensePhase(info.attackerId, targetId, info.cardValue, guides);
         } else {
             window.broadcastGameState(false, guides);
@@ -1251,8 +1278,7 @@ window.tryDrawWithAbility = function(callback) {
 };
 
 window.handlePlayAction = function() {
-    if (window.isGameOver || window.isInitialDealing) return;
-    if (window.game.selectedIndices.length === 0) return;
+    if (window.game.selectedIndices.length === 0 || window.isGameOver || window.isInitialDealing) return;
     
     const me = window.game.players.find(p => p.id === window.game.myId);
     const selectedCards = window.game.selectedIndices.map(i => window.game.myHand[i]);
@@ -1262,11 +1288,11 @@ window.handlePlayAction = function() {
     if (!lastCard) { window.game.selectedIndices = []; window.updateUI(); return; }
 
     const isAbility = selectedCards[0] && selectedCards[0].value && String(selectedCards[0].value).startsWith('id_');
-    
-    // ★ 相手のターンでも能力カードなら発動可能にする
-    if (!window.game.isMyTurn && !isAbility) return;
-
     const isAction = !/^[0-9]$/.test(lastCard.value) && !isAbility;
+
+    if (!window.game.isMyTurn && !isAbility) {
+        window.game.selectedIndices = []; window.updateUI(); return;
+    }
     
     if (me.frozen && !isAbility) {
         alert("凍結中は能力カードしか使用できません！"); window.game.selectedIndices = []; window.updateUI(); return;
@@ -1275,8 +1301,10 @@ window.handlePlayAction = function() {
         alert("ロックされているカードは使用できません！"); window.game.selectedIndices = []; window.updateUI(); return;
     }
 
-    const isLegalPlay = UNORules.canPlaySelected(selectedCards, window.game.topCard, window.game.currentColor, window.game.drawStack);
-    if (!isLegalPlay) { if (window.SE) window.SE.play('Impossible'); return; }
+    if (!isAbility) {
+        const isLegalPlay = UNORules.canPlaySelected(selectedCards, window.game.topCard, window.game.currentColor, window.game.drawStack);
+        if (!isLegalPlay) { if (window.SE) window.SE.play('Impossible'); return; }
+    }
 
     const def = isAbility && window.AbilityDef ? window.AbilityDef[selectedCards[0].value] : null;
     let willDiscard = (isAbility && def && (def.needsDiscard || def.needsAbilityDiscard)) ? 1 : 0;
@@ -1285,7 +1313,7 @@ window.handlePlayAction = function() {
     const willBeActionFinishPenalty = (finalHandCount <= 0 && isAction && window.RuleSettings && !window.RuleSettings.allowActionFinish);
     const willBeAbilityFinishPenalty = (finalHandCount <= 0 && isAbility && window.RuleSettings && !window.RuleSettings.allowAbilityFinish);
     
-    if (isLegalPlay && (willBeActionFinishPenalty || willBeAbilityFinishPenalty || (finalHandCount <= 0 && !window.game.unoDeclared && window.RuleSettings && !window.RuleSettings.unoAuto))) {
+    if (willBeActionFinishPenalty || willBeAbilityFinishPenalty || (finalHandCount <= 0 && !window.game.unoDeclared && window.RuleSettings && !window.RuleSettings.unoAuto)) {
         let penaltyCount = window.RuleSettings.unoPenalty || 2;
         let penaltyMsg = "UNO宣言忘れ！";
         
@@ -1300,7 +1328,8 @@ window.handlePlayAction = function() {
         alert(`${penaltyMsg} ペナルティとして ${penaltyCount}枚ドローします！`); 
         
         window.tryDrawWithAbility(() => {
-            if (window.SE) window.SE.playMultiple('Distribute', penaltyCount, 500);
+            // ★ エラー修正：'Distribute' ではなく 'draw' を使用
+            if (window.SE) window.SE.playMultiple('draw', penaltyCount, 500);
             CardAnimation.animateMultiDraw(penaltyCount, 'player-hand', () => {
                 window.game.selectedIndices = []; window.updateUI();
                 if (window.isHost) {
@@ -1341,7 +1370,7 @@ window.handlePlayAction = function() {
             if (def && cardValue === 'id_20' && sCol) {
                 const validIndices = [];
                 window.game.myHand.forEach((c, i) => {
-                    if (!indices.includes(i) && c.color === sCol) validIndices.push(i);
+                    if (!indices.includes(i) && i !== dIdx && c.color === sCol) validIndices.push(i);
                 });
                 if (validIndices.length > 0) {
                     window.openMultiDiscardSelection(window.game.myHand, validIndices, (selectedMulti) => {
@@ -1403,7 +1432,8 @@ document.getElementById('draw-btn').onclick = () => {
         window.isDrawing = true; window.game.hasDrawnThisTurn = true; window.updateUI();                    
         setTimeout(() => { window.isDrawing = false; }, 3000);
         const s = window.game.drawStack; const count = s > 0 ? s : 1;
-        if (window.SE) window.SE.playMultiple('Distribute', count, 500);
+        // ★ エラー修正：'Distribute' ではなく 'draw' を使用
+        if (window.SE) window.SE.playMultiple('draw', count, 500);
         if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
             CardAnimation.animateMultiDraw(count, 'player-hand', () => {
                 window.isDrawing = false; 
