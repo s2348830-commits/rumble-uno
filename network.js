@@ -330,6 +330,7 @@ window.socket.on('request_ability_reset', (data) => {
     window.broadcastGameState(true);
 });
 
+// ★ サーバーからの通信でじゃんけんのUIを同期する処理
 window.socket.on('update_game_state', (state) => {
     if (!window.game) return;
     window.game.deck = state.deck; 
@@ -340,6 +341,7 @@ window.socket.on('update_game_state', (state) => {
     window.game.drawStack = state.drawStack; 
     window.game.currentColor = state.currentColor;
     if(state.hasDrawnThisTurn !== undefined) window.game.hasDrawnThisTurn = state.hasDrawnThisTurn;
+    if(state.abilityGraveyard) window.game.abilityGraveyard = state.abilityGraveyard;
     
     if (state.playersInfo) {
         let newPlayers = [];
@@ -349,6 +351,8 @@ window.socket.on('update_game_state', (state) => {
                 p.frozen = info.frozen; 
                 p.burnTurns = info.burnTurns; 
                 p.connected = info.connected;
+                p.invincibleTurns = info.invincibleTurns || 0;
+                p.shield = info.shield || { level: 0, turns: 0 };
                 newPlayers.push(p);
             }
         });
@@ -399,6 +403,26 @@ window.socket.on('update_game_state', (state) => {
         const discModal = document.getElementById('discard-modal');
         if (modal) modal.classList.add('hidden');
         if (discModal) discModal.classList.add('hidden');
+    }
+
+    // ★ 追加：じゃんけん画面の同期
+    if (state.jankenPhase) {
+        if (!window.isJankenShowing) {
+            window.showJankenUI(state.jankenPhase.attackerId, state.jankenPhase.targetId, state.jankenPhase.loopCount);
+            window.isJankenShowing = true;
+        }
+        const jTimer = document.getElementById('janken-timer');
+        if (jTimer) jTimer.innerText = state.jankenPhase.timer;
+
+        if (state.jankenPhase.result && !window.jankenResultPlayed) {
+            window.jankenResultPlayed = true;
+            window.playJankenResult(state.jankenPhase.attackerId, state.jankenPhase.targetId, state.jankenPhase.attackerHand, state.jankenPhase.targetHand, state.jankenPhase.result);
+        }
+    } else {
+        window.isJankenShowing = false;
+        window.jankenResultPlayed = false;
+        const jOverlay = document.getElementById('janken-overlay');
+        if (jOverlay && !jOverlay.classList.contains('result-showing')) jOverlay.classList.add('hidden');
     }
 });
 
@@ -461,7 +485,7 @@ window.socket.on('receive_player_action', (data) => {
         window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards, isHV: data.isHV });
         const delay = data.cards.length * 100 + 400;
         setTimeout(() => {
-            if (typeof window.executeAbilityPlay === 'function') window.executeAbilityPlay(playerId, data.indices, data.targetId, data.discardIdx, data.selectedColor, data.multiDiscardIndices);
+            if (typeof window.executeAbilityPlay === 'function') window.executeAbilityPlay(playerId, data.indices, data.targetId, data.discardIdx, data.selectedColor, data.multiDiscardIndices, data.extraData);
         }, delay);
     } else if (data.action === 'defense_response') {
         if (window.pendingDefense && window.pendingDefense.responses) {
@@ -495,6 +519,14 @@ window.socket.on('receive_player_action', (data) => {
         if (window.game && typeof window.game.replaceAbilityCards === 'function') {
             window.game.replaceAbilityCards(playerId, data.cards);
             if (typeof window.broadcastGameState === 'function') window.broadcastGameState(true);
+        }
+    } 
+    // ★ 追加：じゃんけんの手を受信
+    else if (data.action === 'janken_choice') {
+        if (window.pendingJanken && !window.pendingJanken.result) {
+            if (playerId === window.pendingJanken.attackerId) window.pendingJanken.attackerHand = data.choice;
+            if (playerId === window.pendingJanken.targetId) window.pendingJanken.targetHand = data.choice;
+            window.checkJankenReady();
         }
     }
 });

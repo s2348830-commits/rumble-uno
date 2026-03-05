@@ -147,6 +147,7 @@ window.SE = {
         
         let ext = 'mp3';
         if (name === 'fire' || name === 'page') ext = 'wav';
+        // ★ id_20, id_25, id_26 は拡張子 .mov として読み込む
         if (name.includes('id_20') || name.includes('id_25') || name.includes('id_26')) ext = 'mov'; 
 
         if (!this.buffers[name]) {
@@ -187,6 +188,7 @@ const unlockAudioContext = () => {
     if (window.SE.audioCtx.state === 'suspended') window.SE.audioCtx.resume();
     ['win', 'win2', 'setting', 'draw', 'uno_message', 'buttonclick', 'uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6', 'frieze', 'rock', 'Distribute', 'mvp_1', 'mvp_2'].forEach(name => window.SE.loadSound(name, 'mp3'));
     ['fire', 'page'].forEach(name => window.SE.loadSound(name, 'wav'));
+    // ★ id_25, id_26の動画音声を事前ロードに追加
     ['hv/id_20(1)', 'hv/id_20(2)', 'hv/id_25', 'hv/id_26'].forEach(name => window.SE.loadSound(name, 'mov')); 
     document.removeEventListener('click', unlockAudioContext);
     document.removeEventListener('touchstart', unlockAudioContext);
@@ -237,7 +239,9 @@ window.broadcastGameState = function(skipUIUpdate = false, attackGuides = []) {
         defensePhase: window.pendingDefense ? window.pendingDefense.info : null,
         defenseTimer: window.pendingDefense ? window.pendingDefense.timer : 0,
         attackGuides: attackGuides,
-        abilityGraveyard: window.game.abilityGraveyard
+        abilityGraveyard: window.game.abilityGraveyard,
+        // ★ じゃんけんのフェーズ情報を同期用ステートに追加
+        jankenPhase: window.pendingJanken 
     };
     if (window.socket) window.socket.emit('sync_game_state', state);
     if (!skipUIUpdate) window.updateUI();
@@ -566,6 +570,7 @@ window.showAbilityCutin = function(cardValue, isHVActivated = false) {
     void cutinEl.offsetWidth; 
     cutinEl.classList.add('show-cutin');
     
+    // ★ id_20, id_25, id_26 でそれぞれの動画音声を再生
     if (cardValue === 'id_20') {
         const rand = Math.random() < 0.5 ? 1 : 2;
         if (window.SE) window.SE.play(`hv/id_20(${rand})`);
@@ -796,7 +801,6 @@ window.showDefenseModal = function(attackCardValue) {
                     window.showAbilityCutin(item.card.value);
                 }
 
-                // ★ nullチェックを追加
                 if (def && (def.needsDiscard || def.needsAbilityDiscard)) {
                     modal.classList.add('hidden'); 
                     window.openDiscardSelection(myHand, [item.idx], def, (discIdx) => {
@@ -904,6 +908,7 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                     blocked = true;
                 }
                 
+                const def = window.AbilityDef[defCardId];
                 if (defCardId === 'id_2') {
                     window.game.players.filter(px => px.id !== targetId).forEach(px => {
                         window.AbilityEngine.applyDraw(window.game, px.id, 1);
@@ -978,11 +983,6 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
         return;
     }
 
-    if (cardValue === 'id_26') {
-        window.startJankenPhase(playerId, 0);
-        return;
-    }
-
     const multiplier = indices.length; 
     const discCard = discardIdx !== null ? originalHand[discardIdx] : null;
     const multiCards = (multiDiscardIndices || []).map(i => originalHand[i]);
@@ -1004,6 +1004,12 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
             window.game.discardRotations.push(0);
         }
     });
+
+    // ★ id_26 は、手札からカードを消費した直後にじゃんけんフェーズに入る
+    if (cardValue === 'id_26') {
+        window.startJankenPhase(playerId, 0);
+        return;
+    }
 
     if (def.type === 'AT' || def.type === 'AT_BL' || def.type === 'HV') {
         let targets = [];
@@ -1124,6 +1130,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
     }
 };
 
+// ★ じゃんけんフェーズの実装
 window.startJankenPhase = function(attackerId, loopCount) {
     const others = window.game.players.filter(p => p.id !== attackerId && p.connected);
     if (others.length === 0) {
@@ -1135,46 +1142,45 @@ window.startJankenPhase = function(attackerId, loopCount) {
     window.pendingJanken = {
         attackerId, targetId, loopCount,
         attackerHand: null, targetHand: null,
-        timer: 10
+        timer: 10,
+        result: null
     };
 
-    window.socket.emit('player_action', { action: 'start_janken', attackerId, targetId, loopCount });
+    window.broadcastGameState(); // UI表示のために同期
 
     window.jankenInterval = setInterval(() => {
-        if (!window.pendingJanken) {
-            clearInterval(window.jankenInterval);
-            return;
-        }
+        if (!window.pendingJanken || window.pendingJanken.result) return;
+        
         window.pendingJanken.timer--;
         if (window.pendingJanken.timer <= 0) {
-            clearInterval(window.jankenInterval);
+            // タイムアップ時はランダム
             if (!window.pendingJanken.attackerHand) window.pendingJanken.attackerHand = Math.floor(Math.random()*3)+1;
             if (!window.pendingJanken.targetHand) window.pendingJanken.targetHand = Math.floor(Math.random()*3)+1;
             window.resolveJanken();
         } else {
+            // BOTの自動選択処理
             [attackerId, targetId].forEach(id => {
                 const p = window.game.players.find(px => px.id === id);
                 if (p && p.type === 'bot' && !window.pendingJanken[(id===attackerId?'attackerHand':'targetHand')]) {
-                    if (window.pendingJanken.timer === 8) {
+                    if (window.pendingJanken.timer === 8) { // 残り8秒で決める
                         window.pendingJanken[(id===attackerId?'attackerHand':'targetHand')] = Math.floor(Math.random()*3)+1;
                         window.checkJankenReady();
                     }
                 }
             });
+            window.broadcastGameState();
         }
     }, 1000);
 };
 
 window.checkJankenReady = function() {
-    if (window.pendingJanken && window.pendingJanken.attackerHand && window.pendingJanken.targetHand) {
-        clearInterval(window.jankenInterval);
+    if (window.pendingJanken && window.pendingJanken.attackerHand && window.pendingJanken.targetHand && !window.pendingJanken.result) {
         window.resolveJanken();
     }
 };
 
 window.resolveJanken = function() {
     const pJ = window.pendingJanken;
-    window.pendingJanken = null;
     const aH = pJ.attackerHand;
     const tH = pJ.targetHand;
     
@@ -1183,35 +1189,46 @@ window.resolveJanken = function() {
     else if ((aH===1 && tH===2) || (aH===2 && tH===3) || (aH===3 && tH===1)) result = 'win';
     else result = 'lose';
 
-    window.socket.emit('player_action', { action: 'janken_result', attackerId: pJ.attackerId, targetId: pJ.targetId, aH, tH, result, loopCount: pJ.loopCount });
-    
+    pJ.result = result;
+    window.broadcastGameState(); // 結果表示アニメーションの発動
+
     setTimeout(() => {
         let drawCount = 0;
         if (pJ.loopCount === 0) {
-            drawCount = 2; 
+            drawCount = 2; // 初回は絶対2ドロー
         } else if (result === 'win') {
             drawCount = 2; 
         }
         
         if (drawCount > 0) {
             window.AbilityEngine.applyDraw(window.game, pJ.targetId, drawCount, false);
-            window.broadcastGameState();
+            const guides = [{ from: pJ.attackerId, to: pJ.targetId, text: 'じゃんけんドロー!' }];
+            window.broadcastGameState(false, guides);
         }
 
-        if (result === 'win' && pJ.loopCount < 3) {
-            window.startJankenPhase(pJ.attackerId, pJ.loopCount + 1);
+        const nextLoop = pJ.loopCount + 1;
+        const aId = pJ.attackerId;
+        window.pendingJanken = null;
+        window.broadcastGameState();
+
+        // 勝てばループ、あいこは同じ回数で再戦、負けまたは4回で終了
+        if (result === 'win' && nextLoop < 4) {
+            setTimeout(() => window.startJankenPhase(aId, nextLoop), 1000);
+        } else if (result === 'draw') {
+            setTimeout(() => window.startJankenPhase(aId, pJ.loopCount), 1000);
         } else {
-            window.checkTurn();
+            setTimeout(() => window.checkTurn(), 1000);
         }
-    }, 5000); 
+    }, 4500); 
 };
 
+// ★ じゃんけんUI描画
 window.showJankenUI = function(attackerId, targetId, loopCount) {
     if (!document.getElementById('janken-overlay')) {
         const div = document.createElement('div');
         div.id = 'janken-overlay';
         div.className = 'hidden';
-        div.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); z-index:110000; display:flex; flex-direction:column; justify-content:center; align-items:center;";
+        div.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.95); z-index:110000; display:flex; flex-direction:column; justify-content:center; align-items:center;";
         div.innerHTML = `
             <h2 id="janken-title" style="color:white; font-style:italic;">じゃんけん 勝負！</h2>
             <div style="color:#fbc02d; font-size:24px; font-weight:bold; margin-bottom:20px;"><span id="janken-timer">10</span>秒</div>
@@ -1219,13 +1236,13 @@ window.showJankenUI = function(attackerId, targetId, loopCount) {
                 <div id="janken-player1" style="text-align:center; color:white;">
                     <div id="janken-p1-result" style="font-size:24px; font-weight:bold; height:35px; text-shadow: 2px 2px 4px #000;"></div>
                     <div id="janken-p1-name" style="margin-bottom:10px; font-weight:bold;">Player1</div>
-                    <img id="janken-p1-card" src="card/back.png" style="width:80px; border-radius:10px; transition:0.3s;">
+                    <img id="janken-p1-card" src="card/back.png" style="width:80px; border-radius:10px; transition:0.3s; border-top: 10px solid transparent;">
                 </div>
                 <div style="color:white; font-size:30px; font-weight:bold; font-style:italic;">VS</div>
                 <div id="janken-player2" style="text-align:center; color:white;">
                     <div id="janken-p2-result" style="font-size:24px; font-weight:bold; height:35px; text-shadow: 2px 2px 4px #000;"></div>
                     <div id="janken-p2-name" style="margin-bottom:10px; font-weight:bold;">Player2</div>
-                    <img id="janken-p2-card" src="card/back.png" style="width:80px; border-radius:10px; transition:0.3s;">
+                    <img id="janken-p2-card" src="card/back.png" style="width:80px; border-radius:10px; transition:0.3s; border-top: 10px solid transparent;">
                 </div>
             </div>
             <div id="janken-controls" style="display:flex; gap:15px;">
@@ -1246,6 +1263,8 @@ window.showJankenUI = function(attackerId, targetId, loopCount) {
     }
 
     const overlay = document.getElementById('janken-overlay');
+    overlay.classList.remove('result-showing');
+    
     const title = document.getElementById('janken-title');
     const p1Name = document.getElementById('janken-p1-name');
     const p2Name = document.getElementById('janken-p2-name');
@@ -1254,7 +1273,6 @@ window.showJankenUI = function(attackerId, targetId, loopCount) {
     const p1Res = document.getElementById('janken-p1-result');
     const p2Res = document.getElementById('janken-p2-result');
     const controls = document.getElementById('janken-controls');
-    const timer = document.getElementById('janken-timer');
     
     title.innerText = `運命の三姉妹 (Loop: ${loopCount+1}/4)`;
     
@@ -1263,12 +1281,9 @@ window.showJankenUI = function(attackerId, targetId, loopCount) {
     p1Name.innerText = aP ? aP.name : 'Attacker';
     p2Name.innerText = tP ? tP.name : 'Target';
     
-    p1Card.src = 'card/back.png'; p1Card.style.borderTop = 'none';
-    p2Card.src = 'card/back.png'; p2Card.style.borderTop = 'none';
+    p1Card.src = 'card/back.png'; p1Card.style.borderTop = '10px solid transparent';
+    p2Card.src = 'card/back.png'; p2Card.style.borderTop = '10px solid transparent';
     p1Res.innerText = ''; p2Res.innerText = '';
-    
-    let timeLeft = 10;
-    timer.innerText = timeLeft;
     
     if (window.myId === attackerId || window.myId === targetId) {
         controls.style.display = 'flex';
@@ -1277,48 +1292,50 @@ window.showJankenUI = function(attackerId, targetId, loopCount) {
     }
     
     overlay.classList.remove('hidden');
-    
-    if (window.localJankenTimer) clearInterval(window.localJankenTimer);
-    window.localJankenTimer = setInterval(() => {
-        timeLeft--;
-        timer.innerText = timeLeft;
-        if(timeLeft <= 0) clearInterval(window.localJankenTimer);
-    }, 1000);
 };
 
+// ★ じゃんけん結果表示アニメーション
 window.playJankenResult = function(attackerId, targetId, aH, tH, result) {
-    if (window.localJankenTimer) clearInterval(window.localJankenTimer);
+    const overlay = document.getElementById('janken-overlay');
+    if (overlay) overlay.classList.add('result-showing'); 
+
     const p1Card = document.getElementById('janken-p1-card');
     const p2Card = document.getElementById('janken-p2-card');
     const p1Res = document.getElementById('janken-p1-result');
     const p2Res = document.getElementById('janken-p2-result');
+    const controls = document.getElementById('janken-controls');
     
-    p1Card.src = `card/custom/jyanken${aH}.png`;
-    p2Card.src = `card/custom/jyanken${tH}.png`;
+    if (controls) controls.style.display = 'none';
+    
+    if (p1Card) p1Card.src = `card/custom/jyanken${aH}.png`;
+    if (p2Card) p2Card.src = `card/custom/jyanken${tH}.png`;
     
     if (result === 'win') {
-        p1Res.innerText = 'Win'; p1Res.style.color = '#fbc02d';
-        p1Card.style.borderTop = '10px solid #fbc02d';
-        p2Res.innerText = 'Lose'; p2Res.style.color = '#7e57c2';
-        p2Card.style.borderTop = '10px solid #7e57c2';
+        if (p1Res) { p1Res.innerText = 'Win'; p1Res.style.color = '#fbc02d'; }
+        if (p1Card) p1Card.style.borderTop = '10px solid #fbc02d';
+        if (p2Res) { p2Res.innerText = 'Lose'; p2Res.style.color = '#7e57c2'; }
+        if (p2Card) p2Card.style.borderTop = '10px solid #7e57c2';
         if (window.SE) window.SE.play('win'); 
     } else if (result === 'lose') {
-        p1Res.innerText = 'Lose'; p1Res.style.color = '#7e57c2';
-        p1Card.style.borderTop = '10px solid #7e57c2';
-        p2Res.innerText = 'Win'; p2Res.style.color = '#fbc02d';
-        p2Card.style.borderTop = '10px solid #fbc02d';
+        if (p1Res) { p1Res.innerText = 'Lose'; p1Res.style.color = '#7e57c2'; }
+        if (p1Card) p1Card.style.borderTop = '10px solid #7e57c2';
+        if (p2Res) { p2Res.innerText = 'Win'; p2Res.style.color = '#fbc02d'; }
+        if (p2Card) p2Card.style.borderTop = '10px solid #fbc02d';
         if (window.SE) window.SE.play('win2'); 
     } else {
-        p1Res.innerText = 'Draw'; p1Res.style.color = '#aaa';
-        p2Res.innerText = 'Draw'; p2Res.style.color = '#aaa';
+        if (p1Res) { p1Res.innerText = 'Draw'; p1Res.style.color = '#aaa'; }
+        if (p1Card) p1Card.style.borderTop = '10px solid #aaa';
+        if (p2Res) { p2Res.innerText = 'Draw'; p2Res.style.color = '#aaa'; }
+        if (p2Card) p2Card.style.borderTop = '10px solid #aaa';
     }
     
     setTimeout(() => {
-        const overlay = document.getElementById('janken-overlay');
-        if (overlay) overlay.classList.add('hidden');
+        if (overlay) {
+            overlay.classList.remove('result-showing');
+            overlay.classList.add('hidden');
+        }
     }, 4500);
 };
-
 
 window.checkTurn = function() {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return; 
@@ -1731,7 +1748,6 @@ window.handlePlayAction = function() {
         };
 
         const step6 = () => {
-            // ★ 安全対策 (def && def.needs...) を徹底
             if (def && def.needsGraveyard) {
                 window.openGraveyardSelection((selectedId) => {
                     if (!selectedId) { window.game.selectedIndices = []; window.updateUI(); return; }
