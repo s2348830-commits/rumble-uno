@@ -133,7 +133,9 @@ window.ensureModalsExist = function() {
         jOverlay.id = 'janken-overlay';
         jOverlay.className = 'hidden';
         jOverlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.95); z-index:110000; display:flex; flex-direction:column; justify-content:center; align-items:center;";
-        // ★ エラー回避のため、画像を使わずプログラム内のダミーデータを使用
+        // ★ 画像が見つからなくてもエラーで止まらないようにSVGデータを直接指定＆エラー回避処理を追加
+        const dummyBack = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 60'%3E%3Crect width='40' height='60' rx='6' fill='%23222' stroke='%23444' stroke-width='2'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23fff' font-size='24' font-weight='bold'%3E?%3C/text%3E%3C/svg%3E";
+        
         jOverlay.innerHTML = `
             <h2 id="janken-title" style="color:white; font-style:italic; margin-bottom: 5px;">じゃんけん 勝負！</h2>
             <div id="janken-subtitle" style="color:#aaa; font-size:14px; margin-bottom:15px;">Loop: 1/4</div>
@@ -142,19 +144,19 @@ window.ensureModalsExist = function() {
                 <div id="janken-player1" style="text-align:center; color:white; flex: 1;">
                     <div id="janken-p1-result" style="font-size:24px; font-weight:bold; height:35px; text-shadow: 2px 2px 4px #000;"></div>
                     <div id="janken-p1-name" style="margin-bottom:10px; font-weight:bold; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Player1</div>
-                    <img id="janken-p1-card" src="${window.JANKEN_BACK_IMG}" style="width:80px; max-width: 100%; border-radius:10px; transition:0.3s; border-top: 10px solid transparent;">
+                    <img id="janken-p1-card" src="${dummyBack}" style="width:80px; max-width: 100%; border-radius:10px; transition:0.3s; border-top: 10px solid transparent;">
                 </div>
                 <div style="color:white; font-size:30px; font-weight:bold; font-style:italic;">VS</div>
                 <div id="janken-player2" style="text-align:center; color:white; flex: 1;">
                     <div id="janken-p2-result" style="font-size:24px; font-weight:bold; height:35px; text-shadow: 2px 2px 4px #000;"></div>
                     <div id="janken-p2-name" style="margin-bottom:10px; font-weight:bold; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Player2</div>
-                    <img id="janken-p2-card" src="${window.JANKEN_BACK_IMG}" style="width:80px; max-width: 100%; border-radius:10px; transition:0.3s; border-top: 10px solid transparent;">
+                    <img id="janken-p2-card" src="${dummyBack}" style="width:80px; max-width: 100%; border-radius:10px; transition:0.3s; border-top: 10px solid transparent;">
                 </div>
             </div>
             <div id="janken-controls" style="display:flex; gap:15px;">
-                <button class="janken-btn" data-hand="1" style="background:none; border:none; cursor:pointer; transition:transform 0.2s;"><img src="card/custom/jyanken1.png" style="width:70px;"></button>
-                <button class="janken-btn" data-hand="2" style="background:none; border:none; cursor:pointer; transition:transform 0.2s;"><img src="card/custom/jyanken2.png" style="width:70px;"></button>
-                <button class="janken-btn" data-hand="3" style="background:none; border:none; cursor:pointer; transition:transform 0.2s;"><img src="card/custom/jyanken3.png" style="width:70px;"></button>
+                <button class="janken-btn" data-hand="1" style="background:none; border:none; cursor:pointer; transition:transform 0.2s;"><img src="card/custom/jyanken1.png" style="width:70px;" onerror="this.outerHTML='<div style=\\'width:70px;height:70px;background:#fbc02d;color:black;border-radius:50%;display:flex;justify-content:center;align-items:center;font-weight:bold;font-size:18px;\\'>グー</div>'"></button>
+                <button class="janken-btn" data-hand="2" style="background:none; border:none; cursor:pointer; transition:transform 0.2s;"><img src="card/custom/jyanken2.png" style="width:70px;" onerror="this.outerHTML='<div style=\\'width:70px;height:70px;background:#fbc02d;color:black;border-radius:50%;display:flex;justify-content:center;align-items:center;font-weight:bold;font-size:18px;\\'>チョキ</div>'"></button>
+                <button class="janken-btn" data-hand="3" style="background:none; border:none; cursor:pointer; transition:transform 0.2s;"><img src="card/custom/jyanken3.png" style="width:70px;" onerror="this.outerHTML='<div style=\\'width:70px;height:70px;background:#fbc02d;color:black;border-radius:50%;display:flex;justify-content:center;align-items:center;font-weight:bold;font-size:18px;\\'>パー</div>'"></button>
             </div>
         `;
         document.body.appendChild(jOverlay);
@@ -162,7 +164,7 @@ window.ensureModalsExist = function() {
         document.querySelectorAll('.janken-btn').forEach(btn => {
             btn.onclick = () => {
                 const choice = parseInt(btn.dataset.hand);
-                window.socket.emit('player_action', { action: 'janken_choice', playerId: window.myId, choice });
+                if (window.socket) window.socket.emit('player_action', { action: 'janken_choice', playerId: window.myId, choice });
                 document.getElementById('janken-controls').style.display = 'none';
                 document.getElementById('janken-title').innerText = "相手を待っています...";
             };
@@ -1352,23 +1354,29 @@ window.showJankenUI = function(attackerId, targetId, loopCount) {
     const p2Res = document.getElementById('janken-p2-result');
     const controls = document.getElementById('janken-controls');
     
-    title.innerText = `じゃんけん 勝負！`;
-    subtitle.innerText = `運命の三姉妹 (Loop: ${loopCount+1}/4)`;
+    if (title) title.innerText = `じゃんけん 勝負！`;
+    if (subtitle) subtitle.innerText = `運命の三姉妹 (Loop: ${loopCount+1}/4)`;
     
     const aP = window.game.players.find(p=>p.id===attackerId);
     const tP = window.game.players.find(p=>p.id===targetId);
-    p1Name.innerText = aP ? aP.name : 'Attacker';
-    p2Name.innerText = tP ? tP.name : 'Target';
+    if (p1Name) p1Name.innerText = aP ? aP.name : 'Attacker';
+    if (p2Name) p2Name.innerText = tP ? tP.name : 'Target';
     
-    p1Card.src = window.JANKEN_BACK_IMG; p1Card.style.borderTop = '10px solid transparent';
-    p2Card.src = window.JANKEN_BACK_IMG; p2Card.style.borderTop = '10px solid transparent';
-    p1Res.innerText = ''; p2Res.innerText = '';
+    // ★ 画像ではなくダミーのSVG文字列をセットして404エラーを防止
+    const dummyBack = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 60'%3E%3Crect width='40' height='60' rx='6' fill='%23222' stroke='%23444' stroke-width='2'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23fff' font-size='24' font-weight='bold'%3E?%3C/text%3E%3C/svg%3E";
     
-    if (window.myId === attackerId || window.myId === targetId) {
-        controls.style.display = 'flex';
-    } else {
-        controls.style.display = 'none';
-        title.innerText = "じゃんけん観戦中...";
+    if (p1Card) { p1Card.src = dummyBack; p1Card.style.borderTop = '10px solid transparent'; }
+    if (p2Card) { p2Card.src = dummyBack; p2Card.style.borderTop = '10px solid transparent'; }
+    if (p1Res) p1Res.innerText = ''; 
+    if (p2Res) p2Res.innerText = '';
+    
+    if (controls) {
+        if (window.myId === attackerId || window.myId === targetId) {
+            controls.style.display = 'flex';
+        } else {
+            controls.style.display = 'none';
+            if (title) title.innerText = "じゃんけん観戦中...";
+        }
     }
     
     overlay.classList.remove('hidden');
@@ -1388,8 +1396,15 @@ window.playJankenResult = function(attackerId, targetId, aH, tH, result) {
     if (controls) controls.style.display = 'none';
     if (title) title.innerText = "結果発表！";
     
-    if (p1Card) p1Card.src = `card/custom/jyanken${aH}.png`;
-    if (p2Card) p2Card.src = `card/custom/jyanken${tH}.png`;
+    // ★ エラー回避のため、画像がない場合はonerrorで文字に置き換える処理
+    if (p1Card) {
+        p1Card.src = `card/custom/jyanken${aH}.png`;
+        p1Card.onerror = function() { this.src = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 60'%3E%3Crect width='40' height='60' rx='6' fill='%23555'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23fff' font-size='16'%3E手" + aH + "%3C/text%3E%3C/svg%3E"; };
+    }
+    if (p2Card) {
+        p2Card.src = `card/custom/jyanken${tH}.png`;
+        p2Card.onerror = function() { this.src = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 60'%3E%3Crect width='40' height='60' rx='6' fill='%23555'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23fff' font-size='16'%3E手" + tH + "%3C/text%3E%3C/svg%3E"; };
+    }
     
     if (result === 'win') {
         if (p1Res) { p1Res.innerText = 'Win'; p1Res.style.color = '#fbc02d'; }
