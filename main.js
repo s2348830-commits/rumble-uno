@@ -66,12 +66,10 @@ window.ensureModalsExist = function() {
         `;
         document.body.appendChild(defModal);
     }
-    // ★ ペルソナ風のHTML構造で動的生成するように修正
     if (!document.getElementById('ability-cutin')) {
         const cutin = document.createElement('div');
         cutin.id = 'ability-cutin';
         cutin.className = 'hidden';
-        // ★ HTMLと同じくペルソナ風の構造で生成する
         cutin.innerHTML = `
             <div class="cutin-bg-red"></div>
             <div class="cutin-bg-black"></div>
@@ -159,7 +157,7 @@ window.SE = {
 const unlockAudioContext = () => {
     if (window.SE.unlocked) return; window.SE.unlocked = true; window.SE.initContext();
     if (window.SE.audioCtx.state === 'suspended') window.SE.audioCtx.resume();
-    ['win', 'draw', 'uno_message', 'buttonclick', 'uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6', 'frieze', 'rock', 'Distribute', 'mvp_1', 'mvp_2'].forEach(name => window.SE.loadSound(name, 'mp3'));
+    ['win', 'win2', 'setting', 'draw', 'uno_message', 'buttonclick', 'uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6', 'frieze', 'rock', 'Distribute', 'mvp_1', 'mvp_2'].forEach(name => window.SE.loadSound(name, 'mp3'));
     ['fire', 'page'].forEach(name => window.SE.loadSound(name, 'wav'));
     ['hv/id_20(1)', 'hv/id_20(2)'].forEach(name => window.SE.loadSound(name, 'mov')); 
     document.removeEventListener('click', unlockAudioContext);
@@ -527,7 +525,6 @@ window.showAbilityCutin = function(cardValue, isHVActivated = false) {
     
     cutinImg.src = `card/custom/${cardValue}.png`;
     
-    // ★ 名前と説明をセット
     if (window.AbilityDef && window.AbilityDef[cardValue]) {
         if (cutinName) cutinName.innerText = window.AbilityDef[cardValue].name;
         if (cutinText) cutinText.innerText = window.AbilityDef[cardValue].desc;
@@ -545,7 +542,6 @@ window.showAbilityCutin = function(cardValue, isHVActivated = false) {
         if (window.SE) window.SE.play(`mvp_${randMvp}`);
     }
 
-    // ★ 表示時間を2秒に延長してスライドアウト
     setTimeout(() => {
         cutinEl.classList.remove('show-cutin'); 
         cutinEl.classList.add('fade-out');
@@ -717,6 +713,11 @@ window.showDefenseModal = function(attackCardValue) {
             btn.style.width = '50px'; btn.style.height = '75px'; btn.style.margin = '5px'; btn.style.cursor = 'pointer';
             btn.onclick = () => {
                 const def = window.AbilityDef[item.card.value];
+                
+                if (typeof window.showAbilityCutin === 'function') {
+                    window.showAbilityCutin(item.card.value);
+                }
+
                 if (def.needsDiscard || def.needsAbilityDiscard) {
                     modal.classList.add('hidden'); 
                     window.openDiscardSelection(myHand, [item.idx], def, (discIdx) => {
@@ -815,6 +816,11 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                     window.game.discardPile.push(playedDefCard);
                     window.game.discardRotations.push(0);
                     if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: targetId, cards: [playedDefCard] });
+                    
+                    if (targetId !== window.game.myId && typeof window.showAbilityCutin === 'function' && String(defCardId).startsWith('id_')) {
+                        window.showAbilityCutin(defCardId);
+                    }
+
                     defenseGuides.push({ from: targetId, to: targetId, text: '防ぐ!' });
                     blocked = true;
                 }
@@ -830,7 +836,7 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                         window.AbilityEngine.triggerDiscardEffect(targetId, 'id_4', false, null);
                     }
                 } else if (defCardId === 'id_9') {
-                    window.game.players.forEach(px => {
+                    window.game.players.filter(px => px.id !== targetId).forEach(px => {
                         window.game.drawCard(px.id); window.game.drawCard(px.id);
                         if(window.isHost && window.socket) window.socket.emit('request_draw_animation', { playerId: px.id, count: 2 });
                     });

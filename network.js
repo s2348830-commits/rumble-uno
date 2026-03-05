@@ -153,10 +153,8 @@ window.socket.on('room_joined', (data) => {
     lobbyScreen.classList.remove('hidden');
     document.getElementById('display-room-id').innerText = data.roomId;
 
-    const cia = document.getElementById('chat-input-area');
     const log = document.getElementById('chat-log-container');
     if (window.ChatManager && window.ChatManager.enabled) {
-        if(cia) cia.classList.remove('hidden');
         if(log) log.classList.remove('hidden');
     }
 
@@ -283,8 +281,8 @@ function renderSlots(roomState) {
 btnAddSlot.addEventListener('click', () => window.socket.emit('add_slot'));
 btnReady.addEventListener('click', () => window.socket.emit('toggle_ready', { roomId: window.currentRoomState.id, userId: window.clientUserId }));
 
-// ★ ゲーム設定を開いている時はチャット入力欄を隠す
 btnSettings.addEventListener('click', () => {
+    if (window.SE) window.SE.play('setting');
     startOverlay.classList.remove('hidden');
     const cia = document.getElementById('chat-input-area');
     if (cia) cia.classList.add('hidden');
@@ -309,7 +307,6 @@ window.socket.on('game_started', (roomState) => {
     window.isInitialDealing = true; 
     lobbyScreen.classList.add('hidden'); startOverlay.classList.add('hidden'); gameContainer.classList.remove('hidden');
     
-    // ★ 説明書ボタンを隠す
     const manualBtn = document.getElementById('btn-manual');
     if (manualBtn) manualBtn.classList.add('hidden');
 
@@ -417,9 +414,11 @@ window.socket.on('broadcast_uno', (data) => {
 window.socket.on('game_over', (data) => {
     window.isGameOver = true;
     if (data.isDraw) {
+        if (window.SE) window.SE.play('draw');
         setTimeout(() => document.getElementById('draw-curtain').classList.add('show'), 100);
         setTimeout(() => { const b = document.getElementById('winner-banner'); b.innerText = "DRAW"; b.classList.add('show'); }, 3000);
     } else {
+        if (window.SE) window.SE.play(Math.random() < 0.5 ? 'win' : 'win2');
         const { winnerId, winnerName } = data;
         const target = (winnerId === window.myId) ? document.getElementById('my-player-info') : document.querySelector(`.circle-player-badge[data-id="${winnerId}"]`);
         if(target) target.classList.add('winner-crown');
@@ -439,12 +438,12 @@ window.socket.on('back_to_lobby', (roomState) => {
     document.getElementById('draw-curtain').classList.remove('show');
     gameContainer.classList.add('hidden'); lobbyScreen.classList.remove('hidden');
     
-    // ★ 説明書ボタンを再表示
     const manualBtn = document.getElementById('btn-manual');
     if (manualBtn) manualBtn.classList.remove('hidden');
 
     const cia = document.getElementById('chat-input-area');
-    if (cia && window.ChatManager && window.ChatManager.enabled) cia.classList.remove('hidden');
+    if (cia) cia.classList.add('hidden');
+    
     renderSlots(roomState);
 });
 

@@ -25,7 +25,8 @@ const Renderer = {
 
         const currentDir = game.direction;
         
-        arrowSvg.setAttribute('class', 'direction-arrows');
+        arrowSvg.classList.remove('normal', 'reverse', 'predict-normal', 'predict-reverse');
+        
         if (reverseCount > 0) {
             const predictedDir = currentDir * Math.pow(-1, reverseCount);
             if (predictedDir === 1) arrowSvg.classList.add('predict-normal');
@@ -154,14 +155,9 @@ const Renderer = {
             if (game.selectedIndices.includes(i)) div.classList.add('selected');
             else if (canSuggest && card.value === selectedValue) div.classList.add('suggested');
 
-            // ★ すでに選択されているカードをもう一度タップしたら、そのまま発動させる（ダブルタップ発動）
             div.onclick = (e) => {
                 e.stopPropagation();
-                if (game.selectedIndices.includes(i)) {
-                    if (typeof window.handlePlayAction === 'function') window.handlePlayAction();
-                } else {
-                    game.toggleSelect(i); this.updateAll(game); 
-                }
+                game.toggleSelect(i); this.updateAll(game); 
             };
             playerEl.appendChild(div);
         });
@@ -213,6 +209,7 @@ const Renderer = {
         const drawText = document.getElementById('draw-text'); 
         const unoBtn = document.getElementById('uno-btn');
         const endTurnBtn = document.getElementById('end-turn-btn');
+        const btnUnoAuto = document.getElementById('btn-uno-auto'); 
         if(!drawBtn || !unoBtn || !endTurnBtn) return;
 
         if (drawText) {
@@ -223,6 +220,10 @@ const Renderer = {
                 drawText.innerText = '引く';
                 drawText.style.color = 'inherit';
             }
+        }
+
+        if (btnUnoAuto) {
+            btnUnoAuto.style.display = (window.RuleSettings && window.RuleSettings.showUnoAutoBtn === false) ? 'none' : 'inline-flex';
         }
 
         let showUnoBtn = false;
@@ -275,13 +276,12 @@ const Renderer = {
 
         if (card.lockedTurns && card.lockedTurns > 0) {
             div.classList.add('locked');
-            // ★ ロックカードの黄色エフェクト
             const lockOverlay = document.createElement('div');
             lockOverlay.style.position = 'absolute';
             lockOverlay.style.top = '0'; lockOverlay.style.left = '0';
             lockOverlay.style.width = '100%'; lockOverlay.style.height = '100%';
             lockOverlay.style.background = 'rgba(255, 215, 0, 0.4)';
-            lockOverlay.style.boxShadow = 'inset 0 0 15px #ffd700';
+            lockOverlay.style.boxShadow = 'inset 0 0 10px #ffd700';
             lockOverlay.style.zIndex = '40';
             lockOverlay.style.pointerEvents = 'none';
             div.appendChild(lockOverlay);

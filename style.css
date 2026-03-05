@@ -245,21 +245,21 @@ button.disabled-btn { opacity: 0.5; cursor: not-allowed; }
 .manual-indicators { font-size: 14px; letter-spacing: 2px; margin: 15px 0 5px 0; text-align: center; }
 .manual-close-btn { background: #d32f2f; color: white; border: 2px solid white; padding: 6px 20px; font-size: 14px; font-weight: bold; border-radius: 20px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.5); margin-top: 10px; }
 
-/* ★ スタイリッシュなカットイン用のアニメーション */
+/* ====================================================
+   ★ ペルソナ風 アグレッシブ・カットインアニメーション
+   ==================================================== */
 #ability-cutin {
     position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
     z-index: 100000; pointer-events: none; overflow: hidden;
     display: flex; justify-content: center; align-items: center;
 }
 
-/* 真っ赤な背景（左から高速スライド） */
 .cutin-bg-red {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
     background: radial-gradient(circle, #e60012 0%, #a00000 100%);
     transform: translateX(-100%);
 }
 
-/* 黒い斜めの帯（右から鋭くスライド） */
 .cutin-bg-black {
     position: absolute; top: 20%; left: -10%; width: 120%; height: 60%;
     background: #000; border-top: 8px solid #fff; border-bottom: 8px solid #fff;
@@ -273,7 +273,6 @@ button.disabled-btn { opacity: 0.5; cursor: not-allowed; }
 @keyframes p5-red { to { transform: translateX(0); } }
 @keyframes p5-black { to { transform: rotate(-10deg) translateX(0); } }
 
-/* 画像とテキストのコンテナ（叩きつけるように拡大から縮小） */
 .cutin-content {
     position: relative; z-index: 10; display: flex; align-items: center; justify-content: center; gap: 40px;
     opacity: 0; transform: scale(1.5) rotate(5deg);
@@ -284,32 +283,27 @@ button.disabled-btn { opacity: 0.5; cursor: not-allowed; }
     to { opacity: 1; transform: scale(1) rotate(-5deg); }
 }
 
-/* キャラクター画像（白い太フチをつける） */
 #ability-cutin-img {
     max-height: 70vh; max-width: 40vw; object-fit: contain;
     filter: drop-shadow(4px 4px 0px #fff) drop-shadow(-4px -4px 0px #fff) drop-shadow(0px 0px 10px rgba(0,0,0,0.8));
 }
 
-/* テキストコンテナ（斜体＆極太ボーダー） */
 .cutin-text-container {
     display: flex; flex-direction: column; gap: 15px; transform: skewX(-10deg);
 }
 
-/* キャラクター名（黒背景に白文字、赤のドロップシャドウ） */
 #ability-cutin-name {
     margin: 0; font-size: 55px; font-weight: 900; color: #fff; background: #000;
     padding: 5px 30px; border: 4px solid #e60012; display: inline-block; align-self: flex-start;
     box-shadow: 6px 6px 0px #fff; letter-spacing: 3px; font-style: italic;
 }
 
-/* 能力効果テキスト（白背景に黒文字、赤のドロップシャドウ） */
 #ability-cutin-text {
     margin: 0; font-size: 20px; font-weight: bold; color: #000; background: #fff;
     padding: 12px 25px; border: 4px solid #000; box-shadow: 6px 6px 0px #e60012;
     line-height: 1.5; white-space: pre-wrap; display: inline-block;
 }
 
-/* 退場時のアニメーション（シュッと消える） */
 .fade-out .cutin-bg-red { animation: p5-red-out 0.4s ease-in forwards; }
 .fade-out .cutin-bg-black { animation: p5-black-out 0.3s ease-in forwards; }
 .fade-out .cutin-content { animation: p5-content-out 0.3s ease-in forwards; }
@@ -318,7 +312,6 @@ button.disabled-btn { opacity: 0.5; cursor: not-allowed; }
 @keyframes p5-black-out { to { transform: rotate(-10deg) translateX(100%); opacity: 0; } }
 @keyframes p5-content-out { to { transform: scale(0.8) rotate(-5deg); opacity: 0; } }
 
-/* スマホ用のレイアウト調整 */
 @media screen and (max-width: 600px) {
     .cutin-content { flex-direction: column; transform: scale(1.2) rotate(0deg); gap: 15px; }
     .show-cutin .cutin-content { animation: p5-content-mob 0.4s cubic-bezier(0.1, 0.9, 0.2, 1) 0.3s forwards; }
