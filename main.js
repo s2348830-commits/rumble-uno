@@ -1240,6 +1240,9 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
 
 // ★ じゃんけんフェーズの実装
 window.startJankenPhase = function(attackerId, loopCount) {
+    // ★ 修正: 前回のタイマーが動いていたら確実に消す（二重起動の防止）
+    if (window.jankenInterval) clearInterval(window.jankenInterval);
+
     const others = window.game.players.filter(p => p.id !== attackerId && p.connected);
     if (others.length === 0) {
         alert("じゃんけんの相手がいません！");
@@ -1258,10 +1261,17 @@ window.startJankenPhase = function(attackerId, loopCount) {
     window.broadcastGameState(); 
 
     window.jankenInterval = setInterval(() => {
-        if (!window.pendingJanken || window.pendingJanken.result) return;
+        // ★ 修正: すでに結果が出ているか無効ならタイマーを止める
+        if (!window.pendingJanken || window.pendingJanken.result) {
+            clearInterval(window.jankenInterval);
+            return;
+        }
         
         window.pendingJanken.timer--;
         if (window.pendingJanken.timer <= 0) {
+            // ★ 修正: タイムアップ時にもタイマーを止める
+            clearInterval(window.jankenInterval);
+            
             if (!window.pendingJanken.attackerHand) window.pendingJanken.attackerHand = Math.floor(Math.random()*3)+1;
             if (!window.pendingJanken.targetHand) window.pendingJanken.targetHand = Math.floor(Math.random()*3)+1;
             window.resolveJanken();
@@ -1282,11 +1292,16 @@ window.startJankenPhase = function(attackerId, loopCount) {
 
 window.checkJankenReady = function() {
     if (window.pendingJanken && window.pendingJanken.attackerHand && window.pendingJanken.targetHand && !window.pendingJanken.result) {
+        // ★ 修正: 両者の手が揃ったらタイマーを止める
+        if (window.jankenInterval) clearInterval(window.jankenInterval);
         window.resolveJanken();
     }
 };
 
 window.resolveJanken = function() {
+    // ★ 修正: 念のためここでも確実にタイマーを止める
+    if (window.jankenInterval) clearInterval(window.jankenInterval);
+
     const pJ = window.pendingJanken;
     const aH = pJ.attackerHand;
     const tH = pJ.targetHand;
