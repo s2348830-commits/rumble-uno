@@ -71,8 +71,10 @@ window.ensureModalsExist = function() {
         const cutin = document.createElement('div');
         cutin.id = 'ability-cutin';
         cutin.className = 'hidden';
+        // ★ HTMLと同じくペルソナ風の構造で生成する
         cutin.innerHTML = `
-            <div class="cutin-background"></div>
+            <div class="cutin-bg-red"></div>
+            <div class="cutin-bg-black"></div>
             <div class="cutin-content">
                 <img id="ability-cutin-img" src="" alt="Ability">
                 <div class="cutin-text-container">

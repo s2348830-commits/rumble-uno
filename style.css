@@ -248,61 +248,86 @@ button.disabled-btn { opacity: 0.5; cursor: not-allowed; }
 /* ★ スタイリッシュなカットイン用のアニメーション */
 #ability-cutin {
     position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-    z-index: 100000; pointer-events: none;
+    z-index: 100000; pointer-events: none; overflow: hidden;
     display: flex; justify-content: center; align-items: center;
-    overflow: hidden;
 }
 
-/* 背景の斜め帯 */
-.cutin-background {
-    position: absolute; top: 50%; left: 0; width: 200%; height: 300px;
-    background: linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(20,20,20,0.9) 20%, rgba(20,20,20,0.9) 80%, rgba(0,0,0,0) 100%);
-    transform: translateY(-50%) rotate(-10deg) translateX(-100%);
-    z-index: 1;
+/* 真っ赤な背景（左から高速スライド） */
+.cutin-bg-red {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: radial-gradient(circle, #e60012 0%, #a00000 100%);
+    transform: translateX(-100%);
 }
-#ability-cutin.show-cutin .cutin-background { animation: slideBg 0.3s forwards; }
-@keyframes slideBg { to { transform: translateY(-50%) rotate(-10deg) translateX(-25%); } }
 
-/* 画像とテキストのコンテナ（斜めにスライドイン） */
+/* 黒い斜めの帯（右から鋭くスライド） */
+.cutin-bg-black {
+    position: absolute; top: 20%; left: -10%; width: 120%; height: 60%;
+    background: #000; border-top: 8px solid #fff; border-bottom: 8px solid #fff;
+    transform: rotate(-10deg) translateX(100%);
+    box-shadow: 0 0 30px rgba(0,0,0,0.9);
+}
+
+.show-cutin .cutin-bg-red { animation: p5-red 0.3s ease-out forwards; }
+.show-cutin .cutin-bg-black { animation: p5-black 0.4s cubic-bezier(0.1, 0.9, 0.2, 1) 0.1s forwards; }
+
+@keyframes p5-red { to { transform: translateX(0); } }
+@keyframes p5-black { to { transform: rotate(-10deg) translateX(0); } }
+
+/* 画像とテキストのコンテナ（叩きつけるように拡大から縮小） */
 .cutin-content {
-    position: relative; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 30px;
-    transform: translateX(100vw) skewX(-15deg); opacity: 0; width: 90vw; max-width: 800px;
+    position: relative; z-index: 10; display: flex; align-items: center; justify-content: center; gap: 40px;
+    opacity: 0; transform: scale(1.5) rotate(5deg);
 }
-#ability-cutin.show-cutin .cutin-content {
-    animation: slideContent 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-}
-@keyframes slideContent { to { transform: translateX(0) skewX(0); opacity: 1; } }
+.show-cutin .cutin-content { animation: p5-content 0.4s cubic-bezier(0.1, 0.9, 0.2, 1) 0.3s forwards; }
 
-/* カード画像 */
+@keyframes p5-content {
+    to { opacity: 1; transform: scale(1) rotate(-5deg); }
+}
+
+/* キャラクター画像（白い太フチをつける） */
 #ability-cutin-img {
-    max-height: 60vh; max-width: 40vw; object-fit: contain;
-    filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.6));
+    max-height: 70vh; max-width: 40vw; object-fit: contain;
+    filter: drop-shadow(4px 4px 0px #fff) drop-shadow(-4px -4px 0px #fff) drop-shadow(0px 0px 10px rgba(0,0,0,0.8));
 }
 
-/* テキストエリア */
+/* テキストコンテナ（斜体＆極太ボーダー） */
 .cutin-text-container {
-    background: rgba(0, 0, 0, 0.75); border-left: 6px solid #4caf50;
-    padding: 20px 30px; color: white; text-shadow: 2px 2px 4px #000; flex: 1;
+    display: flex; flex-direction: column; gap: 15px; transform: skewX(-10deg);
 }
-#ability-cutin-name {
-    margin: 0 0 10px 0; font-size: 36px; font-weight: 900; color: #fbc02d;
-    font-style: italic; letter-spacing: 3px;
-}
-#ability-cutin-text { margin: 0; font-size: 16px; line-height: 1.6; white-space: pre-wrap; font-weight: bold; }
 
-/* 消える時（スライドアウト） */
-#ability-cutin.fade-out .cutin-content { animation: slideOutContent 0.3s ease-in forwards; }
-#ability-cutin.fade-out .cutin-background { animation: slideOutBg 0.3s ease-in forwards; }
-@keyframes slideOutContent { to { transform: translateX(-100vw) skewX(15deg); opacity: 0; } }
-@keyframes slideOutBg { to { transform: translateY(-50%) rotate(-10deg) translateX(-100%); } }
+/* キャラクター名（黒背景に白文字、赤のドロップシャドウ） */
+#ability-cutin-name {
+    margin: 0; font-size: 55px; font-weight: 900; color: #fff; background: #000;
+    padding: 5px 30px; border: 4px solid #e60012; display: inline-block; align-self: flex-start;
+    box-shadow: 6px 6px 0px #fff; letter-spacing: 3px; font-style: italic;
+}
+
+/* 能力効果テキスト（白背景に黒文字、赤のドロップシャドウ） */
+#ability-cutin-text {
+    margin: 0; font-size: 20px; font-weight: bold; color: #000; background: #fff;
+    padding: 12px 25px; border: 4px solid #000; box-shadow: 6px 6px 0px #e60012;
+    line-height: 1.5; white-space: pre-wrap; display: inline-block;
+}
+
+/* 退場時のアニメーション（シュッと消える） */
+.fade-out .cutin-bg-red { animation: p5-red-out 0.4s ease-in forwards; }
+.fade-out .cutin-bg-black { animation: p5-black-out 0.3s ease-in forwards; }
+.fade-out .cutin-content { animation: p5-content-out 0.3s ease-in forwards; }
+
+@keyframes p5-red-out { to { transform: translateX(-100%); } }
+@keyframes p5-black-out { to { transform: rotate(-10deg) translateX(100%); opacity: 0; } }
+@keyframes p5-content-out { to { transform: scale(0.8) rotate(-5deg); opacity: 0; } }
 
 /* スマホ用のレイアウト調整 */
 @media screen and (max-width: 600px) {
-    .cutin-content { flex-direction: column; text-align: center; gap: 15px; }
-    #ability-cutin-img { max-height: 45vh; max-width: 70vw; }
-    .cutin-text-container { border-left: none; border-top: 4px solid #4caf50; padding: 15px; width: 100%; box-sizing: border-box; }
-    #ability-cutin-name { font-size: 24px; }
-    #ability-cutin-text { font-size: 13px; line-height: 1.4; }
+    .cutin-content { flex-direction: column; transform: scale(1.2) rotate(0deg); gap: 15px; }
+    .show-cutin .cutin-content { animation: p5-content-mob 0.4s cubic-bezier(0.1, 0.9, 0.2, 1) 0.3s forwards; }
+    @keyframes p5-content-mob { to { opacity: 1; transform: scale(1) rotate(0deg); } }
+    
+    #ability-cutin-img { max-height: 40vh; max-width: 70vw; filter: drop-shadow(2px 2px 0px #fff) drop-shadow(-2px -2px 0px #fff); }
+    .cutin-text-container { align-items: center; transform: skewX(-5deg); }
+    #ability-cutin-name { font-size: 30px; padding: 5px 15px; border-width: 3px; box-shadow: 4px 4px 0px #fff; align-self: center; }
+    #ability-cutin-text { font-size: 14px; padding: 8px 15px; border-width: 3px; box-shadow: 4px 4px 0px #e60012; text-align: center; }
 }
 
 .action-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(20, 20, 20, 0.95); padding: 20px; border-radius: 12px; border: 2px solid #4caf50; color: white; z-index: 100000; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
