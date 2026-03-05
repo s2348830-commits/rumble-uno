@@ -10,7 +10,6 @@
 @media screen and (max-width: 500px), screen and (max-height: 600px) {
     :root { --card-w: 32px; --card-h: 48px; --card-ml: -12px; --font-center: 18px; --font-corner: 8px; --ui-gap: 20px; --deck-offset: 1px; --sel-transform: -8px; }
     
-    /* スマホ用に全体を少し上に詰め、下部に入力欄用の余白を確保 */
     #game-container { padding-top: 30px; padding-bottom: 70px; justify-content: flex-start; }
     #circle-table { max-width: 320px; margin-top: 10px; }
     .circle-player-badge { width: 35px; height: 35px; }
@@ -100,7 +99,7 @@ body {
 #uno-area { top: auto; right: -20px; bottom: 0px; }
 #uno-btn { background: linear-gradient(135deg, #f1c40f, #e67e22); color: white; border: 1.5px solid white; border-radius: 30px; padding: 5px 10px; font-size: 11px; font-weight: bold; cursor: pointer; animation: bounce 1s infinite; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
 
-/* ★ ボタン類が被らないように画面左端中央に固定配置（縦並び） */
+/* ★ ボタン類が重ならないように画面左端中央に固定配置（縦並び） */
 .left-side-buttons {
     position: fixed;
     top: 50%;
@@ -136,12 +135,12 @@ body {
 #niconico-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 8000; overflow: hidden; }
 .niconico-msg { position: absolute; white-space: nowrap; font-size: 20px; font-weight: bold; color: white; text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000; background: rgba(0, 0, 0, 0.6); padding: 2px 10px; border-radius: 4px; will-change: transform; }
 
-/* ★ ログが邪魔にならないように透明度アップ ＆ pointer-events: none でタップ貫通！ */
+/* ログが邪魔にならないように透明度アップ ＆ pointer-events: none でタップ貫通！ */
 #chat-log-container { 
     position: fixed; top: 75px; left: 5px; width: 180px; max-height: 25vh; 
     background: transparent; color: white; font-size: 11px; overflow-y: hidden; 
     padding: 6px; z-index: 8500; border: none;
-    pointer-events: none; /* ★ これでログの下にあるアイコンをタップできます */
+    pointer-events: none; 
     display: flex; flex-direction: column; gap: 4px; 
     text-shadow: 1px 1px 2px #000, -1px -1px 2px #000, 1px -1px 2px #000, -1px 1px 2px #000; 
 }
@@ -178,7 +177,6 @@ body {
 .card-corner.top-left { top: 2px; left: 2px; } .card-corner.bottom-right { bottom: 2px; right: 2px; transform: rotate(180deg); }
 .card-img { width: 90%; height: 90%; object-fit: contain; pointer-events: none; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3)); }
 
-/* ★ 手札エリアに入力欄と被らないための余白を追加 */
 .section { background: rgba(255, 255, 255, 0.02); margin: 2px 0; padding: 3px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05); }
 .hand-section { margin-bottom: 70px; position: relative; z-index: 50; } 
 
@@ -204,7 +202,7 @@ body {
 #draw-btn { background: #222; color: #ccc; border: 1px solid #444; border-radius: 4px; padding: 2px 8px; font-size: 10px; cursor: pointer; }
 
 .screen-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; background: transparent; z-index: 5000; }
-/* ★ ロビーの被り対策 */
+
 .login-box, .lobby-box { 
     background: #2a0808; padding: 20px; border-radius: 12px; border: 1px solid #551111; 
     width: 90%; max-width: 400px; text-align: center; color: white; 
@@ -268,7 +266,7 @@ button.disabled-btn { opacity: 0.5; cursor: not-allowed; }
 .volume-icon { font-size: 14px; user-select: none; }
 .volume-slider { width: 60px; height: 4px; accent-color: #fbc02d; cursor: pointer; }
 .lobby-volume { position: absolute; top: 85px; right: 20px; }
-.game-volume { position: fixed; bottom: 65px; left: 10px; z-index: 1000; }
+.game-volume { position: fixed; bottom: 55px; left: 10px; z-index: 1000; }
 
 .bot-difficulty-btn { display: inline-flex; align-items: center; justify-content: center; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: bold; margin-left: 8px; background-color: #000; user-select: none; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
 .bot-difficulty-btn:active { transform: scale(0.95); }
@@ -289,8 +287,8 @@ button.disabled-btn { opacity: 0.5; cursor: not-allowed; }
 #ability-cutin { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center; z-index: 100000; pointer-events: none; opacity: 0; }
 #ability-cutin.show-cutin { opacity: 1; }
 #ability-cutin.fade-out { opacity: 0; transition: opacity 1s ease-out; }
-#ability-cutin-img { max-width: 80vw; max-height: 80vh; object-fit: contain; transform: scale(0.5); opacity: 0; filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.5)); }
-#ability-cutin.show-cutin #ability-cutin-img { animation: zoomIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+#ability-cutin-img { max-width: 80vw; max-height: 80vh; object-fit: contain; filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.5)); }
+#ability-cutin.show-cutin .cutin-wrapper { animation: zoomIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
 @keyframes zoomIn { 0% { transform: scale(0.5) translateY(50px); opacity: 0; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
 
 .action-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(20, 20, 20, 0.95); padding: 20px; border-radius: 12px; border: 2px solid #4caf50; color: white; z-index: 100000; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }

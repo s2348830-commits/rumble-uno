@@ -61,13 +61,6 @@ window.ensureModalsExist = function() {
         `;
         document.body.appendChild(defModal);
     }
-    if (!document.getElementById('ability-cutin')) {
-        const cutin = document.createElement('div');
-        cutin.id = 'ability-cutin';
-        cutin.className = 'hidden';
-        cutin.innerHTML = `<img id="ability-cutin-img" src="" alt="Ability">`;
-        document.body.appendChild(cutin);
-    }
 };
 
 window.SE = {
@@ -505,8 +498,16 @@ window.showAbilityCutin = function(cardValue, isHVActivated = false) {
     window.ensureModalsExist();
     const cutinEl = document.getElementById('ability-cutin');
     const cutinImg = document.getElementById('ability-cutin-img');
+    const textEl = document.getElementById('ability-cutin-text');
     if (!cutinEl || !cutinImg) return;
+    
     cutinImg.src = `card/custom/${cardValue}.png`;
+    
+    // ★ カットインのカードの下部余白に説明テキストを表示
+    if (textEl && window.AbilityDef && window.AbilityDef[cardValue]) {
+        textEl.innerText = window.AbilityDef[cardValue].desc;
+    }
+
     cutinEl.classList.remove('hidden', 'fade-out');
     void cutinEl.offsetWidth; 
     cutinEl.classList.add('show-cutin');
@@ -531,6 +532,7 @@ window.openTargetSelection = function(players, callback) {
     const targets = validPlayers.filter(p => p.id !== window.game.myId);
 
     if (targets.length === 0) { callback(window.game.myId); return; }
+    // ★ 相手が1人しかいない時はダイアログを出さずに自動選択する
     if (targets.length === 1) { callback(targets[0].id); return; }
 
     list.innerHTML = '';
@@ -849,10 +851,11 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
     allRemoveIndices = [...new Set(allRemoveIndices)].sort((a,b) => b - a);
     allRemoveIndices.forEach(i => hand.splice(i, 1));
 
-    playedCards.forEach(c => {
-        window.game.discardPile.push(c); 
-        window.game.discardRotations.push(0);
-    });
+    // ★ 能力カードは discardPile に出さない処理に変更（消費するだけ）
+    // playedCards.forEach(c => {
+    //     window.game.discardPile.push(c); 
+    //     window.game.discardRotations.push(0);
+    // });
 
     if (def.type === 'AT' || def.type === 'AT_BL' || def.type === 'HV') {
         let targets = [];
@@ -1121,9 +1124,9 @@ window.executePlay = function(playerId, indices, isBot = false) {
 
         if (result.needsColor) {
             if (isDrawAttack) {
-                // ★ 能力カードなし設定のときは防御フェーズをスキップして即処理
-                if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length === 0) {
-                    // 何もしない（防御フェーズを経由せず、直接次のターンへ）
+                // ★ 能力カード未設定(通常UNO)の場合は防御フェーズをスキップ
+                if (window.currentRoomState && window.currentRoomState.settings && window.currentRoomState.settings.customCards && window.currentRoomState.settings.customCards.length === 0) {
+                    // 何もしない（直接次のターンへ）
                 } else {
                     window.pendingDrawDefenseInfo = { attackerId: playerId, cardValue: attackCardVal };
                 }
@@ -1146,7 +1149,8 @@ window.executePlay = function(playerId, indices, isBot = false) {
             if (isDrawAttack) {
                 targetId = window.game.currentPlayer.id;
                 guides.push({ from: playerId, to: targetId, text: attackCardVal });
-                if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length > 0) {
+                // ★ ここも能力カード未設定の場合は防御フェーズをスキップ
+                if (window.currentRoomState && window.currentRoomState.settings && window.currentRoomState.settings.customCards && window.currentRoomState.settings.customCards.length > 0) {
                     window.startDrawDefensePhase(playerId, targetId, attackCardVal, guides);
                 } else {
                     window.broadcastGameState(false, guides);
@@ -1175,7 +1179,7 @@ window.executeColor = function(playerId, color) {
     if (info) {
         const targetId = window.game.currentPlayer.id;
         const guides = [{ from: info.attackerId, to: targetId, text: info.cardValue }];
-        if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length > 0) {
+        if (window.currentRoomState && window.currentRoomState.settings && window.currentRoomState.settings.customCards && window.currentRoomState.settings.customCards.length > 0) {
             window.startDrawDefensePhase(info.attackerId, targetId, info.cardValue, guides);
         } else {
             window.broadcastGameState(false, guides);
@@ -1247,7 +1251,8 @@ window.tryDrawWithAbility = function(callback) {
 };
 
 window.handlePlayAction = function() {
-    if (!window.game.isMyTurn || window.game.selectedIndices.length === 0 || window.isGameOver || window.isInitialDealing) return;
+    if (window.isGameOver || window.isInitialDealing) return;
+    if (window.game.selectedIndices.length === 0) return;
     
     const me = window.game.players.find(p => p.id === window.game.myId);
     const selectedCards = window.game.selectedIndices.map(i => window.game.myHand[i]);
@@ -1257,6 +1262,10 @@ window.handlePlayAction = function() {
     if (!lastCard) { window.game.selectedIndices = []; window.updateUI(); return; }
 
     const isAbility = selectedCards[0] && selectedCards[0].value && String(selectedCards[0].value).startsWith('id_');
+    
+    // ★ 相手のターンでも能力カードなら発動可能にする
+    if (!window.game.isMyTurn && !isAbility) return;
+
     const isAction = !/^[0-9]$/.test(lastCard.value) && !isAbility;
     
     if (me.frozen && !isAbility) {
@@ -1332,7 +1341,7 @@ window.handlePlayAction = function() {
             if (def && cardValue === 'id_20' && sCol) {
                 const validIndices = [];
                 window.game.myHand.forEach((c, i) => {
-                    if (!indices.includes(i) && i !== dIdx && c.color === sCol) validIndices.push(i);
+                    if (!indices.includes(i) && c.color === sCol) validIndices.push(i);
                 });
                 if (validIndices.length > 0) {
                     window.openMultiDiscardSelection(window.game.myHand, validIndices, (selectedMulti) => {

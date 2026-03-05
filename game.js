@@ -158,12 +158,15 @@ class UNOGame {
                 this.drawStack = 0;
             }
 
-            selectedCards.forEach(c => {
-                this.discardPile.push(c);
-                this.discardRotations.push(Math.floor(Math.random() * 21) - 10);
-                if (c.value === '+2') this.drawStack += 2;
-                if (c.value === 'Wild+4') this.drawStack += 4;
-            });
+            // ★ 能力カードは場(discardPile)に出さずに消費するだけにする
+            if (!isAbility) {
+                selectedCards.forEach(c => {
+                    this.discardPile.push(c);
+                    this.discardRotations.push(Math.floor(Math.random() * 21) - 10);
+                    if (c.value === '+2') this.drawStack += 2;
+                    if (c.value === 'Wild+4') this.drawStack += 4;
+                });
+            }
 
             const sortedIndices = [...indices].sort((a, b) => b - a);
             sortedIndices.forEach(i => hand.splice(i, 1));
@@ -179,16 +182,17 @@ class UNOGame {
 
             const actionCount = selectedCards.length;
 
+            // ★ スキップ・リバースの重ね出しバグ修正
             if (lastCard.value === 'Skip') {
                 if (this.players.length === 2) {
-                    this.nextTurn(actionCount * 2); // 2人プレイなら何枚出しても自分のターン
+                    this.nextTurn(actionCount * 2); 
                 } else {
                     this.nextTurn(1 + actionCount);
                 }
             }
             else if (lastCard.value === 'Reverse') {
                 if (this.players.length === 2) {
-                    this.nextTurn(actionCount * 2); // 2人プレイのReverseはSkip扱い
+                    this.nextTurn(actionCount * 2); 
                 } else {
                     if (actionCount % 2 !== 0) this.direction *= -1;
                     this.nextTurn(1);

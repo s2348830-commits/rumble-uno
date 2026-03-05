@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>自作UNO</title>
-    <link rel="stylesheet" href="style.css?v=17">
+    <link rel="stylesheet" href="style.css?v=18">
     <link rel="icon" href="data:,">
 </head>
 <body>
@@ -278,7 +278,10 @@
 <div id="winner-banner"></div>
 
 <div id="ability-cutin" class="hidden">
-    <img id="ability-cutin-img" src="" alt="Ability">
+    <div style="position: relative; display: inline-block; text-align: center;">
+        <img id="ability-cutin-img" src="" alt="Ability">
+        <div id="ability-cutin-text" style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 8px 12px; border-radius: 8px; font-size: 14px; white-space: pre-wrap; width: 120%; text-align: center; border: 2px solid #4caf50;"></div>
+    </div>
 </div>
 
 <div id="ability-info" class="hidden"></div>
@@ -316,15 +319,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <script src="https://unpkg.com/canvas-confetti@1.6.0/dist/confetti.browser.js"></script>
 <script src="/socket.io/socket.io.js"></script>
-<script src="rule.js?v=17"></script>
-<script src="ability.js?v=17"></script>
-<script src="animation.js?v=17"></script>
-<script src="renderer.js?v=17"></script>
-<script src="ruleui.js?v=17"></script>
-<script src="game.js?v=17"></script>
-<script src="bot.js?v=17"></script>
-<script src="chat.js?v=17"></script>
-<script src="main.js?v=17"></script>
-<script src="network.js?v=17"></script>
+<script src="rule.js?v=18"></script>
+<script src="ability.js?v=18"></script>
+<script src="animation.js?v=18"></script>
+<script src="renderer.js?v=18"></script>
+<script src="ruleui.js?v=18"></script>
+<script src="game.js?v=18"></script>
+<script src="bot.js?v=18"></script>
+<script src="chat.js?v=18"></script>
+<script src="main.js?v=18"></script>
+<script src="network.js?v=18"></script>
 </body>
 </html>
