@@ -1115,7 +1115,10 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
     });
 
     if (cardValue === 'id_26') {
-        window.startJankenPhase(playerId, 0);
+        // ★ 修正: カットイン演出が終わるまで（2.5秒）待ってからじゃんけんUIを出す
+        setTimeout(() => {
+            window.startJankenPhase(playerId, 0);
+        }, 2500);
         return; 
     }
 
