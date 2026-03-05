@@ -153,9 +153,13 @@ window.socket.on('room_joined', (data) => {
     lobbyScreen.classList.remove('hidden');
     document.getElementById('display-room-id').innerText = data.roomId;
 
-    const log = document.getElementById('chat-log-container');
+    // ★ チャットの二重表示対策：ロビー時はバトルチャットを隠す
+    const cia = document.getElementById('chat-input-area');
+    if (cia) cia.classList.add('hidden'); 
+
+    const lcia = document.getElementById('lobby-chat-container');
     if (window.ChatManager && window.ChatManager.enabled) {
-        if(log) log.classList.remove('hidden');
+        if(lcia) lcia.style.display = 'block';
     }
 
     if (window.isHost) {
@@ -284,13 +288,13 @@ btnReady.addEventListener('click', () => window.socket.emit('toggle_ready', { ro
 btnSettings.addEventListener('click', () => {
     if (window.SE) window.SE.play('setting');
     startOverlay.classList.remove('hidden');
-    const cia = document.getElementById('chat-input-area');
-    if (cia) cia.classList.add('hidden');
+    const lcia = document.getElementById('lobby-chat-container');
+    if (lcia) lcia.classList.add('hidden');
 });
 if (closeSettingsBtn) closeSettingsBtn.onclick = () => {
     startOverlay.classList.add('hidden');
-    const cia = document.getElementById('chat-input-area');
-    if (cia && window.ChatManager && window.ChatManager.enabled) cia.classList.remove('hidden');
+    const lcia = document.getElementById('lobby-chat-container');
+    if (lcia && window.ChatManager && window.ChatManager.enabled) lcia.classList.remove('hidden');
 };
 
 window.sendSettingsUpdate = () => { if (window.isHost) window.socket.emit('update_settings', window.RuleSettings); };
@@ -313,6 +317,9 @@ window.socket.on('game_started', (roomState) => {
     const cia = document.getElementById('chat-input-area');
     if (cia && window.ChatManager && window.ChatManager.enabled) cia.classList.remove('hidden');
     
+    const lcia = document.getElementById('lobby-chat-container');
+    if (lcia) lcia.style.display = 'none';
+    
     if (window.game) window.game.setup(roomState.slots, window.myId);
     window.isGameOver = false; 
     if (window.isHost) { 
@@ -330,7 +337,6 @@ window.socket.on('request_ability_reset', (data) => {
     window.broadcastGameState(true);
 });
 
-// ★ サーバーからの通信でじゃんけんのUIを同期する処理
 window.socket.on('update_game_state', (state) => {
     if (!window.game) return;
     window.game.deck = state.deck; 
@@ -405,7 +411,7 @@ window.socket.on('update_game_state', (state) => {
         if (discModal) discModal.classList.add('hidden');
     }
 
-    // ★ 追加：じゃんけん画面の同期
+    // ★ じゃんけんの同期（他のプレイヤーにも見えるように）
     if (state.jankenPhase) {
         if (!window.isJankenShowing) {
             window.showJankenUI(state.jankenPhase.attackerId, state.jankenPhase.targetId, state.jankenPhase.loopCount);
@@ -413,6 +419,19 @@ window.socket.on('update_game_state', (state) => {
         }
         const jTimer = document.getElementById('janken-timer');
         if (jTimer) jTimer.innerText = state.jankenPhase.timer;
+
+        if (window.myId === state.jankenPhase.attackerId && state.jankenPhase.attackerHand) {
+            const controls = document.getElementById('janken-controls');
+            const title = document.getElementById('janken-title');
+            if (controls) controls.style.display = 'none';
+            if (title) title.innerText = "相手を待っています...";
+        }
+        if (window.myId === state.jankenPhase.targetId && state.jankenPhase.targetHand) {
+            const controls = document.getElementById('janken-controls');
+            const title = document.getElementById('janken-title');
+            if (controls) controls.style.display = 'none';
+            if (title) title.innerText = "相手を待っています...";
+        }
 
         if (state.jankenPhase.result && !window.jankenResultPlayed) {
             window.jankenResultPlayed = true;
@@ -468,6 +487,9 @@ window.socket.on('back_to_lobby', (roomState) => {
     const cia = document.getElementById('chat-input-area');
     if (cia) cia.classList.add('hidden');
     
+    const lcia = document.getElementById('lobby-chat-container');
+    if (lcia && window.ChatManager && window.ChatManager.enabled) lcia.style.display = 'block';
+    
     renderSlots(roomState);
 });
 
@@ -521,7 +543,6 @@ window.socket.on('receive_player_action', (data) => {
             if (typeof window.broadcastGameState === 'function') window.broadcastGameState(true);
         }
     } 
-    // ★ 追加：じゃんけんの手を受信
     else if (data.action === 'janken_choice') {
         if (window.pendingJanken && !window.pendingJanken.result) {
             if (playerId === window.pendingJanken.attackerId) window.pendingJanken.attackerHand = data.choice;
