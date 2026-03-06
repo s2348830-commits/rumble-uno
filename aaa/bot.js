@@ -1,8 +1,6 @@
 /**
- * bot.js (Node.js Server Module)
+ * bot.js
  */
-const UNORules = require('./rule.js');
-
 const UNOBot = {
     play: function(game, botId) {
         const botHand = game.hands[botId];
@@ -29,6 +27,24 @@ const UNOBot = {
 
             if (abilities.length > 0) {
                 selectedIndex = abilities[Math.floor(Math.random() * abilities.length)];
+            } 
+            else if (game.drawStack > 0) {
+                if (difficulty === '優しい') {
+                    return { action: 'draw' }; 
+                }
+            }
+            else if (difficulty === '優しい') {
+                if (numbers.length > 0) {
+                    selectedIndex = numbers[Math.floor(Math.random() * numbers.length)];
+                } else {
+                    return { action: 'draw' };
+                }
+            } else if (difficulty === '普通') {
+                if (numbers.length > 0) {
+                    selectedIndex = numbers[Math.floor(Math.random() * numbers.length)];
+                } else if (actions.length > 0) {
+                    selectedIndex = actions[Math.floor(Math.random() * actions.length)];
+                }
             } else if (difficulty === '強い') {
                 if (actions.length > 0) {
                     selectedIndex = actions[Math.floor(Math.random() * actions.length)];
@@ -41,8 +57,7 @@ const UNOBot = {
             const isDraw = (cardToPlay.value === '+2' || cardToPlay.value === 'Wild+4');
             const isNumber = !isActionCard(cardToPlay) && !isAbilityCard(cardToPlay);
             
-            // window.RuleSettings を game.ruleSettings に変更
-            let limit = isDraw ? (game.ruleSettings ? parseInt(game.ruleSettings.maxDrawMultiPlay) : 1) : (isNumber ? (game.ruleSettings ? parseInt(game.ruleSettings.maxMultiPlay) : 1) : 1);
+            let limit = isDraw ? (window.RuleSettings ? parseInt(window.RuleSettings.maxDrawMultiPlay) : 1) : (isNumber ? (window.RuleSettings ? parseInt(window.RuleSettings.maxMultiPlay) : 1) : 1);
             if (isNaN(limit) || limit === 0) limit = 1;
 
             if (difficulty === '強い' && isDraw && limit > 1) {
@@ -61,9 +76,7 @@ const UNOBot = {
 
             return { action: 'play', indices: sameCardsIndices };
         } else {
-            return { action: 'draw', count: 1 };
+            return { action: 'draw' };
         }
     }
 };
-
-module.exports = UNOBot;
