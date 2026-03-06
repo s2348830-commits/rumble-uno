@@ -17,8 +17,35 @@ window.ensureModalsExist = function() {
     // ... 他のモーダルも同様に生成（中略） ...
 };
 
-window.SE = { /* 既存のSE処理をそのまま利用 */ };
-window.initVolumeControl = function() { /* 既存の音量設定ロジック */ };
+window.SE = {
+    muted: false,
+    volume: 0.5,
+    play: function(soundName) {
+        if (this.muted) return;
+        
+        try {
+            // 例: 'touch_to_start.mp3' など、実際のファイルパスに合わせて拡張子やフォルダ名を調整してください
+            // もし index.html 内に <audio id="se-touch_to_start"> のように定義している場合は
+            // const audio = document.getElementById('se-' + soundName); のように取得してください。
+            
+            const audio = new Audio(`se/${soundName}.mp3`); // ← 元の構成に合わせてパスを変更してください
+            audio.volume = this.volume;
+            audio.play().catch(e => {
+                // ブラウザの自動再生ブロック等によるエラーを無視
+                console.warn("SE再生エラー (クリック前などの理由):", e);
+            });
+        } catch (e) {
+            console.error("SE読み込みエラー:", e);
+        }
+    },
+    setVolume: function(vol) {
+        this.volume = vol;
+    }
+};
+
+window.initVolumeControl = function() { 
+    /* 元々あった音量スライダー等の初期化ロジックがあればここに入れます */ 
+};
 
 const ColorUI = { 
     callback: null,
