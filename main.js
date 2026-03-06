@@ -2,7 +2,6 @@
  * main.js
  */
 
-// ★ 修正: UI（renderer.js）がエラーを起こさないように、ゲッターやカード選択機能を持ったオブジェクトを再定義
 window.game = {
     players: [], hands: {}, discardPile: [], discardRotations: [], deck: [],
     currentColor: "", drawStack: 0, turnIndex: 0, direction: 1, abilityGraveyard: [], customDeck: [],
@@ -35,6 +34,8 @@ window.isDrawing = false;
 window.isInitialDealing = false; 
 window.isDefending = false; 
 window.isProcessingPlay = false;
+
+window.isDefensePhase = false; // ★ 追加: 全員共通の防御フェーズフラグ
 
 window.currentDefensePhaseId = null;
 window.hasRespondedDefense = false;
@@ -674,9 +675,9 @@ window.showAbilityCutin = function(cardValue, isHVActivated = false) {
         const rand = Math.random() < 0.5 ? 1 : 2;
         if (window.SE) window.SE.play(`hv/id_20(${rand})`);
     } else if (cardValue === 'id_25') {
-        if (window.SE) window.SE.play(`hv/id_26`);
-    } else if (cardValue === 'id_26') {
         if (window.SE) window.SE.play(`hv/id_25`);
+    } else if (cardValue === 'id_26') {
+        if (window.SE) window.SE.play(`hv/id_26`);
     } else {
         const randMvp = Math.random() < 0.5 ? 1 : 2;
         if (window.SE) window.SE.play(`mvp_${randMvp}`);
@@ -1069,7 +1070,8 @@ window.tryDrawWithAbility = function(callback) {
 window.handlePlayAction = function() {
     if (window.game.selectedIndices.length === 0 || window.isGameOver || window.isInitialDealing || window.isDrawing) return;
     
-    if (window.pendingJanken || window.currentDefensePhaseId || window.isJankenShowing) {
+    // ★ 追加: 防御フェーズ中やじゃんけん中は、アクションを受け付けない
+    if (window.pendingJanken || window.isDefensePhase || window.isJankenShowing) {
         alert("現在、他の能力が処理中です。解決するまでお待ちください。");
         window.game.selectedIndices = []; window.updateUI(); return;
     }
@@ -1278,7 +1280,7 @@ window.onColorChosen = function(color) {
 };
 
 document.getElementById('draw-btn').onclick = () => {
-    if (window.pendingJanken || window.isDrawing || window.isProcessingPlay || window.currentDefensePhaseId) return; 
+    if (window.pendingJanken || window.isDrawing || window.isProcessingPlay || window.isDefensePhase) return; 
     if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
     if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) return;
     
@@ -1301,7 +1303,7 @@ document.getElementById('draw-btn').onclick = () => {
 };
 
 document.getElementById('end-turn-btn').onclick = () => {
-    if (window.pendingJanken || window.isDrawing || window.isProcessingPlay || window.currentDefensePhaseId) return; 
+    if (window.pendingJanken || window.isDrawing || window.isProcessingPlay || window.isDefensePhase) return; 
     if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
     
     window.isDrawing = true; 
@@ -1374,8 +1376,12 @@ function initMainSocketEvents() {
         
         if(state.hasDrawnThisTurn !== undefined) window.game.hasDrawnThisTurn = state.hasDrawnThisTurn;
         if(state.unoDeclared !== undefined) window.game.unoDeclared = state.unoDeclared;
+        if(state.ruleSettings) window.RuleSettings = state.ruleSettings; // ★ 追加: ルール同期
         if(state.abilityGraveyard) window.game.abilityGraveyard = state.abilityGraveyard;
         if(state.customDeck) window.game.customDeck = state.customDeck;
+        
+        // ★ 追加: 全員が「今防御フェーズ中か」を判定できるフラグ
+        window.isDefensePhase = !!state.defensePhase;
         
         if (state.playersInfo) {
             let newPlayers = [];
@@ -1463,7 +1469,7 @@ function initMainSocketEvents() {
                 if (typeof confetti === 'function') confetti({ particleCount: 150, spread: 80, origin: { x: 0.5, y: 0.5 } });
             }, 5000);
         }
-        setTimeout(() => { if (window.isHost) window.socket.emit('return_to_lobby'); }, 8000);
+        setTimeout(() => { window.socket.emit('return_to_lobby'); }, 8000);
     });
 
     window.socket.on('back_to_lobby', (roomState) => {
