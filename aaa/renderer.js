@@ -88,15 +88,28 @@ const Renderer = {
             }
             if (p.type === 'bot' && window.RuleSettings && window.RuleSettings.showBotPersonality && personality) displayName += ` [${personality}]`;
 
+            // 【抜粋】 renderer.js (100行目付近・renderPlayersCircleの中)
+
             let overlayHtml = '';
             if (p.frozen) overlayHtml += '<div class="status-overlay status-frozen"></div>';
-            if (p.burnTurns > 0) overlayHtml += `<div class="status-overlay status-burned"><span style="position:absolute; bottom:0; left:50%; transform:translateX(-50%); font-size:12px; font-weight:bold; color:white;">${p.burnTurns}</span></div>`;
+            if (p.burnTurns > 0) overlayHtml += `<div class="status-overlay status-burned"></div>`;
 
+            // ▼▼▼ ここから書き換え ▼▼▼
+            // ★ 各種ステータスアイコンとターン数表示
             let statusIcons = '';
-            if (p.frozen) statusIcons += '❄';
-            if (p.burnTurns > 0) statusIcons += '🔥';
+            if (p.invincibleTurns > 0) statusIcons += `<div>🔲 無敵(${p.invincibleTurns}T)</div>`;
+            if (p.shield && p.shield.turns > 0 && p.shield.level > 0) statusIcons += `<div>🛡️ ｼｰﾙﾄﾞ${p.shield.level}(${p.shield.turns}T)</div>`;
+            if (p.frozen) statusIcons += '<div>❄ 凍結(1T)</div>';
+            if (p.burnTurns > 0) statusIcons += `<div>🔥 燃焼(${p.burnTurns}T)</div>`;
+            
+            // ロックされているカードの中で一番長いターン数を計算して表示
+            let maxLockTurns = 0;
             const hand = game.hands[p.id] || [];
-            if (hand.some(c => c.lockedTurns && c.lockedTurns > 0)) statusIcons += '🔒';
+            hand.forEach(c => {
+                if (c.lockedTurns && c.lockedTurns > maxLockTurns) maxLockTurns = c.lockedTurns;
+            });
+            if (maxLockTurns > 0) statusIcons += `<div>🗝️ ﾛｯｸ(${maxLockTurns}T)</div>`;
+            // ▲▲▲ ここまで書き換え ▲▲▲
 
             const badge = document.createElement('div');
             badge.className = `circle-player-badge other-player-badge ${isTurn ? 'active-turn' : ''} ${isPredictTurn ? 'predict-turn' : ''} ${isOffline ? 'offline' : ''} ${p.id === game.myId ? 'my-badge' : ''}`;
@@ -120,7 +133,6 @@ const Renderer = {
     },
 
     applyFanStyle: function(element, index, total) {
-        // ★ 15枚を超えたら扇状を解除し、横並び（スクロール）にする
         if (total > 15) { 
             element.style.setProperty('--fan-rot', `0deg`); 
             element.style.setProperty('--fan-y', `0px`); 
@@ -155,7 +167,6 @@ const Renderer = {
             if (game.selectedIndices.includes(i)) div.classList.add('selected');
             else if (canSuggest && card.value === selectedValue) div.classList.add('suggested');
 
-            // ★ 自分のターン以外でもカードをタップして浮かせる(選択状態にする)ことは可能にする
             div.onclick = (e) => {
                 e.stopPropagation();
                 game.toggleSelect(i); this.updateAll(game); 
@@ -211,6 +222,16 @@ const Renderer = {
         const unoBtn = document.getElementById('uno-btn');
         const endTurnBtn = document.getElementById('end-turn-btn');
         const btnUnoAuto = document.getElementById('btn-uno-auto'); 
+
+        const discardArea = document.getElementById('discard-area');
+        if (discardArea) {
+            if (game.selectedIndices && game.selectedIndices.length > 0) {
+                discardArea.classList.add('highlight-discard');
+            } else {
+                discardArea.classList.remove('highlight-discard');
+            }
+        }
+
         if(!drawBtn || !unoBtn || !endTurnBtn) return;
 
         if (drawText) {
@@ -275,7 +296,18 @@ const Renderer = {
         const imgMap = { 'Wild': 'card/wild.png', 'Wild+4': 'card/+4.png', 'Reverse': 'card/reverse.png', 'Skip': 'card/skip.png' };
         const displayValue = this.getDisplayValue(card.value);
 
-        if (card.lockedTurns && card.lockedTurns > 0) div.classList.add('locked');
+        if (card.lockedTurns && card.lockedTurns > 0) {
+            div.classList.add('locked');
+            const lockOverlay = document.createElement('div');
+            lockOverlay.style.position = 'absolute';
+            lockOverlay.style.top = '0'; lockOverlay.style.left = '0';
+            lockOverlay.style.width = '100%'; lockOverlay.style.height = '100%';
+            lockOverlay.style.background = 'rgba(255, 215, 0, 0.4)';
+            lockOverlay.style.boxShadow = 'inset 0 0 10px #ffd700';
+            lockOverlay.style.zIndex = '40';
+            lockOverlay.style.pointerEvents = 'none';
+            div.appendChild(lockOverlay);
+        }
 
         const me = window.game ? window.game.players.find(p => p.id === window.game.myId) : null;
         const isFrozen = me && me.frozen;
