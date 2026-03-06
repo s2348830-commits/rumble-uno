@@ -99,7 +99,10 @@ window.socket.on('room_joined', (data) => {
     
     if(data.state && data.state.gameStarted) {
         lobbyScreen.classList.add('hidden'); gameContainer.classList.remove('hidden');
-        if (window.game) window.game.setup(data.state.slots, data.state.settings);
+        if (window.game) {
+            window.game.setup(data.state.slots, data.state.settings);
+            window.game.myId = window.myId; // ★ 追加：自分のIDをゲームエンジンに教える
+        }
     } else {
         renderSlots(data.state);
     }
@@ -159,7 +162,10 @@ btnStart.addEventListener('click', () => { btnStart.disabled = true; window.sock
 window.socket.on('game_started', (roomState) => {
     window.currentRoomState = roomState; window.isInitialDealing = true; 
     lobbyScreen.classList.add('hidden'); startOverlay.classList.add('hidden'); gameContainer.classList.remove('hidden');
-    if (window.game) window.game.setup(roomState.slots, roomState.settings);
+    if (window.game) {
+        window.game.setup(roomState.slots, roomState.settings);
+        window.game.myId = window.myId; // ★ 追加：自分のIDをゲームエンジンに教える
+    }
     window.isGameOver = false; 
 });
 
