@@ -1,7 +1,7 @@
 /**
- * ability.js (Isomorphic: Server & Browser)
+ * ability.js
  */
-const AbilityDef = {
+window.AbilityDef = {
     'id_1': { rarity: 'SSR', type: 'AT', name: 'ミシェル', desc: '【AT】1人指定。1枚引かせ70%で凍結(能力のみ使用可)。', needsTarget: true },
     'id_2': { rarity: 'SSR', type: 'AT_BL', name: 'ルネイユ', desc: '【AT/BL】他全員に固定で1枚引かせる。その後自分にシールドIを1ターン付与する。また60%確率で他全員に固定で1枚引かせる。', fixedDraw: true },
     'id_3': { rarity: 'SSR', type: 'HE', name: 'ヴィオラ', desc: '【HE】手札を1枚選んで捨てる。', needsDiscard: true },
@@ -38,7 +38,7 @@ const AbilityDef = {
     'id_34': { rarity: 'SSR', type: 'HE', name: 'オリヴィア', desc: '【HE】自分に回避I(20%の確率で攻撃を防ぐ)を1ターン付与する。' }
 };
 
-const AbilityEngine = {
+window.AbilityEngine = {
     checkEvasion: function(target) {
         if (!target || !target.evasion || target.evasion.turns <= 0 || target.evasion.level <= 0) return false;
         let rate = 0;
@@ -54,15 +54,13 @@ const AbilityEngine = {
         if (t.invincibleTurns > 0) return 0; 
         if (this.checkEvasion(t)) return -1; 
         
-        let actualDrawn = 0;
+        let actualDrawn = count;
+        
         for (let i = 0; i < count; i++) {
-            if (!game.drawCard(targetId)) {
-                break; 
-            }
-            actualDrawn++;
+            game.drawCard(targetId); 
         }
-        if (actualDrawn > 0 && game.addAnimationEvent) {
-            game.addAnimationEvent('request_draw_animation', { playerId: targetId, count: actualDrawn });
+        if (count > 0 && window.isHost && window.socket) {
+            window.socket.emit('request_draw_animation', { playerId: targetId, count: count });
         }
         return actualDrawn;
     },
@@ -99,7 +97,7 @@ const AbilityEngine = {
 
     resolve: function(game, attackerId, abilityId, selectedTargetId, discCard, defenseResponses, multiplier = 1, selectedColor = null, multiCards = [], extraData = {}) {
         let guides = [];
-        const def = AbilityDef[abilityId];
+        const def = window.AbilityDef[abilityId];
         if (!def) return guides;
 
         const others = game.players.filter(p => p.id !== attackerId && p.connected);
@@ -108,14 +106,14 @@ const AbilityEngine = {
 
         let costPaid = false; 
         if ((def.needsDiscard || def.needsAbilityDiscard) && discCard) {
-            if (game.addAnimationEvent) game.addAnimationEvent('request_play_animation', { playerId: attackerId, cards: [discCard] });
+            if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: attackerId, cards: [discCard] });
             this.triggerDiscardEffect(game, attackerId, discCard.value, true, discCard);
             costPaid = true;
         }
 
         if (abilityId === 'id_20') {
             if (multiCards && multiCards.length > 0) {
-                if (game.addAnimationEvent) game.addAnimationEvent('request_play_animation', { playerId: attackerId, cards: multiCards });
+                if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: attackerId, cards: multiCards });
                 guides.push({ from: attackerId, to: attackerId, text: `${selectedColor}を${multiCards.length}枚消費` });
             }
             return guides; 
@@ -147,6 +145,7 @@ const AbilityEngine = {
                     const resp = defenseResponses[targetId];
                     if (resp && resp.cardValue) return;
 
+                    let reduceDraw = false;
                     let drawCount = 0;
                     
                     if (abilityId === 'id_1') {
@@ -210,7 +209,7 @@ const AbilityEngine = {
                             const attacker = game.players.find(p => p.id === attackerId);
                             if (attacker) {
                                 attacker.usedRaia = true;
-                                attacker.raiaReturnPending = true; 
+                                attacker.raiaReturnPending = true; // ★ 次のターンに戻るフラグ
                             }
                             guides.push({ from: attackerId, to: attackerId, text: '回収待機' });
                         }
@@ -245,7 +244,7 @@ const AbilityEngine = {
                             hand.push({ color: col, value: val });
                         }
                         guides.push({ from: attackerId, to: attackerId, text: '+補充' });
-                        if (game.addAnimationEvent) game.addAnimationEvent('request_draw_animation', { playerId: attackerId, count: 2 });
+                        if (window.isHost && window.socket) window.socket.emit('request_draw_animation', { playerId: attackerId, count: 2 });
                     }
                 } else if (abilityId === 'id_8') {
                     const res = this.applyDraw(game, selectedTargetId, 1);
@@ -356,10 +355,3 @@ const AbilityEngine = {
         return guides;
     }
 };
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { AbilityDef, AbilityEngine };
-} else {
-    window.AbilityDef = AbilityDef;
-    window.AbilityEngine = AbilityEngine;
-}

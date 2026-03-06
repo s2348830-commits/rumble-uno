@@ -1,9 +1,6 @@
 /**
- * game.js (Node.js Server Module)
+ * game.js
  */
-const UNORules = require('./rule.js');
-const { AbilityDef } = require('./ability.js');
-
 class UNOGame {
     constructor() {
         this.deck = [];
@@ -15,30 +12,20 @@ class UNOGame {
         this.discardRotations = [];
         this.drawStack = 0;
         this.currentColor = "";
+        this.myId = null; 
+        this.selectedIndices = [];
         this.unoDeclared = false;
         this.hasDrawnThisTurn = false;
         this.abilityGraveyard = []; 
         this.customDeck = []; 
-        
-        this.ruleSettings = {};
-        this.isGameOver = false;
-        
-        // クライアントへ送るアニメーションイベントを保持するキュー
-        this.animationEvents = []; 
     }
 
+    get isMyTurn() { return this.currentPlayer && this.currentPlayer.id === this.myId; }
     get currentPlayer() { return this.players[this.turnIndex]; }
     get topCard() { return this.discardPile[this.discardPile.length - 1]; }
+    get myHand() { return this.hands[this.myId] || []; }
 
-    addAnimationEvent(type, data) {
-        this.animationEvents.push({ type, data });
-    }
-
-    clearAnimationEvents() {
-        this.animationEvents = [];
-    }
-
-    setup(slots, ruleSettings) {
+    setup(slots, myId) {
         this.players = slots.filter(s => s.type === 'host' || s.type === 'player' || s.type === 'bot');
         this.players.forEach(p => {
             p.frozen = false;
@@ -48,18 +35,17 @@ class UNOGame {
             p.evasion = { level: 0, turns: 0 }; 
             p.frozenBurnImmune = false; 
             p.usedRaia = false; 
-            p.raiaReturnPending = false; 
+            p.raiaReturnPending = false; // ★ 追加
         });
-        this.ruleSettings = ruleSettings || {};
+        this.myId = myId;
     }
 
     start() {
         this.deck = UNORules.createDeck();
         this.abilityGraveyard = [];
         this.customDeck = [];
-        this.isGameOver = false;
         
-        if (this.ruleSettings.randomTurnOrder) {
+        if (window.RuleSettings && window.RuleSettings.randomTurnOrder) {
             for (let i = this.players.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [this.players[i], this.players[j]] = [this.players[j], this.players[i]];
@@ -67,16 +53,16 @@ class UNOGame {
         }
         this.turnIndex = 0; 
 
-        const size = this.ruleSettings.initialHandSize ? parseInt(this.ruleSettings.initialHandSize) : 7; 
-        const customSize = (this.ruleSettings.customCards && this.ruleSettings.customCards.length > 0) ? (parseInt(this.ruleSettings.initialCustomHandSize) || 2) : 0;
+        const size = (window.RuleSettings && window.RuleSettings.initialHandSize) ? parseInt(window.RuleSettings.initialHandSize) : 7; 
+        const customSize = (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length > 0) ? (parseInt(window.RuleSettings.initialCustomHandSize) || 2) : 0;
                             
         this.hands = {};
         this.players.forEach(p => {
             if(p && p.id) { this.hands[p.id] = this.deck.splice(0, size); }
         });
         
-        if (customSize > 0 && this.ruleSettings.customCards && this.ruleSettings.customCards.length > 0) {
-            this.customDeck = UNORules.shuffle([...this.ruleSettings.customCards].map(id => ({ color: 'black', value: id })));
+        if (customSize > 0 && window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length > 0) {
+            this.customDeck = UNORules.shuffle([...window.RuleSettings.customCards].map(id => ({ color: 'black', value: id })));
             this.players.forEach(p => {
                 if (p && p.id) {
                     for (let i = 0; i < customSize; i++) {
@@ -149,10 +135,12 @@ class UNOGame {
 
         this.turnIndex = (this.turnIndex + (this.direction * skipCount) + this.players.length * 10) % this.players.length;
         this.hasDrawnThisTurn = false;
+        this.selectedIndices = [];
 
         if (this.currentPlayer) {
             this.currentPlayer.usedRaia = false;
             
+            // ★ ライア回収処理（次のターン開始時）
             if (this.currentPlayer.raiaReturnPending) {
                 const gIdx = this.abilityGraveyard.indexOf('id_33');
                 if (gIdx > -1) {
@@ -168,9 +156,26 @@ class UNOGame {
         if (this.currentPlayer && this.currentPlayer.burnTurns > 0) {
             if (this.currentPlayer.invincibleTurns <= 0 && !this.currentPlayer.frozenBurnImmune) {
                 this.drawCard(this.currentPlayer.id);
-                this.addAnimationEvent('request_draw_animation', { playerId: this.currentPlayer.id, count: 1 });
+                if (window.isHost && window.socket) {
+                    window.socket.emit('request_draw_animation', { playerId: this.currentPlayer.id, count: 1 });
+                }
             }
             this.currentPlayer.burnTurns--;
+        }
+    }
+
+    toggleSelect(index) {
+        const card = this.myHand[index];
+        if (!card) return;
+        const foundPos = this.selectedIndices.indexOf(index);
+        if (foundPos > -1) {
+            this.selectedIndices.splice(foundPos, 1);
+        } else {
+            if (this.selectedIndices.length > 0) {
+                const first = this.myHand[this.selectedIndices[0]];
+                if (card.value === first.value) this.selectedIndices.push(index);
+                else this.selectedIndices = [index];
+            } else this.selectedIndices.push(index);
         }
     }
 
@@ -179,23 +184,23 @@ class UNOGame {
         const selectedCards = indices.map(i => hand[i]).filter(c => c !== undefined);
         if (selectedCards.length === 0) return { success: false };
 
-        if (UNORules.canPlaySelected(selectedCards, this.topCard, this.currentColor, this.drawStack, this.ruleSettings)) {
+        if (UNORules.canPlaySelected(selectedCards, this.topCard, this.currentColor, this.drawStack)) {
             const lastCard = selectedCards[selectedCards.length - 1];
             
             const isAbility = lastCard.value && String(lastCard.value).startsWith('id_');
             const isAction = !/^[0-9]$/.test(lastCard.value) && !isAbility;
             
-            const willBeActionFinishPenalty = (hand.length === selectedCards.length && isAction && !this.ruleSettings.allowActionFinish);
-            const willBeAbilityFinishPenalty = (hand.length === selectedCards.length && isAbility && !this.ruleSettings.allowAbilityFinish);
+            const willBeActionFinishPenalty = (hand.length === selectedCards.length && isAction && window.RuleSettings && !window.RuleSettings.allowActionFinish);
+            const willBeAbilityFinishPenalty = (hand.length === selectedCards.length && isAbility && window.RuleSettings && !window.RuleSettings.allowAbilityFinish);
             
             if (willBeActionFinishPenalty || willBeAbilityFinishPenalty) {
-                const penalty = willBeActionFinishPenalty ? (parseInt(this.ruleSettings.actionFinishPenalty) || 3) : (parseInt(this.ruleSettings.abilityFinishPenalty) || 3);
+                const penalty = willBeActionFinishPenalty ? (parseInt(window.RuleSettings.actionFinishPenalty) || 3) : (parseInt(window.RuleSettings.abilityFinishPenalty) || 3);
                 for (let i = 0; i < penalty; i++) this.drawCard(playerId);
                 this.nextTurn(1);
                 return { success: false, penalty: true, penaltyReason: willBeActionFinishPenalty ? '記号' : '能力' };
             }
 
-            if (this.drawStack > 0 && isAbility && AbilityDef[lastCard.value].type.includes('BL')) {
+            if (this.drawStack > 0 && isAbility && window.AbilityDef && window.AbilityDef[lastCard.value].type.includes('BL')) {
                 this.drawStack = 0;
             }
 
@@ -214,6 +219,8 @@ class UNOGame {
 
             const sortedIndices = [...indices].sort((a, b) => b - a);
             sortedIndices.forEach(i => hand.splice(i, 1));
+            
+            if (playerId === this.myId) this.selectedIndices = [];
 
             if (isAbility) {
                 return { success: true, lastCard: lastCard, isAbility: true };
@@ -250,7 +257,9 @@ class UNOGame {
 
     drawCard(targetId, ignoreShield = false) {
         const t = this.players.find(p => p.id === targetId);
+        
         if (t && t.invincibleTurns > 0) return false;
+        
         if (!ignoreShield && t && t.shield && t.shield.turns > 0 && t.shield.level > 0) {
             t.shield.level--;
             if (t.shield.level <= 0) t.shield.turns = 0;
@@ -259,8 +268,8 @@ class UNOGame {
 
         if (this.deck.length === 0) {
             if (this.discardPile.length <= 1) {
-                this.isGameOver = true; 
-                this.addAnimationEvent('announce_draw', {});
+                if (typeof window !== 'undefined') window.isGameOver = true; 
+                if (window.isHost && typeof window.socket !== 'undefined') window.socket.emit('announce_draw');
                 return false;
             }
             const top = this.discardPile.pop();
@@ -269,28 +278,35 @@ class UNOGame {
             const newDeck = [];
             const newDiscardPile = [];
             const newDiscardRotations = [];
+            
             for(let i = 0; i < this.discardPile.length; i++) {
                 const c = this.discardPile[i];
                 if (c.value && String(c.value).startsWith('id_')) {
-                    newDiscardPile.push(c); newDiscardRotations.push(this.discardRotations[i]);
-                } else { newDeck.push(c); }
+                    newDiscardPile.push(c);
+                    newDiscardRotations.push(this.discardRotations[i]);
+                } else {
+                    newDeck.push(c);
+                }
             }
+            
             this.deck = UNORules.shuffle(newDeck);
-            this.discardPile = newDiscardPile; this.discardRotations = newDiscardRotations;
-            this.discardPile.push(top); this.discardRotations.push(topRot);
+            this.discardPile = newDiscardPile;
+            this.discardRotations = newDiscardRotations;
+            
+            this.discardPile.push(top);
+            this.discardRotations.push(topRot);
         }
 
         if (this.hands[targetId] && this.deck.length > 0) {
             this.hands[targetId].push(this.deck.pop());
-            // ★ 追加: 引いて手札が2枚以上になったらUNO宣言フラグを解除する
-            if (this.hands[targetId].length > 1) {
+            if (targetId === this.myId && this.hands[targetId].length > 1) {
                 this.unoDeclared = false;
             }
             return true;
         }
         return false;
     }
-    
+
     lockRandomCard(attackerId, targetId, type, count = 1, turns = 1) {
         const hand = this.hands[targetId];
         if (!hand) return;
@@ -313,5 +329,3 @@ class UNOGame {
         }
     }
 }
-
-module.exports = UNOGame;
