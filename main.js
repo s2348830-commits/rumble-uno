@@ -1360,11 +1360,11 @@ function initMainSocketEvents() {
         return;
     }
 
-    wwindow.socket.on('update_game_state', (state) => {
+    window.socket.on('update_game_state', (state) => {
         if (!window.game) return;
         
-        // ★ 追加: サーバーから最新状態が届いたら、クライアントの操作ロックを解除する
-        window.isProcessingPlay = false; 
+        // サーバーから最新状態が届いたら、クライアントの操作ロックを解除する
+        window.isProcessingPlay = false;
 
         const wasMyTurn = window.game.isMyTurn;
 
