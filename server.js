@@ -3,6 +3,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { Server } = require('socket.io');
+const url = require('url'); // ★ 追加
 
 const UNORules = require('./rule.js');
 const { AbilityDef, AbilityEngine } = require('./ability.js');
@@ -31,7 +32,9 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    let filePath = '.' + req.url;
+    // ★ 修正箇所: クエリパラメータ（?v=25 など）を取り除いて純粋なパスを取得する
+    const parsedUrl = url.parse(req.url);
+    let filePath = '.' + parsedUrl.pathname;
     if (filePath === './') filePath = './index.html';
 
     const extname = String(path.extname(filePath)).toLowerCase();
@@ -40,6 +43,7 @@ const server = http.createServer((req, res) => {
     fs.readFile(filePath, (err, content) => {
         if (err) {
             if (err.code === 'ENOENT') {
+                console.log(`[404] File not found: ${filePath}`); // サーバーログで確認用
                 res.writeHead(404, { 'Content-Type': 'text/html' });
                 res.end("404 Not Found", 'utf-8');
             } else {
@@ -79,7 +83,7 @@ function broadcastGameState(roomId) {
         })),
         hasDrawnThisTurn: game.hasDrawnThisTurn,
         unoDeclared: game.unoDeclared,
-        ruleSettings: room.ruleSettings, // ★ 追加: ルール設定をクライアントに同期
+        ruleSettings: room.ruleSettings,
         defensePhase: room.pendingDefense ? room.pendingDefense.info : null,
         defenseTimer: room.pendingDefense ? room.pendingDefense.timer : 0,
         attackGuides: room.attackGuides || [],
@@ -119,7 +123,7 @@ function startTurnTimer(roomId) {
     if (!room || !room.gameInstance) return;
     const game = room.gameInstance;
 
-    room.isProcessingAction = false; // ★ 追加: アクションのロックを解除
+    room.isProcessingAction = false; 
 
     if (room.timers.turn) clearTimeout(room.timers.turn);
     if (game.isGameOver || checkWin(roomId)) return;
@@ -129,7 +133,6 @@ function startTurnTimer(roomId) {
 
     broadcastGameState(roomId);
 
-    // ★ 修正: BOTまたは切断プレイヤーの場合は即座(1.5秒後)に代打ちさせる
     if (current.type === 'bot' || !current.connected) {
         room.timers.turn = setTimeout(() => {
             if (room.pendingDefense || room.pendingJanken || game.currentPlayer.id !== current.id) return;
@@ -140,7 +143,7 @@ function startTurnTimer(roomId) {
         room.timers.turn = setInterval(() => {
             if (room.pendingDefense || room.pendingJanken) return;
             afkTime++;
-            if (afkTime >= 180) { // 3分放置で代打ち
+            if (afkTime >= 180) { 
                 clearInterval(room.timers.turn);
                 if (game.currentPlayer.id === current.id) playBotTurn(roomId, current.id);
             }
@@ -163,7 +166,7 @@ function playBotTurn(roomId, botId) {
             io.to(roomId).emit('play_animation', { playerId: botId, cards: playedCards });
             setTimeout(() => { 
                 if (room.pendingDefense || room.pendingJanken || game.currentPlayer.id !== botId) return;
-                room.isProcessingAction = true; // ★実行時にロック
+                room.isProcessingAction = true; 
                 executeAbilityPlay(roomId, botId, result.indices, null, null, null, [], {}); 
             }, playedCards.length * 100 + 400);
             return;
@@ -209,14 +212,14 @@ function playBotTurn(roomId, botId) {
             io.to(roomId).emit('play_animation', { playerId: botId, cards: playedCards });
             setTimeout(() => {
                 if (room.pendingDefense || room.pendingJanken || game.currentPlayer.id !== botId) return;
-                room.isProcessingAction = true; // ★実行時にロック
+                room.isProcessingAction = true; 
                 executeAbilityPlay(roomId, botId, result.indices, botTargetId, botDiscardIdx, botSelectedColor, botMultiDiscardIndices, extraData);
             }, playedCards.length * 100 + 400);
         } else {
             io.to(roomId).emit('play_animation', { playerId: botId, cards: playedCards });
             setTimeout(() => { 
                 if (room.pendingDefense || room.pendingJanken || game.currentPlayer.id !== botId) return;
-                room.isProcessingAction = true; // ★実行時にロック
+                room.isProcessingAction = true; 
                 executePlay(roomId, botId, result.indices, true); 
             }, playedCards.length * 100 + 400);
         }
@@ -225,7 +228,7 @@ function playBotTurn(roomId, botId) {
         io.to(roomId).emit('draw_animation', { playerId: botId, count: drawCount });
         setTimeout(() => {
             if (room.pendingDefense || room.pendingJanken || game.currentPlayer.id !== botId) return;
-            room.isProcessingAction = true; // ★実行時にロック
+            room.isProcessingAction = true; 
             executeDraw(roomId, botId, true);
         }, drawCount * 100 + 400);
     }
@@ -630,7 +633,7 @@ io.on('connection', (socket) => {
         rooms[roomId] = {
             id: roomId, host: socket.id, slots: Array(10).fill(null).map(() => ({ id: null, userId: null, type: 'empty', name: '空き枠', icon: null, ready: false, connected: false })),
             ruleSettings: data.ruleSettings || {}, gameStarted: false, gameInstance: null, timers: {}, pendingDefense: null, pendingJanken: null, attackGuides: [],
-            isProcessingAction: false // ★追加: サーバー連打対策フラグ
+            isProcessingAction: false 
         };
         rooms[roomId].slots[0] = { id: socket.id, userId: data.userId, type: 'host', name: data.playerName, icon: data.icon, ready: true, connected: true };
         socket.join(roomId); socket.roomId = roomId;
@@ -726,17 +729,14 @@ io.on('connection', (socket) => {
         broadcastGameState(socket.roomId);
     });
 
-    // ★ サーバー主導のアクション受付
     socket.on('player_action', (data) => {
         const roomId = socket.roomId;
         const room = rooms[roomId];
         if (!room || !room.gameInstance) return;
         const game = room.gameInstance;
 
-        // ★ 追加: サーバーが別のアクションを処理中なら全て無視する(二重実行防止)
         if (room.isProcessingAction && data.action !== 'defense_response' && data.action !== 'janken_choice') return;
 
-        // ターンと割り込みのバリデーション
         if (['play', 'color', 'draw', 'end_turn'].includes(data.action)) {
             if (game.currentPlayer.id !== socket.id) return; 
             if (room.pendingDefense || room.pendingJanken) return; 
@@ -745,7 +745,6 @@ io.on('connection', (socket) => {
             if (room.pendingDefense || room.pendingJanken) return; 
         }
 
-        // ★ アクション開始時にロックをかける
         if (['play', 'play_ability', 'draw', 'end_turn', 'color', 'draw_penalty'].includes(data.action)) {
             room.isProcessingAction = true;
         }
@@ -800,16 +799,15 @@ io.on('connection', (socket) => {
                     if (room.gameStarted) {
                         slot.connected = false;
                         
-                        // ▼▼▼ 追加: 防御フェーズ中に切断した場合、自動で「防御しない」としてタイマーをスキップする ▼▼▼
                         if (room.pendingDefense && room.pendingDefense.responses && room.pendingDefense.responses[slot.id]) {
                             if (!room.pendingDefense.responses[slot.id].cardValue) {
                                 room.pendingDefense.responses[slot.id] = { cardValue: null, discardIdx: null };
-                                // 全員の回答が揃ったかチェックし、揃っていればタイマーを0にして即解決
                                 if (Object.keys(room.pendingDefense.responses).length >= room.pendingDefense.info.targets.length) {
                                     room.pendingDefense.timer = 0; 
                                 }
                             }
                         }
+
                         io.to(roomId).emit('room_state_update', room);
                     } else {
                         const slotIndex = room.slots.indexOf(slot);
