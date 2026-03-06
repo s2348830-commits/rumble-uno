@@ -32,7 +32,7 @@ class UNOGame {
             p.burnTurns = 0;
             p.invincibleTurns = 0; 
             p.shield = { level: 0, turns: 0 }; 
-            p.evasion = { level: 0, turns: 0 }; // ★ 回避ステータスの追加
+            p.evasion = { level: 0, turns: 0 }; 
             p.frozenBurnImmune = false; 
         });
         this.myId = myId;
@@ -134,7 +134,7 @@ class UNOGame {
         this.turnIndex = (this.turnIndex + (this.direction * skipCount) + this.players.length * 10) % this.players.length;
         this.hasDrawnThisTurn = false;
         this.selectedIndices = [];
-        this.raiaReturnedThisTurn = false; // ★ ターン開始時にライアのフラグをリセット
+        this.raiaReturnedThisTurn = false;
 
         if (this.currentPlayer && this.currentPlayer.burnTurns > 0) {
             if (this.currentPlayer.invincibleTurns <= 0 && !this.currentPlayer.frozenBurnImmune) {
@@ -179,6 +179,10 @@ class UNOGame {
             if (willBeActionFinishPenalty || willBeAbilityFinishPenalty) {
                 const penalty = willBeActionFinishPenalty ? (parseInt(window.RuleSettings.actionFinishPenalty) || 3) : (parseInt(window.RuleSettings.abilityFinishPenalty) || 3);
                 for (let i = 0; i < penalty; i++) this.drawCard(playerId);
+                
+                // ★ ホスト側の処理：ペナルティを受けた場合は強制的に次の人にターンを回す
+                this.nextTurn(1);
+                
                 return { success: false, penalty: true, penaltyReason: willBeActionFinishPenalty ? '記号' : '能力' };
             }
 
