@@ -1431,8 +1431,18 @@ window.playJankenResult = function(attackerId, targetId, aH, tH, result) {
         if (p1Card) p1Card.style.borderTop = '10px solid #fbc02d';
         if (p2Res) { p2Res.innerText = 'Lose'; p2Res.style.color = '#7e57c2'; }
         if (p2Card) p2Card.style.borderTop = '10px solid #7e57c2';
+        
         if (window.myId === attackerId) { if(window.SE) window.SE.play('win'); }
         else if (window.myId === targetId) { if(window.SE) window.SE.play('win2'); }
+        
+        // ★ 追加: じゃんけんに勝った場合、動画音声(.mov)を全員に再度再生する
+        if (window.SE) {
+            setTimeout(() => {
+                // ※三姉妹の音声の場合は 'hv/id_26' となります（id_25 にしたい場合は変更してください）
+                window.SE.play('hv/id_25'); 
+            }, 500); // 「Win!」のSEと被りすぎないように0.5秒だけ遅らせて再生
+        }
+
     } else if (result === 'lose') {
         if (p1Res) { p1Res.innerText = 'Lose'; p1Res.style.color = '#7e57c2'; }
         if (p1Card) p1Card.style.borderTop = '10px solid #7e57c2';
