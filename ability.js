@@ -23,7 +23,7 @@ window.AbilityDef = {
     'id_19': { rarity: 'SR', type: 'BL', name: 'ヴィンディ', desc: '【BL】防御時手札1枚捨てる。攻撃者に1枚引かせる。', needsDiscard: true },
     'id_20': { rarity: 'UR', type: 'HV', name: '幽艶レベッカ', desc: '【HV】トリック・オア・キャロット。色を指定でき、指定した色のカードを好きな枚数重ねて場に出す。(記号効果は適用されない)', needsColor: true },
     'id_21': { rarity: 'SR', type: 'AT', name: 'アヤメ', desc: '【AT】自分以外のプレイヤーを一人指定し、そのプレイヤーにカードを3枚引かせる。', needsTarget: true },
-    'id_22': { rarity: 'SSR', type: 'HE', name: '遊鈴', desc: '【HE】自分のデバフ(凍結/燃焼)を1つ解除し、全員に1枚カードを引かせる。', needsDebuffSelect: true },
+    'id_22': { rarity: 'SSR', type: 'HE', name: '遊鈴', desc: '【HE】自分のデバフ(凍結/燃焼)を1つ解除し、自分以外の全員に1枚カードを引かせる。', needsDebuffSelect: true },
     'id_23': { rarity: 'SSR', type: 'HE', name: 'ダンタ', desc: '【HE】自分を1ターン無敵状態にし、デバフを1つランダムに解除する。' },
     'id_24': { rarity: 'R', type: 'AT', name: 'アクアヘッド', desc: '【AT】自分以外のランダムなプレイヤーに燃焼を1ターン付与する。' },
     'id_25': { rarity: 'UR', type: 'HE', name: 'ミサ', desc: '【HE】自分のカード1枚をワイルドにし、使用されたSSR以下の能力カードを1枚手札に戻す。', needsGraveyard: true },
@@ -38,20 +38,16 @@ window.AbilityEngine = {
         if (!t) return 0;
         if (t.invincibleTurns > 0) return 0; 
         
-        let finalCount = count;
-        if (t.shield && t.shield.turns > 0 && t.shield.level > 0) {
-            let reduce = Math.min(finalCount, t.shield.level);
-            finalCount -= reduce;
-            t.shield.level -= reduce; 
-        }
+        let actualDrawn = count;
         
-        for (let i = 0; i < finalCount; i++) {
-            game.drawCard(targetId);
+        // game.drawCardに任せるため、ここでは回数を記録するだけ
+        for (let i = 0; i < count; i++) {
+            game.drawCard(targetId); 
         }
-        if (finalCount > 0 && window.isHost && window.socket) {
-            window.socket.emit('request_draw_animation', { playerId: targetId, count: finalCount });
+        if (count > 0 && window.isHost && window.socket) {
+            window.socket.emit('request_draw_animation', { playerId: targetId, count: count });
         }
-        return finalCount;
+        return actualDrawn;
     },
 
     applyBurn: function(game, targetId, turns) {
@@ -247,9 +243,10 @@ window.AbilityEngine = {
                         else if (extraData.debuffToClear === 'burn') self.burnTurns = 0;
                     }
                     game.players.forEach(p => {
-                        if(p.connected) this.applyDraw(game, p.id, 1);
+                        // ★ 自分以外の全員に変更
+                        if(p.connected && p.id !== attackerId) this.applyDraw(game, p.id, 1);
                     });
-                    guides.push({ from: attackerId, to: attackerId, text: 'デバフ解除＆全員1枚' });
+                    guides.push({ from: attackerId, to: attackerId, text: 'デバフ解除＆他全員1枚' });
                 } else if (abilityId === 'id_23') {
                     const self = game.players.find(p=>p.id === attackerId);
                     if(self) {

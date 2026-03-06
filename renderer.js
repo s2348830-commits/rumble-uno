@@ -25,7 +25,6 @@ const Renderer = {
 
         const currentDir = game.direction;
         
-        // ★ 矢印クラスのリセットと再設定を確実にする
         arrowSvg.setAttribute('class', 'direction-arrows');
         if (reverseCount > 0) {
             const predictedDir = currentDir * Math.pow(-1, reverseCount);
@@ -91,16 +90,16 @@ const Renderer = {
 
             let overlayHtml = '';
             if (p.frozen) overlayHtml += '<div class="status-overlay status-frozen"></div>';
-            if (p.burnTurns > 0) overlayHtml += `<div class="status-overlay status-burned"><span style="position:absolute; bottom:0; left:50%; transform:translateX(-50%); font-size:12px; font-weight:bold; color:white;">${p.burnTurns}</span></div>`;
+            if (p.burnTurns > 0) overlayHtml += `<div class="status-overlay status-burned"></div>`;
 
-            // ★ シールドと無敵のアイコン表示追加
+            // ★ シールドと無敵のアイコン表示追加（テキスト付き）
             let statusIcons = '';
-            if (p.invincibleTurns > 0) statusIcons += '⭐';
-            if (p.shield && p.shield.turns > 0 && p.shield.level > 0) statusIcons += `🔰${p.shield.level}`;
-            if (p.frozen) statusIcons += '❄';
-            if (p.burnTurns > 0) statusIcons += '🔥';
+            if (p.invincibleTurns > 0) statusIcons += `<div>🔲 ${p.invincibleTurns}T</div>`;
+            if (p.shield && p.shield.turns > 0 && p.shield.level > 0) statusIcons += `<div>🛡️ ${p.shield.level} (${p.shield.turns}T)</div>`;
+            if (p.frozen) statusIcons += '<div>❄ 凍結</div>';
+            if (p.burnTurns > 0) statusIcons += `<div>🔥 燃焼(${p.burnTurns}T)</div>`;
             const hand = game.hands[p.id] || [];
-            if (hand.some(c => c.lockedTurns && c.lockedTurns > 0)) statusIcons += '🔒';
+            if (hand.some(c => c.lockedTurns && c.lockedTurns > 0)) statusIcons += '<div>🔒 ロック</div>';
 
             const badge = document.createElement('div');
             badge.className = `circle-player-badge other-player-badge ${isTurn ? 'active-turn' : ''} ${isPredictTurn ? 'predict-turn' : ''} ${isOffline ? 'offline' : ''} ${p.id === game.myId ? 'my-badge' : ''}`;
@@ -214,7 +213,6 @@ const Renderer = {
         const endTurnBtn = document.getElementById('end-turn-btn');
         const btnUnoAuto = document.getElementById('btn-uno-auto'); 
 
-        // ★ 追加: 手札が選択されている時、「場」全体を緑色に光らせる
         const discardArea = document.getElementById('discard-area');
         if (discardArea) {
             if (game.selectedIndices && game.selectedIndices.length > 0) {

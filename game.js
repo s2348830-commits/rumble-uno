@@ -16,7 +16,7 @@ class UNOGame {
         this.selectedIndices = [];
         this.unoDeclared = false;
         this.hasDrawnThisTurn = false;
-        this.abilityGraveyard = []; // ★ 墓地追加
+        this.abilityGraveyard = []; 
     }
 
     get isMyTurn() { return this.currentPlayer && this.currentPlayer.id === this.myId; }
@@ -29,8 +29,8 @@ class UNOGame {
         this.players.forEach(p => {
             p.frozen = false;
             p.burnTurns = 0;
-            p.invincibleTurns = 0; // ★ 無敵ターン
-            p.shield = { level: 0, turns: 0 }; // ★ シールド
+            p.invincibleTurns = 0; 
+            p.shield = { level: 0, turns: 0 }; 
             p.frozenBurnImmune = false; 
         });
         this.myId = myId;
@@ -106,7 +106,6 @@ class UNOGame {
             this.currentPlayer.frozen = false;
             this.currentPlayer.frozenBurnImmune = false;
             
-            // ★ 無敵とシールドのターン消費
             if (this.currentPlayer.invincibleTurns > 0) this.currentPlayer.invincibleTurns--;
             if (this.currentPlayer.shield && this.currentPlayer.shield.turns > 0) {
                 this.currentPlayer.shield.turns--;
@@ -124,7 +123,6 @@ class UNOGame {
         this.hasDrawnThisTurn = false;
         this.selectedIndices = [];
 
-        // ★ 燃焼ドローの処理（無敵時は無効）
         if (this.currentPlayer && this.currentPlayer.burnTurns > 0) {
             if (this.currentPlayer.invincibleTurns <= 0 && !this.currentPlayer.frozenBurnImmune) {
                 this.drawCard(this.currentPlayer.id);
@@ -181,7 +179,6 @@ class UNOGame {
                     this.discardPile.push(c);
                     this.discardRotations.push(Math.floor(Math.random() * 21) - 10);
                 } else {
-                    // ★ 墓地に追加
                     this.abilityGraveyard.push(c.value);
                 }
                 
@@ -227,7 +224,20 @@ class UNOGame {
         return { success: false };
     }
 
-    drawCard(targetId) {
+    // ★ シールドでの肩代わり（吸収）を追加
+    drawCard(targetId, ignoreShield = false) {
+        const t = this.players.find(p => p.id === targetId);
+        
+        // 無敵中は一切ドローしない
+        if (t && t.invincibleTurns > 0) return false;
+        
+        // シールドがあればドローを肩代わりして手札を増やさない
+        if (!ignoreShield && t && t.shield && t.shield.turns > 0 && t.shield.level > 0) {
+            t.shield.level--;
+            if (t.shield.level <= 0) t.shield.turns = 0;
+            return true; // 処理としては正常だが手札は増えない
+        }
+
         if (this.deck.length === 0) {
             if (this.discardPile.length <= 1) {
                 if (typeof window !== 'undefined') window.isGameOver = true; 
