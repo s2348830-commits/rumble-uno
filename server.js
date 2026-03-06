@@ -799,6 +799,17 @@ io.on('connection', (socket) => {
                 if (slot) {
                     if (room.gameStarted) {
                         slot.connected = false;
+                        
+                        // ▼▼▼ 追加: 防御フェーズ中に切断した場合、自動で「防御しない」としてタイマーをスキップする ▼▼▼
+                        if (room.pendingDefense && room.pendingDefense.responses && room.pendingDefense.responses[slot.id]) {
+                            if (!room.pendingDefense.responses[slot.id].cardValue) {
+                                room.pendingDefense.responses[slot.id] = { cardValue: null, discardIdx: null };
+                                // 全員の回答が揃ったかチェックし、揃っていればタイマーを0にして即解決
+                                if (Object.keys(room.pendingDefense.responses).length >= room.pendingDefense.info.targets.length) {
+                                    room.pendingDefense.timer = 0; 
+                                }
+                            }
+                        }
                         io.to(roomId).emit('room_state_update', room);
                     } else {
                         const slotIndex = room.slots.indexOf(slot);

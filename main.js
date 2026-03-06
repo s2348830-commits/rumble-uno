@@ -1097,7 +1097,6 @@ window.handlePlayAction = function() {
         
         window.animateSequentialPlay(indicesToSend, window.game, () => {
             window.socket.emit('player_action', { action: 'play_ability', indices: indicesToSend, cards: cardsToSend, targetId: null, discardIdx: null, selectedColor: null, multiDiscardIndices: [], isHV: false, extraData: {} });
-            window.isProcessingPlay = false; 
         });
         return;
     }
@@ -1361,9 +1360,12 @@ function initMainSocketEvents() {
         return;
     }
 
-    window.socket.on('update_game_state', (state) => {
+    wwindow.socket.on('update_game_state', (state) => {
         if (!window.game) return;
         
+        // ★ 追加: サーバーから最新状態が届いたら、クライアントの操作ロックを解除する
+        window.isProcessingPlay = false; 
+
         const wasMyTurn = window.game.isMyTurn;
 
         window.game.deck = state.deck; 
