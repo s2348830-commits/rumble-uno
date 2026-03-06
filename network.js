@@ -3,9 +3,10 @@
  */
 
 window.socket = io({
-    reconnectionAttempts: 5, 
-    timeout: 10000,          
-    transports: ['websocket', 'polling'],
+    reconnectionAttempts: 10,  // Renderのスリープ復帰待ちを考慮してリトライ回数を増やす
+    reconnectionDelay: 1000,
+    timeout: 20000,            // タイムアウト時間を長めに設定
+    transports: ['polling', 'websocket'], // ★重要: HTTPポーリングで確実に接続してからWebSocketへ昇格させる
     extraHeaders: {
         "ngrok-skip-browser-warning": "true"
     }
