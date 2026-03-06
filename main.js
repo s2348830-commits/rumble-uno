@@ -674,9 +674,9 @@ window.showAbilityCutin = function(cardValue, isHVActivated = false) {
         const rand = Math.random() < 0.5 ? 1 : 2;
         if (window.SE) window.SE.play(`hv/id_20(${rand})`);
     } else if (cardValue === 'id_25') {
-        if (window.SE) window.SE.play(`hv/id_25`);
-    } else if (cardValue === 'id_26') {
         if (window.SE) window.SE.play(`hv/id_26`);
+    } else if (cardValue === 'id_26') {
+        if (window.SE) window.SE.play(`hv/id_25`);
     } else {
         const randMvp = Math.random() < 0.5 ? 1 : 2;
         if (window.SE) window.SE.play(`mvp_${randMvp}`);

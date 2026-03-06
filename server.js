@@ -533,7 +533,13 @@ function startJankenPhase(roomId, attackerId, loopCount, fixedTargetId = null) {
     let targetId = fixedTargetId;
     if (!targetId) {
         const others = game.players.filter(p => p.id !== attackerId && p.connected);
-        if (others.length === 0) { startTurnTimer(roomId); return; }
+        if (others.length === 0) { 
+            // 相手がいない場合は完全に終了させる
+            room.pendingJanken = null;
+            broadcastGameState(roomId);
+            startTurnTimer(roomId); 
+            return; 
+        }
         targetId = others[Math.floor(Math.random() * others.length)].id;
     }
     
@@ -586,18 +592,23 @@ function resolveJanken(roomId) {
         if (drawCount > 0) {
             AbilityEngine.applyDraw(game, pJ.targetId, drawCount, false);
             room.attackGuides.push({ from: pJ.attackerId, to: pJ.targetId, text: 'じゃんけんドロー!', delay: 0 });
-            broadcastGameState(roomId);
         }
 
         if (!checkWin(roomId)) {
             const nextLoop = pJ.loopCount + 1;
             const aId = pJ.attackerId; const tId = pJ.targetId; 
-            room.pendingJanken = null;
-            broadcastGameState(roomId);
 
-            if (result === 'win' && nextLoop < 4) setTimeout(() => startJankenPhase(roomId, aId, nextLoop), 1000);
-            else if (result === 'draw') setTimeout(() => startJankenPhase(roomId, aId, pJ.loopCount, tId), 1000);
-            else setTimeout(() => startTurnTimer(roomId), 1000);
+            // ★ 修正: 次がある場合は null にせず即座に新しいループを始める（チラつき防止）
+            if (result === 'win' && nextLoop < 4) {
+                startJankenPhase(roomId, aId, nextLoop);
+            } else if (result === 'draw') {
+                startJankenPhase(roomId, aId, pJ.loopCount, tId);
+            } else {
+                // 完全に終了する場合は null にして閉じる
+                room.pendingJanken = null;
+                broadcastGameState(roomId);
+                setTimeout(() => startTurnTimer(roomId), 500);
+            }
         }
     }, 4500); 
 }
