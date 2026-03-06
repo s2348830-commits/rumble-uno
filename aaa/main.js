@@ -339,7 +339,10 @@ window.updatePhaseUI = function(state) {
         window.jankenResultPlayed = false;
         window.currentJankenLoopId = null; 
         const jOverlay = document.getElementById('janken-overlay');
-        if (jOverlay && !jOverlay.classList.contains('result-showing')) jOverlay.classList.add('hidden');
+        if (jOverlay) {
+            jOverlay.classList.remove('result-showing');
+            jOverlay.classList.add('hidden');
+        }
     }
 };
 
@@ -1144,11 +1147,19 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
 
     const multiplier = indices.length; 
     const discCard = discardIdx !== null ? originalHand[discardIdx] : null;
-    const multiCards = (multiDiscardIndices || []).map(i => originalHand[i]);
+
+    let safeMultiDiscardIndices = [];
+    if (multiDiscardIndices && multiDiscardIndices.length > 0) {
+        safeMultiDiscardIndices = multiDiscardIndices.filter(i => {
+            const c = originalHand[i];
+            return c && c.color === selectedColor && !(c.value && String(c.value).startsWith('id_'));
+        });
+    }
+    const multiCards = safeMultiDiscardIndices.map(i => originalHand[i]);
 
     let allRemoveIndices = [...indices];
     if (discardIdx !== null) allRemoveIndices.push(discardIdx);
-    if (multiDiscardIndices && multiDiscardIndices.length > 0) allRemoveIndices.push(...multiDiscardIndices);
+    if (safeMultiDiscardIndices.length > 0) allRemoveIndices.push(...safeMultiDiscardIndices);
     
     allRemoveIndices = [...new Set(allRemoveIndices)].sort((a,b) => b - a);
     allRemoveIndices.forEach(i => hand.splice(i, 1));
@@ -1507,7 +1518,7 @@ window.showJankenUI = function(attackerId, targetId, loopCount) {
     const jankenLoopId = `${attackerId}-${targetId}-${loopCount}`;
     if (window.currentJankenLoopId !== jankenLoopId) {
         window.currentJankenLoopId = jankenLoopId;
-        if (window.SE) window.SE.play('hv/id_26');
+        if (loopCount > 0 && window.SE) window.SE.play('hv/id_26');
     }
 
     overlay.classList.remove('result-showing');
@@ -1643,7 +1654,7 @@ window.checkTurn = function() {
                     if (playedCards[0].value === 'id_20' && botSelectedColor) {
                         const bHand = window.game.hands[current.id];
                         bHand.forEach((c, i) => {
-                            if (!result.indices.includes(i) && c.color === botSelectedColor) botMultiDiscardIndices.push(i);
+                            if (!result.indices.includes(i) && c.color === botSelectedColor && !(c.value && String(c.value).startsWith('id_'))) botMultiDiscardIndices.push(i);
                         });
                         willDiscard += botMultiDiscardIndices.length;
                     }
@@ -1732,7 +1743,7 @@ window.checkTurn = function() {
                             if (playedCards[0].value === 'id_20' && botSelectedColor) {
                                 const bHand = window.game.hands[current.id];
                                 bHand.forEach((c, i) => {
-                                    if (!result.indices.includes(i) && c.color === botSelectedColor) botMultiDiscardIndices.push(i);
+                                    if (!result.indices.includes(i) && c.color === botSelectedColor && !(c.value && String(c.value).startsWith('id_'))) botMultiDiscardIndices.push(i);
                                 });
                                 willDiscard += botMultiDiscardIndices.length;
                             }
@@ -2118,7 +2129,7 @@ window.handlePlayAction = function() {
             if (def && cardValue === 'id_20' && selColor) {
                 const validIndices = [];
                 window.game.myHand.forEach((c, i) => {
-                    if (!indices.includes(i) && i !== discardIdx && c.color === selColor) validIndices.push(i);
+                    if (!indices.includes(i) && i !== discardIdx && c.color === selColor && !(c.value && String(c.value).startsWith('id_'))) validIndices.push(i);
                 });
                 if (validIndices.length > 0) {
                     window.openMultiDiscardSelection(window.game.myHand, validIndices, (selectedMulti) => {
@@ -2261,7 +2272,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initMainSocketEvents() {
-    // ★ 修正: 通信(socket)の準備ができるまで待機する安全処理
     if (typeof window.socket === 'undefined') {
         setTimeout(initMainSocketEvents, 100);
         return;
@@ -2392,7 +2402,6 @@ function initMainSocketEvents() {
         const playerId = data.playerId;
         
         if (data.action === 'play') {
-            // ★ 追加: ホスト側でも、能力解決中は通常カードの割り込みをブロック
             if (window.pendingDefense || window.pendingJanken) return;
 
             window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards });
@@ -2401,7 +2410,6 @@ function initMainSocketEvents() {
                 if (typeof window.executePlay === 'function') window.executePlay(playerId, data.indices);
             }, delay);
         } else if (data.action === 'play_ability') {
-            // ★ 追加: ホスト側でも、能力解決中は新規の能力割り込みをブロック
             if (window.pendingDefense || window.pendingJanken) return;
 
             window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards, isHV: data.isHV });
@@ -2434,7 +2442,7 @@ function initMainSocketEvents() {
             setTimeout(() => {
                 if (typeof window.game !== 'undefined' && typeof window.game.drawCard === 'function') {
                     for(let i=0; i<data.count; i++) window.game.drawCard(playerId);
-                    if (typeof window.executeEndTurn === 'function') window.executeEndTurn(playerId); // ペナルティ後はターン終了
+                    if (typeof window.executeEndTurn === 'function') window.executeEndTurn(playerId);
                 }
             }, delay);
         } else if (data.action === 'ability_reset') {
@@ -2478,5 +2486,4 @@ function initMainSocketEvents() {
     });
 }
 
-// 最後に処理を呼び出す
 initMainSocketEvents();
