@@ -7,8 +7,15 @@
     --suggest-color: #00d2ff;
 }
 
-@media screen and (max-width: 500px), screen and (max-height: 500px) {
+@media screen and (max-width: 500px), screen and (max-height: 600px) {
     :root { --card-w: 32px; --card-h: 48px; --card-ml: -12px; --font-center: 18px; --font-corner: 8px; --ui-gap: 20px; --deck-offset: 1px; --sel-transform: -8px; }
+    
+    #game-container { padding-top: 30px; padding-bottom: 70px; justify-content: flex-start; }
+    #circle-table { max-width: 320px; margin-top: 10px; }
+    .circle-player-badge { width: 35px; height: 35px; }
+    .circle-player-badge.my-badge { width: 45px; height: 45px; }
+    .cp-name { font-size: 9px; }
+    .manual-btn { top: 10px; right: 10px; padding: 6px 10px; font-size: 11px; }
 }
 
 body { 
@@ -53,7 +60,22 @@ body {
 .cp-name { font-size: 11px; color: #ddd; font-weight: bold; }
 .cp-cards { font-size: 10px; background: #d32f2f; color: white; padding: 2px 5px; border-radius: 10px; margin-top: 2px; }
 
-.cp-status-icons { position: absolute; top: 85%; left: 50%; transform: translateX(-50%); font-size: 18px; z-index: 25; text-shadow: 0px 0px 5px #000, 0px 0px 5px #000; white-space: nowrap; line-height: 1; }
+.cp-status-icons { 
+    position: absolute; 
+    left: 105%; 
+    top: 50%; 
+    transform: translateY(-50%); 
+    font-size: 11px; 
+    z-index: 25; 
+    text-shadow: 0px 0px 5px #000, 0px 0px 5px #000; 
+    white-space: nowrap; 
+    line-height: 1.2; 
+    display: flex; 
+    flex-direction: column; 
+    align-items: flex-start; 
+    gap: 3px;
+}
+
 .status-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 50%; pointer-events: none; z-index: 15; }
 .status-frozen { background: rgba(0, 191, 255, 0.4); box-shadow: inset 0 0 15px #00bfff; }
 .status-burned { background: rgba(255, 69, 0, 0.4); box-shadow: inset 0 0 15px #ff4500; animation: flicker 1s infinite alternate; }
@@ -92,40 +114,24 @@ body {
 #uno-area { top: auto; right: -20px; bottom: 0px; }
 #uno-btn { background: linear-gradient(135deg, #f1c40f, #e67e22); color: white; border: 1.5px solid white; border-radius: 30px; padding: 5px 10px; font-size: 11px; font-weight: bold; cursor: pointer; animation: bounce 1s infinite; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
 
-/* ★ ボタン類が重ならないように縦に並べる調整 */
-.btn-chat-toggle { position: absolute; background: #000; padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; display: inline-flex; align-items: center; justify-content: center; border: 1.5px solid #fff; color: #fff; cursor: pointer; user-select: none; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.5); white-space: nowrap; z-index: 10000; }
+.btn-chat-toggle { background: #000; padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; display: inline-flex; align-items: center; justify-content: center; border: 1.5px solid #fff; color: #fff; cursor: pointer; user-select: none; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.5); white-space: nowrap; z-index: 10000; }
 .btn-chat-toggle.is-on { border-color: #fbc02d; color: #fbc02d; }
 .btn-chat-toggle:active { transform: scale(0.95); }
 
-/* ★ スマホで入力欄が手札と被らないように最下部固定＋手札を上に持ち上げる */
-.chat-input-area { 
-    position: fixed; bottom: 5px; left: 50%; transform: translateX(-50%); 
-    display: flex; gap: 5px; z-index: 10000; background: rgba(0,0,0,0.6); 
-    padding: 6px; border-radius: 20px; width: 90%; max-width: 400px; 
-    box-sizing: border-box; justify-content: center;
-}
-#chat-input { flex-grow: 1; padding: 5px 10px; border-radius: 15px; border: none; outline: none; background: rgba(255,255,255,0.9); font-size: 12px; pointer-events: auto; }
-#btn-chat-send { background: #4caf50; color: white; border: none; border-radius: 15px; padding: 5px 15px; cursor: pointer; font-weight: bold; font-size: 12px; pointer-events: auto; white-space: nowrap; }
+.chat-input-area { position: fixed; bottom: max(10px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); display: flex; gap: 5px; z-index: 8500; background: rgba(0,0,0,0.8); padding: 8px; border-radius: 20px; width: 95%; max-width: 400px; box-sizing: border-box; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.8); }
+#chat-input { flex-grow: 1; padding: 8px 12px; border-radius: 15px; border: none; outline: none; background: rgba(255,255,255,0.9); font-size: 13px; pointer-events: auto; }
+#btn-chat-send { background: #4caf50; color: white; border: none; border-radius: 15px; padding: 8px 16px; cursor: pointer; font-weight: bold; font-size: 13px; pointer-events: auto; white-space: nowrap; }
 
-/* ★ 流れる文字のスタイル */
 #niconico-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 8000; overflow: hidden; }
 .niconico-msg { position: absolute; white-space: nowrap; font-size: 20px; font-weight: bold; color: white; text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000; background: rgba(0, 0, 0, 0.6); padding: 2px 10px; border-radius: 4px; will-change: transform; }
 
-/* ★ ログが邪魔にならないように透明度アップ ＆ pointer-events: none でタップ貫通！ */
-#chat-log-container { 
-    position: fixed; top: 75px; left: 5px; width: 180px; max-height: 25vh; 
-    background: rgba(0, 0, 0, 0.3); color: white; font-size: 11px; overflow-y: hidden; 
-    border-radius: 8px; padding: 6px; z-index: 10000; 
-    pointer-events: none; /* ★背後のアイコンをタップできるようにする */
-    display: flex; flex-direction: column; gap: 4px; 
-    text-shadow: 1px 1px 1px #000; 
-}
+#chat-log-container { position: fixed; top: 75px; left: 5px; width: 180px; max-height: 25vh; background: transparent; color: white; font-size: 11px; overflow-y: hidden; padding: 6px; z-index: 8500; border: none; pointer-events: none; display: flex; flex-direction: column; gap: 4px; text-shadow: 1px 1px 2px #000, -1px -1px 2px #000, 1px -1px 2px #000, -1px 1px 2px #000; }
 #chat-log-container.hidden { display: none !important; }
 .chat-log-item { word-break: break-all; line-height: 1.2; }
 .chat-log-name { color: #fbc02d; font-weight: bold; margin-right: 5px; }
 
 @media screen and (max-width: 500px), screen and (max-height: 500px) {
-    #chat-log-container { width: 140px; max-height: 20vh; font-size: 10px; top: 60px; left: 2px; }
+    #chat-log-container { width: 140px; max-height: 20vh; font-size: 10px; top: 75px; left: 2px; }
 }
 
 .toggle-switch { position:relative; width:34px; height:16px; display:inline-block; }
@@ -153,9 +159,8 @@ body {
 .card-corner.top-left { top: 2px; left: 2px; } .card-corner.bottom-right { bottom: 2px; right: 2px; transform: rotate(180deg); }
 .card-img { width: 90%; height: 90%; object-fit: contain; pointer-events: none; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3)); }
 
-/* ★ 手札エリアの下にスペースを作り、入力欄と被らないようにする */
 .section { background: rgba(255, 255, 255, 0.02); margin: 2px 0; padding: 3px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05); }
-.hand-section { margin-bottom: 50px; } 
+.hand-section { margin-bottom: 70px; position: relative; z-index: 50; } 
 
 #discard-pile { position: relative; width: var(--card-w); height: var(--card-h); display: flex; justify-content: center; align-items: center; } 
 #discard-pile .card { margin: 0; position: absolute; top: 0; left: 0; }
@@ -167,7 +172,17 @@ body {
 .deck-layer:nth-child(1) { transform: translate(0, 0); z-index: 4; } .deck-layer:nth-child(2) { transform: translate(var(--deck-offset), var(--deck-offset)); z-index: 3; } .deck-layer:nth-child(3) { transform: translate(calc(var(--deck-offset)*2), calc(var(--deck-offset)*2)); z-index: 2; } .deck-layer:nth-child(4) { transform: translate(calc(var(--deck-offset)*3), calc(var(--deck-offset)*3)); z-index: 1; }
 .deck-count-badge { margin-top: 3px; font-size: 9px; color: #aaa; background: #111; padding: 2px 6px; border-radius: 8px; border: 1px solid #333; }
 
-.red-glow { box-shadow: 0 0 10px var(--red); } .blue-glow { box-shadow: 0 0 10px var(--blue); } .green-glow { box-shadow: 0 0 10px var(--green); } .yellow-glow { box-shadow: 0 0 10px var(--yellow); }
+/* ★ ワイルドカードの色指定用CSSオーバーレイ */
+.red-glow { box-shadow: 0 0 10px var(--red); border-color: var(--red) !important; }
+.blue-glow { box-shadow: 0 0 10px var(--blue); border-color: var(--blue) !important; }
+.green-glow { box-shadow: 0 0 10px var(--green); border-color: var(--green) !important; }
+.yellow-glow { box-shadow: 0 0 10px var(--yellow); border-color: var(--yellow) !important; }
+
+.card.red-glow::after { content: ''; position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(211, 47, 47, 0.4); pointer-events: none; border-radius: 6px; }
+.card.blue-glow::after { content: ''; position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(25, 118, 210, 0.4); pointer-events: none; border-radius: 6px; }
+.card.green-glow::after { content: ''; position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(56, 142, 60, 0.4); pointer-events: none; border-radius: 6px; }
+.card.yellow-glow::after { content: ''; position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(251, 192, 45, 0.4); pointer-events: none; border-radius: 6px; }
+
 .card.selected { border: 2px solid #f1c40f; transform: translateY(calc(var(--fan-y, 0px) + var(--sel-transform))) rotate(var(--fan-rot, 0deg)); z-index: 1000 !important; }
 .card.suggested { border: 2px solid var(--suggest-color); box-shadow: 0 0 6px var(--suggest-color); }
 
@@ -179,7 +194,7 @@ body {
 #draw-btn { background: #222; color: #ccc; border: 1px solid #444; border-radius: 4px; padding: 2px 8px; font-size: 10px; cursor: pointer; }
 
 .screen-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; background: transparent; z-index: 5000; }
-.login-box, .lobby-box { background: #2a0808; padding: 20px; border-radius: 12px; border: 1px solid #551111; width: 90%; max-width: 400px; text-align: center; color: white; box-shadow: 0 10px 30px rgba(0,0,0,0.8); position: relative; } 
+.login-box, .lobby-box { background: #2a0808; padding: 20px; border-radius: 12px; border: 1px solid #551111; width: 90%; max-width: 400px; text-align: center; color: white; box-shadow: 0 10px 30px rgba(0,0,0,0.8); position: relative; max-height: calc(100vh - 80px); overflow-y: auto; margin-bottom: 60px; } 
 .icon-upload-wrapper { margin-bottom: 15px; }
 .icon-upload-wrapper input[type="file"] { display: none; }
 .icon-upload-wrapper label { display: inline-block; padding: 8px 12px; background: #333; border-radius: 8px; cursor: pointer; border: 1px solid #555; font-size: 12px;}
@@ -233,12 +248,11 @@ button.disabled-btn { opacity: 0.5; cursor: not-allowed; }
 #winner-banner { position: fixed; top: 50%; left: 0; width: 100%; background: rgba(0, 0, 0, 0.7); color: white; font-size: 24px; font-weight: bold; text-align: center; padding: 20px 0; transform: translateY(-50%); z-index: 100000; opacity: 0; transition: opacity 1s; border-top: 2px solid rgba(255,255,255,0.3); border-bottom: 2px solid rgba(255,255,255,0.3); pointer-events: none; }
 #winner-banner.show { opacity: 1; }
 
-/* ★ 音量ボタンをチャット入力欄と被らないように少し上に上げる */
 .volume-container { display: inline-flex; align-items: center; gap: 5px; background: rgba(0, 0, 0, 0.5); padding: 4px 8px; border-radius: 15px; border: 1px solid #555; }
 .volume-icon { font-size: 14px; user-select: none; }
 .volume-slider { width: 60px; height: 4px; accent-color: #fbc02d; cursor: pointer; }
 .lobby-volume { position: absolute; top: 85px; right: 20px; }
-.game-volume { position: fixed; bottom: 55px; left: 10px; z-index: 1000; }
+.game-volume { position: fixed; bottom: 65px; left: 10px; z-index: 1000; }
 
 .bot-difficulty-btn { display: inline-flex; align-items: center; justify-content: center; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: bold; margin-left: 8px; background-color: #000; user-select: none; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
 .bot-difficulty-btn:active { transform: scale(0.95); }
@@ -256,12 +270,83 @@ button.disabled-btn { opacity: 0.5; cursor: not-allowed; }
 .manual-indicators { font-size: 14px; letter-spacing: 2px; margin: 15px 0 5px 0; text-align: center; }
 .manual-close-btn { background: #d32f2f; color: white; border: 2px solid white; padding: 6px 20px; font-size: 14px; font-weight: bold; border-radius: 20px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.5); margin-top: 10px; }
 
-#ability-cutin { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center; z-index: 100000; pointer-events: none; opacity: 0; }
-#ability-cutin.show-cutin { opacity: 1; }
-#ability-cutin.fade-out { opacity: 0; transition: opacity 1s ease-out; }
-#ability-cutin-img { max-width: 80vw; max-height: 80vh; object-fit: contain; transform: scale(0.5); opacity: 0; filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.5)); }
-#ability-cutin.show-cutin #ability-cutin-img { animation: zoomIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-@keyframes zoomIn { 0% { transform: scale(0.5) translateY(50px); opacity: 0; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
+/* ====================================================
+   ★ ペルソナ風 アグレッシブ・カットインアニメーション
+   ==================================================== */
+#ability-cutin {
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    z-index: 100000; pointer-events: none; overflow: hidden;
+    display: flex; justify-content: center; align-items: center;
+}
+
+.cutin-bg-red {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: radial-gradient(circle, #e60012 0%, #a00000 100%);
+    transform: translateX(-100%);
+}
+
+.cutin-bg-black {
+    position: absolute; top: 20%; left: -10%; width: 120%; height: 60%;
+    background: #000; border-top: 8px solid #fff; border-bottom: 8px solid #fff;
+    transform: rotate(-10deg) translateX(100%);
+    box-shadow: 0 0 30px rgba(0,0,0,0.9);
+}
+
+.show-cutin .cutin-bg-red { animation: p5-red 0.3s ease-out forwards; }
+.show-cutin .cutin-bg-black { animation: p5-black 0.4s cubic-bezier(0.1, 0.9, 0.2, 1) 0.1s forwards; }
+
+@keyframes p5-red { to { transform: translateX(0); } }
+@keyframes p5-black { to { transform: rotate(-10deg) translateX(0); } }
+
+.cutin-content {
+    position: relative; z-index: 10; display: flex; align-items: center; justify-content: center; gap: 40px;
+    opacity: 0; transform: scale(1.5) rotate(5deg);
+}
+.show-cutin .cutin-content { animation: p5-content 0.4s cubic-bezier(0.1, 0.9, 0.2, 1) 0.3s forwards; }
+
+@keyframes p5-content {
+    to { opacity: 1; transform: scale(1) rotate(-5deg); }
+}
+
+#ability-cutin-img {
+    max-height: 70vh; max-width: 40vw; object-fit: contain;
+    filter: drop-shadow(4px 4px 0px #fff) drop-shadow(-4px -4px 0px #fff) drop-shadow(0px 0px 10px rgba(0,0,0,0.8));
+}
+
+.cutin-text-container {
+    display: flex; flex-direction: column; gap: 15px; transform: skewX(-10deg);
+}
+
+#ability-cutin-name {
+    margin: 0; font-size: 55px; font-weight: 900; color: #fff; background: #000;
+    padding: 5px 30px; border: 4px solid #e60012; display: inline-block; align-self: flex-start;
+    box-shadow: 6px 6px 0px #fff; letter-spacing: 3px; font-style: italic;
+}
+
+#ability-cutin-text {
+    margin: 0; font-size: 20px; font-weight: bold; color: #000; background: #fff;
+    padding: 12px 25px; border: 4px solid #000; box-shadow: 6px 6px 0px #e60012;
+    line-height: 1.5; white-space: pre-wrap; display: inline-block;
+}
+
+.fade-out .cutin-bg-red { animation: p5-red-out 0.4s ease-in forwards; }
+.fade-out .cutin-bg-black { animation: p5-black-out 0.3s ease-in forwards; }
+.fade-out .cutin-content { animation: p5-content-out 0.3s ease-in forwards; }
+
+@keyframes p5-red-out { to { transform: translateX(-100%); } }
+@keyframes p5-black-out { to { transform: rotate(-10deg) translateX(100%); opacity: 0; } }
+@keyframes p5-content-out { to { transform: scale(0.8) rotate(-5deg); opacity: 0; } }
+
+@media screen and (max-width: 600px) {
+    .cutin-content { flex-direction: column; transform: scale(1.2) rotate(0deg); gap: 15px; }
+    .show-cutin .cutin-content { animation: p5-content-mob 0.4s cubic-bezier(0.1, 0.9, 0.2, 1) 0.3s forwards; }
+    @keyframes p5-content-mob { to { opacity: 1; transform: scale(1) rotate(0deg); } }
+    
+    #ability-cutin-img { max-height: 40vh; max-width: 70vw; filter: drop-shadow(2px 2px 0px #fff) drop-shadow(-2px -2px 0px #fff); }
+    .cutin-text-container { align-items: center; transform: skewX(-5deg); }
+    #ability-cutin-name { font-size: 30px; padding: 5px 15px; border-width: 3px; box-shadow: 4px 4px 0px #fff; align-self: center; }
+    #ability-cutin-text { font-size: 14px; padding: 8px 15px; border-width: 3px; box-shadow: 4px 4px 0px #e60012; text-align: center; }
+}
 
 .action-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(20, 20, 20, 0.95); padding: 20px; border-radius: 12px; border: 2px solid #4caf50; color: white; z-index: 100000; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
 .action-popup-grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 15px; }
@@ -272,3 +357,21 @@ button.disabled-btn { opacity: 0.5; cursor: not-allowed; }
 .target-icon-btn span { font-size: 12px; margin-top: 5px; font-weight: bold; }
 
 #ability-info { position: fixed; bottom: 150px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.95); border: 2px solid #4caf50; color: white; padding: 8px 15px; border-radius: 8px; font-size: 13px; font-weight: bold; z-index: 10000; pointer-events: none; white-space: pre-wrap; text-align: left; box-shadow: 0 4px 15px rgba(0,0,0,0.8); width: 80%; max-width: 300px; }
+
+.discard-area {
+    position: relative;
+    padding: 10px;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+}
+.highlight-discard {
+    cursor: pointer;
+    background: rgba(76, 175, 80, 0.2) !important;
+    box-shadow: 0 0 20px #4caf50;
+    animation: pulseDiscard 1.5s infinite;
+}
+@keyframes pulseDiscard {
+    0% { box-shadow: 0 0 10px #4caf50; }
+    50% { box-shadow: 0 0 25px #4caf50; }
+    100% { box-shadow: 0 0 10px #4caf50; }
+}
