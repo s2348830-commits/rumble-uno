@@ -51,9 +51,6 @@ window.ensureModalsExist = function() {
             <button id="btn-cancel-graveyard" style="margin-top:15px; padding:8px 15px; background:#777; color:white; border:none; border-radius:8px; cursor:pointer;">キャンセル</button>
         `;
         document.body.appendChild(gyModal);
-        document.getElementById('btn-cancel-graveyard').onclick = () => {
-            gyModal.classList.add('hidden');
-        };
     }
     if (!document.getElementById('debuff-modal')) {
         const dbModal = document.createElement('div');
@@ -127,15 +124,11 @@ window.ensureModalsExist = function() {
         `;
         document.body.appendChild(resOver);
     }
-    
     if (!document.getElementById('janken-overlay')) {
         const jOverlay = document.createElement('div');
         jOverlay.id = 'janken-overlay';
         jOverlay.className = 'hidden';
         jOverlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.95); z-index:110000; display:flex; flex-direction:column; justify-content:center; align-items:center;";
-        // ★ 画像が見つからなくてもエラーで止まらないようにSVGデータを直接指定＆エラー回避処理を追加
-        const dummyBack = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 60'%3E%3Crect width='40' height='60' rx='6' fill='%23222' stroke='%23444' stroke-width='2'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23fff' font-size='24' font-weight='bold'%3E?%3C/text%3E%3C/svg%3E";
-        
         jOverlay.innerHTML = `
             <h2 id="janken-title" style="color:white; font-style:italic; margin-bottom: 5px;">じゃんけん 勝負！</h2>
             <div id="janken-subtitle" style="color:#aaa; font-size:14px; margin-bottom:15px;">Loop: 1/4</div>
@@ -144,13 +137,13 @@ window.ensureModalsExist = function() {
                 <div id="janken-player1" style="text-align:center; color:white; flex: 1;">
                     <div id="janken-p1-result" style="font-size:24px; font-weight:bold; height:35px; text-shadow: 2px 2px 4px #000;"></div>
                     <div id="janken-p1-name" style="margin-bottom:10px; font-weight:bold; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Player1</div>
-                    <img id="janken-p1-card" src="${dummyBack}" style="width:80px; max-width: 100%; border-radius:10px; transition:0.3s; border-top: 10px solid transparent;">
+                    <img id="janken-p1-card" src="${window.JANKEN_BACK_IMG}" style="width:80px; max-width: 100%; border-radius:10px; transition:0.3s; border-top: 10px solid transparent;">
                 </div>
                 <div style="color:white; font-size:30px; font-weight:bold; font-style:italic;">VS</div>
                 <div id="janken-player2" style="text-align:center; color:white; flex: 1;">
                     <div id="janken-p2-result" style="font-size:24px; font-weight:bold; height:35px; text-shadow: 2px 2px 4px #000;"></div>
                     <div id="janken-p2-name" style="margin-bottom:10px; font-weight:bold; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Player2</div>
-                    <img id="janken-p2-card" src="${dummyBack}" style="width:80px; max-width: 100%; border-radius:10px; transition:0.3s; border-top: 10px solid transparent;">
+                    <img id="janken-p2-card" src="${window.JANKEN_BACK_IMG}" style="width:80px; max-width: 100%; border-radius:10px; transition:0.3s; border-top: 10px solid transparent;">
                 </div>
             </div>
             <div id="janken-controls" style="display:flex; gap:15px;">
@@ -203,12 +196,20 @@ window.SE = {
         const now = Date.now();
         if (this.lastPlayed[name] && (now - this.lastPlayed[name] < 100)) return;
         this.lastPlayed[name] = now;
-        if (!this.audioCtx) this.initContext();
         
         let ext = 'mp3';
         if (name === 'fire' || name === 'page') ext = 'wav';
         if (name.includes('id_20') || name.includes('id_25') || name.includes('id_26')) ext = 'mov'; 
 
+        // ★ スマホ(Safari等)で .mov を確実に再生するための処理
+        if (ext === 'mov') {
+            const audio = new Audio(`se/${name}.${ext}`);
+            audio.volume = this.volume;
+            audio.play().catch(e => console.log('Audio playback error:', e));
+            return;
+        }
+
+        if (!this.audioCtx) this.initContext();
         if (!this.buffers[name]) {
             this.loadSound(name, ext).then(() => this.playSoundBuffer(name, false));
         } else {
@@ -685,9 +686,9 @@ window.showAbilityCutin = function(cardValue, isHVActivated = false) {
         const rand = Math.random() < 0.5 ? 1 : 2;
         if (window.SE) window.SE.play(`hv/id_20(${rand})`);
     } else if (cardValue === 'id_25') {
-        if (window.SE) window.SE.play(`hv/id_26`);
-    } else if (cardValue === 'id_26') {
         if (window.SE) window.SE.play(`hv/id_25`);
+    } else if (cardValue === 'id_26') {
+        if (window.SE) window.SE.play(`hv/id_26`);
     } else {
         const randMvp = Math.random() < 0.5 ? 1 : 2;
         if (window.SE) window.SE.play(`mvp_${randMvp}`);
@@ -811,8 +812,11 @@ window.openGraveyardSelection = function(callback) {
     });
     
     if (list.length === 0) {
-        alert("墓地にSSR以下の能力カードがありません！");
-        callback(null);
+        if(confirm("対象となるSSR以下のカードが墓地にありません。\n適用されない効果がありますが、それでも実行しますか？")) {
+            callback(null);
+        } else {
+            callback(false);
+        }
         return;
     }
     
@@ -830,6 +834,12 @@ window.openGraveyardSelection = function(callback) {
         };
         container.appendChild(btn);
     });
+
+    document.getElementById('btn-cancel-graveyard').onclick = () => {
+        modal.classList.add('hidden');
+        callback(false); 
+    };
+
     modal.classList.remove('hidden');
 };
 
@@ -1115,7 +1125,6 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
     });
 
     if (cardValue === 'id_26') {
-        // ★ 修正: カットイン演出が終わるまで（2.5秒）待ってからじゃんけんUIを出す
         setTimeout(() => {
             window.startJankenPhase(playerId, 0);
         }, 2500);
@@ -1241,18 +1250,19 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
     }
 };
 
-// ★ じゃんけんフェーズの実装
-window.startJankenPhase = function(attackerId, loopCount) {
-    // ★ 修正: 前回のタイマーが動いていたら確実に消す（二重起動の防止）
+window.startJankenPhase = function(attackerId, loopCount, fixedTargetId = null) {
     if (window.jankenInterval) clearInterval(window.jankenInterval);
 
-    const others = window.game.players.filter(p => p.id !== attackerId && p.connected);
-    if (others.length === 0) {
-        alert("じゃんけんの相手がいません！");
-        window.checkTurn();
-        return;
+    let targetId = fixedTargetId;
+    if (!targetId) {
+        const others = window.game.players.filter(p => p.id !== attackerId && p.connected);
+        if (others.length === 0) {
+            alert("じゃんけんの相手がいません！");
+            window.checkTurn();
+            return;
+        }
+        targetId = others[Math.floor(Math.random() * others.length)].id;
     }
-    const targetId = others[Math.floor(Math.random() * others.length)].id;
     
     window.pendingJanken = {
         attackerId, targetId, loopCount,
@@ -1264,7 +1274,6 @@ window.startJankenPhase = function(attackerId, loopCount) {
     window.broadcastGameState(); 
 
     window.jankenInterval = setInterval(() => {
-        // ★ 修正: すでに結果が出ているか無効ならタイマーを止める
         if (!window.pendingJanken || window.pendingJanken.result) {
             clearInterval(window.jankenInterval);
             return;
@@ -1272,9 +1281,7 @@ window.startJankenPhase = function(attackerId, loopCount) {
         
         window.pendingJanken.timer--;
         if (window.pendingJanken.timer <= 0) {
-            // ★ 修正: タイムアップ時にもタイマーを止める
             clearInterval(window.jankenInterval);
-            
             if (!window.pendingJanken.attackerHand) window.pendingJanken.attackerHand = Math.floor(Math.random()*3)+1;
             if (!window.pendingJanken.targetHand) window.pendingJanken.targetHand = Math.floor(Math.random()*3)+1;
             window.resolveJanken();
@@ -1295,14 +1302,12 @@ window.startJankenPhase = function(attackerId, loopCount) {
 
 window.checkJankenReady = function() {
     if (window.pendingJanken && window.pendingJanken.attackerHand && window.pendingJanken.targetHand && !window.pendingJanken.result) {
-        // ★ 修正: 両者の手が揃ったらタイマーを止める
         if (window.jankenInterval) clearInterval(window.jankenInterval);
         window.resolveJanken();
     }
 };
 
 window.resolveJanken = function() {
-    // ★ 修正: 念のためここでも確実にタイマーを止める
     if (window.jankenInterval) clearInterval(window.jankenInterval);
 
     const pJ = window.pendingJanken;
@@ -1341,13 +1346,14 @@ window.resolveJanken = function() {
         if (!someoneWon) {
             const nextLoop = pJ.loopCount + 1;
             const aId = pJ.attackerId;
+            const tId = pJ.targetId;
             window.pendingJanken = null;
             window.broadcastGameState();
 
             if (result === 'win' && nextLoop < 4) {
                 setTimeout(() => window.startJankenPhase(aId, nextLoop), 1000);
             } else if (result === 'draw') {
-                setTimeout(() => window.startJankenPhase(aId, pJ.loopCount), 1000);
+                setTimeout(() => window.startJankenPhase(aId, pJ.loopCount, tId), 1000);
             } else {
                 setTimeout(() => window.checkTurn(), 1000);
             }
@@ -1380,11 +1386,8 @@ window.showJankenUI = function(attackerId, targetId, loopCount) {
     if (p1Name) p1Name.innerText = aP ? aP.name : 'Attacker';
     if (p2Name) p2Name.innerText = tP ? tP.name : 'Target';
     
-    // ★ 画像ではなくダミーのSVG文字列をセットして404エラーを防止
-    const dummyBack = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 60'%3E%3Crect width='40' height='60' rx='6' fill='%23222' stroke='%23444' stroke-width='2'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23fff' font-size='24' font-weight='bold'%3E?%3C/text%3E%3C/svg%3E";
-    
-    if (p1Card) { p1Card.src = dummyBack; p1Card.style.borderTop = '10px solid transparent'; }
-    if (p2Card) { p2Card.src = dummyBack; p2Card.style.borderTop = '10px solid transparent'; }
+    if (p1Card) { p1Card.src = window.JANKEN_BACK_IMG; p1Card.style.borderTop = '10px solid transparent'; }
+    if (p2Card) { p2Card.src = window.JANKEN_BACK_IMG; p2Card.style.borderTop = '10px solid transparent'; }
     if (p1Res) p1Res.innerText = ''; 
     if (p2Res) p2Res.innerText = '';
     
@@ -1414,7 +1417,6 @@ window.playJankenResult = function(attackerId, targetId, aH, tH, result) {
     if (controls) controls.style.display = 'none';
     if (title) title.innerText = "結果発表！";
     
-    // ★ エラー回避のため、画像がない場合はonerrorで文字に置き換える処理
     if (p1Card) {
         p1Card.src = `card/custom/jyanken${aH}.png`;
         p1Card.onerror = function() { this.src = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 60'%3E%3Crect width='40' height='60' rx='6' fill='%23555'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23fff' font-size='16'%3E手" + aH + "%3C/text%3E%3C/svg%3E"; };
@@ -1729,7 +1731,9 @@ window.executeEndTurn = function(playerId) {
 
 window.checkWin = function(playerId) {
     if (window.game.hands[playerId] && window.game.hands[playerId].length === 0) {
-        window.isGameOver = true; window.broadcastGameState(); 
+        window.isGameOver = true; 
+        if (window.SE) window.SE.stopLoop('final_sprint'); // ★ 勝利時にBGMをストップ
+        window.broadcastGameState(); 
         const winner = window.game.players.find(p => p.id === playerId);
         let winnerName = winner ? winner.name : "不明なプレイヤー";
         if (winner && winner.type === 'bot' && window.RuleSettings && window.RuleSettings.showBotPersonality && winner.personality) winnerName += ` [${winner.personality}]`;
@@ -1772,6 +1776,7 @@ window.tryDrawWithAbility = function(callback) {
 
 window.handlePlayAction = function() {
     if (window.game.selectedIndices.length === 0 || window.isGameOver || window.isInitialDealing) return;
+    if (window.pendingJanken) return; // ★ じゃんけん中は操作ロック
     
     const me = window.game.players.find(p => p.id === window.game.myId);
     const selectedCards = window.game.selectedIndices.map(i => window.game.myHand[i]);
@@ -1866,7 +1871,9 @@ window.handlePlayAction = function() {
         const step6 = () => {
             if (def && def.needsGraveyard) {
                 window.openGraveyardSelection((selectedId) => {
-                    if (!selectedId) { window.game.selectedIndices = []; window.updateUI(); return; }
+                    if (selectedId === false) { 
+                        window.game.selectedIndices = []; window.updateUI(); return; 
+                    }
                     graveyardCardId = selectedId;
                     finishAbilityPlay();
                 });
@@ -1947,6 +1954,7 @@ window.onColorChosen = function(color) {
 };
 
 document.getElementById('draw-btn').onclick = () => {
+    if (window.pendingJanken) return; // ★ じゃんけん中は操作ロック
     if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
     if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) return;
     
