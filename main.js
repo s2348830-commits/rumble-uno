@@ -17,6 +17,8 @@ window.isProcessingPlay = false;
 window.currentDefensePhaseId = null;
 window.hasRespondedDefense = false;
 window.currentJankenLoopId = null; 
+window.lastGameStateFingerprint = ""; 
+window.hostSyncInterval = null; 
 
 window.JANKEN_BACK_IMG = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 60'%3E%3Crect width='40' height='60' rx='6' fill='%23222' stroke='%23444' stroke-width='2'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23fff' font-size='24' font-family='sans-serif' font-weight='bold'%3E?%3C/text%3E%3C/svg%3E";
 
@@ -269,7 +271,10 @@ const ColorUI = {
 };
 
 window.updateUI = function() { 
-    if(window.game && window.game.players && window.game.players.length > 0) { Renderer.updateAll(window.game); window.checkFinalSprint(); } 
+    if(window.game && window.game.players && window.game.players.length > 0) { 
+        Renderer.updateAll(window.game); 
+        window.checkFinalSprint(); 
+    } 
 };
 
 window.checkFinalSprint = function() {
@@ -294,9 +299,6 @@ window.updatePhaseUI = function(state) {
                 const discModal = document.getElementById('discard-modal');
                 if (modal) modal.classList.add('hidden');
                 if (discModal) discModal.classList.add('hidden');
-            } else {
-                const timerText = document.getElementById('defense-timer-text');
-                if (timerText) timerText.innerText = state.defenseTimer;
             }
         }
     } else {
@@ -314,8 +316,6 @@ window.updatePhaseUI = function(state) {
             if (typeof window.showJankenUI === 'function') window.showJankenUI(state.jankenPhase.attackerId, state.jankenPhase.targetId, state.jankenPhase.loopCount);
             window.isJankenShowing = true;
         }
-        const jTimer = document.getElementById('janken-timer');
-        if (jTimer) jTimer.innerText = state.jankenPhase.timer;
 
         if (window.myId === state.jankenPhase.attackerId && state.jankenPhase.attackerHand) {
             const controls = document.getElementById('janken-controls');
@@ -364,9 +364,13 @@ window.broadcastGameState = function(skipUIUpdate = false, attackGuides = []) {
         jankenPhase: window.pendingJanken,
         customDeck: window.game.customDeck 
     };
+    
     if (window.socket) window.socket.emit('sync_game_state', state);
-    if (!skipUIUpdate) window.updateUI();
 
+    if (!skipUIUpdate) {
+        window.lastGameStateFingerprint = ""; 
+        window.updateUI();
+    }
     window.updatePhaseUI(state);
 
     if (attackGuides && attackGuides.length > 0) {
@@ -376,6 +380,17 @@ window.broadcastGameState = function(skipUIUpdate = false, attackGuides = []) {
                 if (typeof window.showAttackGuide === 'function') window.showAttackGuide(g.from, g.to, g.text, g.se);
             }, delay);
         });
+    }
+
+    if (!window.hostSyncInterval) {
+        window.hostSyncInterval = setInterval(() => {
+            if (window.isHost && window.currentRoomState && window.currentRoomState.gameStarted) {
+                window.broadcastGameState(true);
+            } else {
+                clearInterval(window.hostSyncInterval);
+                window.hostSyncInterval = null;
+            }
+        }, 1500);
     }
 };
 
@@ -1745,7 +1760,7 @@ window.checkTurn = function() {
                                 bHand.forEach((c, i) => {
                                     if (!result.indices.includes(i) && c.color === botSelectedColor && !(c.value && String(c.value).startsWith('id_'))) botMultiDiscardIndices.push(i);
                                 });
-                                willDiscard += botMultiDiscardIndices.length;
+                                wilDiscard += botMultiDiscardIndices.length;
                             }
                         }
 
@@ -1817,7 +1832,6 @@ window.executePlay = function(playerId, indices, isBot = false) {
         if (result.needsColor) {
             if (isDrawAttack) {
                 if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length === 0) {
-                    // 何もしない
                 } else {
                     window.pendingDrawDefenseInfo = { attackerId: playerId, cardValue: attackCardVal };
                 }
@@ -1938,7 +1952,7 @@ window.tryDrawWithAbility = function(callback) {
     const me = window.game.players.find(p => p.id === window.game.myId);
     const renaIdx = window.game.myHand.findIndex(c => c.value === 'id_9');
     if (renaIdx > -1 && !me.frozen) {
-        if (confirm("【レナ】カードを引く代わりに「レナ」を場に出して効果を発動しますか？")) {
+        if (confirm("【レナ】カードを引く代わりに「レナ」を場に出して効果を発発動しますか？")) {
             window.isDrawing = false; 
             window.game.selectedIndices = [renaIdx]; window.handlePlayAction(); return; 
         }
@@ -2277,8 +2291,13 @@ function initMainSocketEvents() {
         return;
     }
 
-    window.socket.on('update_game_state', (state) => {
+    window.socket.on('sync_game_state', (state) => {
         if (!window.game) return;
+        
+        const currentFingerprint = JSON.stringify(state);
+        if (window.lastGameStateFingerprint === currentFingerprint && !window.isInitialDealing) return;
+        window.lastGameStateFingerprint = currentFingerprint;
+
         window.game.deck = state.deck; 
         window.game.turnIndex = state.turnIndex; 
         window.game.direction = state.direction; 
@@ -2377,6 +2396,7 @@ function initMainSocketEvents() {
     window.socket.on('back_to_lobby', (roomState) => {
         window.currentRoomState = roomState;
         window.isGameOver = false; window.isInitialDealing = false;
+        if (window.hostSyncInterval) { clearInterval(window.hostSyncInterval); window.hostSyncInterval = null; }
         document.getElementById('winner-banner').classList.remove('show');
         document.getElementById('draw-curtain').classList.remove('show');
         document.getElementById('game-container').classList.add('hidden'); 
@@ -2386,10 +2406,7 @@ function initMainSocketEvents() {
         if (manualBtn) manualBtn.classList.remove('hidden');
 
         const cia = document.getElementById('chat-input-area');
-        if (cia) {
-            cia.style.display = 'none';
-            cia.classList.add('hidden');
-        }
+        if (cia) { cia.style.display = 'none'; cia.classList.add('hidden'); }
         
         const lcia = document.getElementById('lobby-chat-container');
         if (lcia && window.ChatManager && window.ChatManager.enabled) lcia.style.display = 'block';
@@ -2403,29 +2420,21 @@ function initMainSocketEvents() {
         
         if (data.action === 'play') {
             if (window.pendingDefense || window.pendingJanken) return;
-
             window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards });
             const delay = data.cards.length * 100 + 400;
-            setTimeout(() => {
-                if (typeof window.executePlay === 'function') window.executePlay(playerId, data.indices);
-            }, delay);
+            setTimeout(() => { if (typeof window.executePlay === 'function') window.executePlay(playerId, data.indices); }, delay);
         } else if (data.action === 'play_ability') {
             if (window.pendingDefense || window.pendingJanken) return;
-
             window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards, isHV: data.isHV });
             const delay = data.cards.length * 100 + 400;
-            setTimeout(() => {
-                if (typeof window.executeAbilityPlay === 'function') window.executeAbilityPlay(playerId, data.indices, data.targetId, data.discardIdx, data.selectedColor, data.multiDiscardIndices, data.extraData);
-            }, delay);
+            setTimeout(() => { if (typeof window.executeAbilityPlay === 'function') window.executeAbilityPlay(playerId, data.indices, data.targetId, data.discardIdx, data.selectedColor, data.multiDiscardIndices, data.extraData); }, delay);
         } else if (data.action === 'defense_response') {
             if (window.pendingDefense && window.pendingDefense.responses) {
                 window.pendingDefense.responses[data.targetId] = { cardValue: data.cardValue || null, discardIdx: data.discardIdx !== undefined ? data.discardIdx : null };
                 if (window.pendingDefense.info && window.pendingDefense.info.targets) {
                     const targetCount = window.pendingDefense.info.targets.length;
                     const responseCount = Object.keys(window.pendingDefense.responses).length;
-                    if (responseCount >= targetCount) {
-                        window.pendingDefense.timer = 0;
-                    }
+                    if (responseCount >= targetCount) window.pendingDefense.timer = 0;
                 }
             }
         } else if (data.action === 'draw') {
