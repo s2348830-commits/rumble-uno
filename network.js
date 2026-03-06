@@ -513,28 +513,3 @@ window.socket.on('receive_player_action', (data) => {
         }
     }
 });
-
-window.socket.on('play_animation', (data) => {
-    if (data.playerId !== window.myId) {
-        if (typeof window.playOpponentAnimation === 'function') window.playOpponentAnimation(data.playerId, data.cards);
-        if (data.cards && data.cards.length > 0 && data.cards[0].value && String(data.cards[0].value).startsWith('id_')) {
-            if (typeof window.showAbilityCutin === 'function') window.showAbilityCutin(data.cards[0].value, data.isHV); 
-        }
-    }
-});
-
-window.socket.on('draw_animation', (data) => {
-    if (data.playerId !== window.myId) {
-        if (typeof window.drawOpponentAnimation === 'function') window.drawOpponentAnimation(data.playerId, data.count);
-    }
-});
-
-window.socket.on('show_color_selector', () => {
-    if (typeof ColorUI !== 'undefined' && ColorUI.show) ColorUI.show();
-});
-
-window.socket.on('receive_chat', (data) => {
-    if (window.ChatManager && typeof window.ChatManager.showMsg === 'function') {
-        window.ChatManager.showMsg(data.message, data.senderName);
-    }
-});
