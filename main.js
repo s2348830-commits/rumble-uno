@@ -1523,7 +1523,7 @@ window.playJankenResult = function(attackerId, targetId, aH, tH, result) {
         if (window.SE) {
             setTimeout(() => {
                 window.SE.play('hv/id_26'); 
-            }, 500); 
+            }, 1500); 
         }
     } else if (result === 'lose') {
         if (p1Res) { p1Res.innerText = 'Lose'; p1Res.style.color = '#7e57c2'; }
