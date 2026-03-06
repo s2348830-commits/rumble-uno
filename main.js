@@ -1107,7 +1107,7 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
 
 window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, selectedColor = null, multiDiscardIndices = [], extraData = {}) {
     if (!window.isHost) return;
-    if (window.game.currentPlayer.id !== playerId) return; // ★ ホスト側検証：手番じゃない場合は弾く
+    // ★ 削除: if (window.game.currentPlayer.id !== playerId) return; (割り込みで能力を使えるように削除)
 
     const hand = window.game.hands[playerId];
     if (!hand || !hand[indices[0]]) return; 
@@ -1758,7 +1758,7 @@ window.checkTurn = function() {
 
 window.executePlay = function(playerId, indices, isBot = false) {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
-    if (window.game.currentPlayer.id !== playerId) return; // ★ ホスト側検証：手番じゃない場合は弾く
+    // ★ 削除: if (window.game.currentPlayer.id !== playerId) return; (割り込み使用の妨げになるため削除)
     
     clearInterval(window.turnTimer); 
     if(window.playerAfkTimes) window.playerAfkTimes[playerId] = 0; 
