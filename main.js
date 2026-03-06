@@ -12,7 +12,6 @@ window.isDefending = false;
 window.pendingDrawDefenseInfo = null; 
 window.pendingJanken = null;
 
-// ★ じゃんけん待機中用の裏面カード（画像ファイルがなくても表示できるデータ）
 window.JANKEN_BACK_IMG = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 60'%3E%3Crect width='40' height='60' rx='6' fill='%23222' stroke='%23444' stroke-width='2'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23fff' font-size='24' font-family='sans-serif' font-weight='bold'%3E?%3C/text%3E%3C/svg%3E";
 
 window.ensureModalsExist = function() {
@@ -51,6 +50,9 @@ window.ensureModalsExist = function() {
             <button id="btn-cancel-graveyard" style="margin-top:15px; padding:8px 15px; background:#777; color:white; border:none; border-radius:8px; cursor:pointer;">キャンセル</button>
         `;
         document.body.appendChild(gyModal);
+        document.getElementById('btn-cancel-graveyard').onclick = () => {
+            gyModal.classList.add('hidden');
+        };
     }
     if (!document.getElementById('debuff-modal')) {
         const dbModal = document.createElement('div');
@@ -201,7 +203,6 @@ window.SE = {
         if (name === 'fire' || name === 'page') ext = 'wav';
         if (name.includes('id_20') || name.includes('id_25') || name.includes('id_26')) ext = 'mov'; 
 
-        // ★ スマホ(Safari等)で .mov を確実に再生するための処理
         if (ext === 'mov') {
             const audio = new Audio(`se/${name}.${ext}`);
             audio.volume = this.volume;
@@ -686,9 +687,9 @@ window.showAbilityCutin = function(cardValue, isHVActivated = false) {
         const rand = Math.random() < 0.5 ? 1 : 2;
         if (window.SE) window.SE.play(`hv/id_20(${rand})`);
     } else if (cardValue === 'id_25') {
-        if (window.SE) window.SE.play(`hv/id_26`);
-    } else if (cardValue === 'id_26') {
         if (window.SE) window.SE.play(`hv/id_25`);
+    } else if (cardValue === 'id_26') {
+        if (window.SE) window.SE.play(`hv/id_26`);
     } else {
         const randMvp = Math.random() < 0.5 ? 1 : 2;
         if (window.SE) window.SE.play(`mvp_${randMvp}`);
@@ -1016,11 +1017,14 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                 if (cIdx > -1) {
                     if (actualDefDiscardIdx !== null && cIdx < actualDefDiscardIdx) actualDefDiscardIdx--;
                     const playedDefCard = tHand.splice(cIdx, 1)[0];
-                    window.game.discardPile.push(playedDefCard);
-                    window.game.discardRotations.push(0);
+                    
+                    // ★ 修正: 防御で使った能力カードは墓地へ送る
+                    if(!window.game.abilityGraveyard) window.game.abilityGraveyard = [];
+                    window.game.abilityGraveyard.push(playedDefCard.value);
+
                     if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: targetId, cards: [playedDefCard] });
                     
-                    if (targetId !== window.game.myId && typeof window.showAbilityCutin === 'function' && String(defCardId).startsWith('id_')) {
+                    if (targetId !== window.game.myId && typeof window.showAbilityCutin === 'function') {
                         window.showAbilityCutin(defCardId);
                     }
 
@@ -1028,6 +1032,22 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                     blocked = true;
                 }
                 
+                // コストの破棄処理
+                if (actualDefDiscardIdx !== null && tHand && tHand.length > actualDefDiscardIdx) {
+                    const discCard = tHand.splice(actualDefDiscardIdx, 1)[0];
+                    if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: targetId, cards: [discCard] });
+                    if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) {
+                        window.AbilityEngine.triggerDiscardEffect(window.game, targetId, discCard.value, true, discCard);
+                    }
+                    if (discCard.value && String(discCard.value).startsWith('id_')) {
+                        window.game.abilityGraveyard.push(discCard.value);
+                    } else {
+                        window.game.discardPile.push(discCard);
+                        window.game.discardRotations.push(0);
+                    }
+                }
+
+                const def = window.AbilityDef[defCardId];
                 if (defCardId === 'id_2') {
                     window.game.players.filter(px => px.id !== targetId).forEach(px => {
                         window.AbilityEngine.applyDraw(window.game, px.id, 1);
@@ -1053,18 +1073,9 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                     });
                     const targetP = window.game.players.find(p=>p.id===targetId);
                     if(targetP) targetP.shield = { level: 1, turns: 2 };
-                } else if (defCardId === 'id_17' || defCardId === 'id_19') {
-                    if (actualDefDiscardIdx !== null && window.game.hands[targetId] && window.game.hands[targetId].length > actualDefDiscardIdx) {
-                        const discCard = window.game.hands[targetId].splice(actualDefDiscardIdx, 1)[0];
-                        if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: targetId, cards: [discCard] });
-                        if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) {
-                            window.AbilityEngine.triggerDiscardEffect(window.game, targetId, discCard.value, true, discCard);
-                        }
-                    }
-                    if (defCardId === 'id_19') {
-                        window.AbilityEngine.applyDraw(window.game, attackerId, 1);
-                        defenseGuides.push({ from: targetId, to: attackerId, text: 'ヴィンディ' });
-                    }
+                } else if (defCardId === 'id_19') {
+                    window.AbilityEngine.applyDraw(window.game, attackerId, 1);
+                    defenseGuides.push({ from: targetId, to: attackerId, text: 'ヴィンディ' });
                 }
             }
 
@@ -1218,7 +1229,82 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                 window.pendingDefense = null;
                 
                 let guides = [];
-                if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, finalResponses, multiplier, selectedColor, multiCards, extraData);
+
+                // ★ 追加: 能力に対する各プレイヤーの防御カードを消費・処理する
+                if (finalResponses) {
+                    Object.keys(finalResponses).forEach(tid => {
+                        const resp = finalResponses[tid];
+                        if (resp && resp.cardValue) {
+                            const defCardId = resp.cardValue;
+                            const tHand = window.game.hands[tid];
+                            const cIdx = tHand.findIndex(c => c.value === defCardId);
+                            
+                            let actualDefDiscardIdx = resp.discardIdx;
+                            if (cIdx > -1) {
+                                if (actualDefDiscardIdx !== null && cIdx < actualDefDiscardIdx) actualDefDiscardIdx--;
+                                const playedDefCard = tHand.splice(cIdx, 1)[0];
+                                
+                                if(!window.game.abilityGraveyard) window.game.abilityGraveyard = [];
+                                window.game.abilityGraveyard.push(playedDefCard.value);
+                                
+                                if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: tid, cards: [playedDefCard] });
+                                
+                                if (tid !== window.game.myId && typeof window.showAbilityCutin === 'function') {
+                                    window.showAbilityCutin(defCardId);
+                                }
+                                guides.push({ from: tid, to: tid, text: '防ぐ!' });
+                            }
+                            
+                            // コストの処理
+                            if (actualDefDiscardIdx !== null && tHand && tHand.length > actualDefDiscardIdx) {
+                                const discCard = tHand.splice(actualDefDiscardIdx, 1)[0];
+                                if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: tid, cards: [discCard] });
+                                if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) {
+                                    window.AbilityEngine.triggerDiscardEffect(window.game, tid, discCard.value, true, discCard);
+                                }
+                                if (discCard.value && String(discCard.value).startsWith('id_')) {
+                                    window.game.abilityGraveyard.push(discCard.value);
+                                } else {
+                                    window.game.discardPile.push(discCard);
+                                    window.game.discardRotations.push(0);
+                                }
+                            }
+                            
+                            const def = window.AbilityDef[defCardId];
+                            if (defCardId === 'id_2') {
+                                window.game.players.filter(px => px.id !== tid).forEach(px => {
+                                    window.AbilityEngine.applyDraw(window.game, px.id, 1);
+                                });
+                                const targetP = window.game.players.find(p=>p.id===tid);
+                                if(targetP) targetP.shield = { level: 1, turns: 1 };
+                                if (Math.random() < 0.6) {
+                                    window.game.players.filter(px => px.id !== tid).forEach(px => {
+                                        window.AbilityEngine.applyDraw(window.game, px.id, 1);
+                                    });
+                                }
+                            } else if (defCardId === 'id_4') {
+                                if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) {
+                                    window.AbilityEngine.triggerDiscardEffect(window.game, tid, 'id_4', false, null);
+                                }
+                            } else if (defCardId === 'id_9') {
+                                window.game.players.filter(px => px.id !== tid).forEach(px => {
+                                    window.AbilityEngine.applyDraw(window.game, px.id, 2);
+                                });
+                            } else if (defCardId === 'id_18') {
+                                window.game.players.filter(px => px.id !== tid).forEach(px => {
+                                    window.AbilityEngine.applyDraw(window.game, px.id, 1);
+                                });
+                                const targetP = window.game.players.find(p=>p.id===tid);
+                                if(targetP) targetP.shield = { level: 1, turns: 2 };
+                            } else if (defCardId === 'id_19') {
+                                window.AbilityEngine.applyDraw(window.game, playerId, 1);
+                                guides.push({ from: tid, to: playerId, text: 'ヴィンディ' });
+                            }
+                        }
+                    });
+                }
+
+                if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, finalResponses, multiplier, selectedColor, multiCards, extraData).concat(guides);
                 window.broadcastGameState(false, guides);
 
                 let someoneWon = false;
@@ -1431,18 +1517,14 @@ window.playJankenResult = function(attackerId, targetId, aH, tH, result) {
         if (p1Card) p1Card.style.borderTop = '10px solid #fbc02d';
         if (p2Res) { p2Res.innerText = 'Lose'; p2Res.style.color = '#7e57c2'; }
         if (p2Card) p2Card.style.borderTop = '10px solid #7e57c2';
-        
         if (window.myId === attackerId) { if(window.SE) window.SE.play('win'); }
         else if (window.myId === targetId) { if(window.SE) window.SE.play('win2'); }
         
-        // ★ 追加: じゃんけんに勝った場合、動画音声(.mov)を全員に再度再生する
         if (window.SE) {
             setTimeout(() => {
-                // ※三姉妹の音声の場合は 'hv/id_26' となります（id_25 にしたい場合は変更してください）
-                window.SE.play('hv/id_25'); 
-            }, 500); // 「Win!」のSEと被りすぎないように0.5秒だけ遅らせて再生
+                window.SE.play('hv/id_26'); 
+            }, 500); 
         }
-
     } else if (result === 'lose') {
         if (p1Res) { p1Res.innerText = 'Lose'; p1Res.style.color = '#7e57c2'; }
         if (p1Card) p1Card.style.borderTop = '10px solid #7e57c2';
@@ -1742,7 +1824,7 @@ window.executeEndTurn = function(playerId) {
 window.checkWin = function(playerId) {
     if (window.game.hands[playerId] && window.game.hands[playerId].length === 0) {
         window.isGameOver = true; 
-        if (window.SE) window.SE.stopLoop('final_sprint'); // ★ 勝利時にBGMをストップ
+        if (window.SE) window.SE.stopLoop('final_sprint');
         window.broadcastGameState(); 
         const winner = window.game.players.find(p => p.id === playerId);
         let winnerName = winner ? winner.name : "不明なプレイヤー";
@@ -1786,7 +1868,7 @@ window.tryDrawWithAbility = function(callback) {
 
 window.handlePlayAction = function() {
     if (window.game.selectedIndices.length === 0 || window.isGameOver || window.isInitialDealing) return;
-    if (window.pendingJanken) return; // ★ じゃんけん中は操作ロック
+    if (window.pendingJanken) return; 
     
     const me = window.game.players.find(p => p.id === window.game.myId);
     const selectedCards = window.game.selectedIndices.map(i => window.game.myHand[i]);
@@ -1964,7 +2046,7 @@ window.onColorChosen = function(color) {
 };
 
 document.getElementById('draw-btn').onclick = () => {
-    if (window.pendingJanken) return; // ★ じゃんけん中は操作ロック
+    if (window.pendingJanken) return; 
     if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
     if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) return;
     
