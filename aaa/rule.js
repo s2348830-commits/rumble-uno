@@ -28,14 +28,15 @@ const UNORules = {
         return array;
     },
 
-    canPlaySingle: function(card, topCard, currentColor, drawStack, settings, abilityDef) {
+    canPlaySingle: function(card, topCard, currentColor, drawStack) {
         if (card.lockedTurns && card.lockedTurns > 0) return false;
         
+        // ★ +2, +4 のスタックがある場合でも、防御(BL)カードなら無効化して出せる
         if (drawStack > 0) {
-            if (card.value && String(card.value).startsWith('id_') && abilityDef && abilityDef[card.value] && abilityDef[card.value].type.includes('BL')) {
+            if (card.value && String(card.value).startsWith('id_') && window.AbilityDef && window.AbilityDef[card.value] && window.AbilityDef[card.value].type.includes('BL')) {
                 return true;
             }
-            if (settings && settings.allowDrawResponse) {
+            if (window.RuleSettings && window.RuleSettings.allowDrawResponse) {
                 if (topCard.value === '+2') return (card.value === '+2' || card.value === 'Wild+4');
                 if (topCard.value === 'Wild+4') return (card.value === 'Wild+4');
                 return false;
@@ -52,7 +53,7 @@ const UNORules = {
         return card.color === targetColor || card.value === topCard.value;
     },
 
-    canPlaySelected: function(selectedCards, topCard, currentColor, drawStack, settings, abilityDef) {
+    canPlaySelected: function(selectedCards, topCard, currentColor, drawStack) {
         if (selectedCards.length === 0) return false;
         if (selectedCards.some(c => c.lockedTurns && c.lockedTurns > 0)) return false;
 
@@ -60,17 +61,11 @@ const UNORules = {
         if (!selectedCards.every(card => card.value === firstValue)) return false;
 
         const isDrawCard = (firstValue === '+2' || firstValue === 'Wild+4');
-        const limit = isDrawCard ? (settings ? parseInt(settings.maxDrawMultiPlay) : 0) : (settings ? parseInt(settings.maxMultiPlay) : 0);
+        const limit = isDrawCard ? (window.RuleSettings ? parseInt(window.RuleSettings.maxDrawMultiPlay) : 0) : (window.RuleSettings ? parseInt(window.RuleSettings.maxMultiPlay) : 0);
         
         if (limit === 0 && selectedCards.length > 1) return false;
         if (limit > 0 && selectedCards.length > limit) return false;
 
-        return this.canPlaySingle(selectedCards[0], topCard, currentColor, drawStack, settings, abilityDef);
+        return this.canPlaySingle(selectedCards[0], topCard, currentColor, drawStack);
     }
 };
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { UNORules };
-} else {
-    window.UNORules = UNORules;
-}
