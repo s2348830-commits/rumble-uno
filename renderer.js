@@ -88,18 +88,27 @@ const Renderer = {
             }
             if (p.type === 'bot' && window.RuleSettings && window.RuleSettings.showBotPersonality && personality) displayName += ` [${personality}]`;
 
+            // 【抜粋】 renderer.js (100行目付近・renderPlayersCircleの中)
+
             let overlayHtml = '';
             if (p.frozen) overlayHtml += '<div class="status-overlay status-frozen"></div>';
             if (p.burnTurns > 0) overlayHtml += `<div class="status-overlay status-burned"></div>`;
 
-            // ★ シールドと無敵のアイコン表示追加（テキスト付き）
+            // ▼▼▼ ここから書き換え ▼▼▼
+            // ★ 各種ステータスアイコンとターン数表示
             let statusIcons = '';
-            if (p.invincibleTurns > 0) statusIcons += `<div>🔲 ${p.invincibleTurns}T</div>`;
-            if (p.shield && p.shield.turns > 0 && p.shield.level > 0) statusIcons += `<div>🛡️ ${p.shield.level} (${p.shield.turns}T)</div>`;
-            if (p.frozen) statusIcons += '<div>❄ 凍結</div>';
-            if (p.burnTurns > 0) statusIcons += `<div>🔥 燃焼(${p.burnTurns}T)</div>`;
+            if (p.invincibleTurns > 0) statusIcons += `<span style="margin-right:3px;">🔲(${p.invincibleTurns}T)</span>`;
+            if (p.shield && p.shield.turns > 0 && p.shield.level > 0) statusIcons += `<span style="margin-right:3px;">🛡️${p.shield.level}(${p.shield.turns}T)</span>`;
+            if (p.frozen) statusIcons += `<span style="margin-right:3px;">❄️(1T)</span>`;
+            if (p.burnTurns > 0) statusIcons += `<span style="margin-right:3px;">🔥(${p.burnTurns}T)</span>`;
+            
+            // ロックされているカードの中で一番長いターン数を計算して表示
+            let maxLockTurns = 0;
             const hand = game.hands[p.id] || [];
-            if (hand.some(c => c.lockedTurns && c.lockedTurns > 0)) statusIcons += '<div>🔒 ロック</div>';
+            hand.forEach(c => {
+                if (c.lockedTurns && c.lockedTurns > maxLockTurns) maxLockTurns = c.lockedTurns;
+            });
+            if (maxLockTurns > 0) statusIcons += `<span style="margin-right:3px;">🗝️(${maxLockTurns}T)</span>`;
 
             const badge = document.createElement('div');
             badge.className = `circle-player-badge other-player-badge ${isTurn ? 'active-turn' : ''} ${isPredictTurn ? 'predict-turn' : ''} ${isOffline ? 'offline' : ''} ${p.id === game.myId ? 'my-badge' : ''}`;
@@ -112,13 +121,14 @@ const Renderer = {
                     <img class="cp-icon" src="${p.icon || 'data:image/svg+xml;charset=utf-8,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%23ccc\'%3E%3Cpath d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z\'/%3E%3C/svg%3E'}">
                     ${overlayHtml}
                 </div>
-                <div class="cp-status-icons">${statusIcons}</div>
+                <div class="cp-status-icons" style="font-size: 11px;">${statusIcons}</div>
                 <div class="cp-info">
                     <span class="cp-name">${displayName} ${isOffline ? '(切断)' : ''}</span>
                     <span class="cp-cards">${handCount}枚</span>
                 </div>
             `;
             circle.appendChild(badge);
+            // ▲▲▲ ここまで書き換え ▲▲▲
         }
     },
 
