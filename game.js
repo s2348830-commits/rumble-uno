@@ -114,7 +114,6 @@ class UNOGame {
         if (this.currentPlayer) {
             this.currentPlayer.frozen = false;
             this.currentPlayer.frozenBurnImmune = false;
-            this.currentPlayer.usedRaia = false; //
             
             if (this.currentPlayer.invincibleTurns > 0) this.currentPlayer.invincibleTurns--;
             if (this.currentPlayer.shield && this.currentPlayer.shield.turns > 0) {
@@ -136,7 +135,9 @@ class UNOGame {
         this.turnIndex = (this.turnIndex + (this.direction * skipCount) + this.players.length * 10) % this.players.length;
         this.hasDrawnThisTurn = false;
         this.selectedIndices = [];
-        this.raiaReturnedThisTurn = false;
+        if (this.currentPlayer) {
+            this.currentPlayer.usedRaia = false;
+        }
 
         if (this.currentPlayer && this.currentPlayer.burnTurns > 0) {
             if (this.currentPlayer.invincibleTurns <= 0 && !this.currentPlayer.frozenBurnImmune) {

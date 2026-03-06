@@ -12,7 +12,7 @@ window.isDefending = false;
 window.pendingDrawDefenseInfo = null; 
 window.pendingJanken = null;
 
-// ★ 連打防止用のロックフラグを追加
+// 連打防止用のロックフラグ
 window.isProcessingPlay = false;
 
 window.JANKEN_BACK_IMG = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 60'%3E%3Crect width='40' height='60' rx='6' fill='%23222' stroke='%23444' stroke-width='2'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23fff' font-size='24' font-family='sans-serif' font-weight='bold'%3E?%3C/text%3E%3C/svg%3E";
@@ -332,8 +332,7 @@ window.broadcastGameState = function(skipUIUpdate = false, attackGuides = []) {
     if (!window.isHost) return;
     const playersInfo = window.game.players.map(p => ({ 
         id: p.id, connected: p.connected, frozen: p.frozen, burnTurns: p.burnTurns, 
-        invincibleTurns: p.invincibleTurns, shield: p.shield, evasion: p.evasion,
-        usedRaia: p.usedRaia // ★ 追加
+        invincibleTurns: p.invincibleTurns, shield: p.shield, evasion: p.evasion, usedRaia: p.usedRaia 
     }));
     const state = {
         deck: window.game.deck, turnIndex: window.game.turnIndex, direction: window.game.direction,
@@ -1108,8 +1107,7 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
 
 window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, selectedColor = null, multiDiscardIndices = [], extraData = {}) {
     if (!window.isHost) return;
-    // ★ 削除: if (window.game.currentPlayer.id !== playerId) return; (割り込みで能力を使えるように削除)
-
+    
     const hand = window.game.hands[playerId];
     if (!hand || !hand[indices[0]]) return; 
 
@@ -1596,7 +1594,6 @@ window.checkTurn = function() {
                 
                 const def = isAbility && window.AbilityDef ? window.AbilityDef[playedCards[0].value] : null;
 
-                // ★ 追加: BOTが誤ってBLカードを選んだ場合はドローに変換する
                 if (isAbility && def && def.type === 'BL') {
                     window.socket.emit('request_play_animation', { playerId: current.id, cards: playedCards });
                     setTimeout(() => {
@@ -1687,11 +1684,11 @@ window.checkTurn = function() {
                         
                         const def = isAbility && window.AbilityDef ? window.AbilityDef[playedCards[0].value] : null;
 
-                        // ★ 追加: BOTが誤ってBLカードを選んだ場合はドローに変換する
                         if (isAbility && def && def.type === 'BL') {
-                            const drawCount = 1;
-                            window.socket.emit('request_draw_animation', { playerId: current.id, count: drawCount });
-                            setTimeout(() => window.executeDraw(current.id, true), drawCount * 100 + 400);
+                            window.socket.emit('request_play_animation', { playerId: current.id, cards: playedCards });
+                            setTimeout(() => {
+                                window.executeAbilityPlay(current.id, result.indices, null, null, null, [], {});
+                            }, playedCards.length * 100 + 400);
                             return;
                         }
 
@@ -1760,7 +1757,6 @@ window.checkTurn = function() {
 
 window.executePlay = function(playerId, indices, isBot = false) {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
-    // ★ 削除: if (window.game.currentPlayer.id !== playerId) return; (割り込み使用の妨げになるため削除)
     
     clearInterval(window.turnTimer); 
     if(window.playerAfkTimes) window.playerAfkTimes[playerId] = 0; 
@@ -1830,7 +1826,6 @@ window.executePlay = function(playerId, indices, isBot = false) {
 
 window.executeColor = function(playerId, color) {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
-    if (window.game.currentPlayer.id !== playerId) return; // ★ ホスト側検証：手番じゃない場合は弾く
     
     if(window.playerAfkTimes) window.playerAfkTimes[playerId] = 0; 
     window.game.currentColor = color; 
@@ -1856,7 +1851,6 @@ window.executeColor = function(playerId, color) {
 
 window.executeDraw = function(playerId, isBot = false) {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
-    if (window.game.currentPlayer.id !== playerId) return; // ★ ホスト側検証：手番じゃない場合は弾く
 
     clearInterval(window.turnTimer);
     if(window.playerAfkTimes) window.playerAfkTimes[playerId] = 0;
@@ -1868,7 +1862,6 @@ window.executeDraw = function(playerId, isBot = false) {
 
 window.executeEndTurn = function(playerId) {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
-    if (window.game.currentPlayer.id !== playerId) return; // ★ ホスト側検証：手番じゃない場合は弾く
 
     clearInterval(window.turnTimer);
     if(window.playerAfkTimes) window.playerAfkTimes[playerId] = 0; 
@@ -1914,7 +1907,7 @@ window.tryDrawWithAbility = function(callback) {
     const renaIdx = window.game.myHand.findIndex(c => c.value === 'id_9');
     if (renaIdx > -1 && !me.frozen) {
         if (confirm("【レナ】カードを引く代わりに「レナ」を場に出して効果を発動しますか？")) {
-            window.isDrawing = false; // ★ ロック解除
+            window.isDrawing = false; 
             window.game.selectedIndices = [renaIdx]; window.handlePlayAction(); return; 
         }
     }
@@ -1924,7 +1917,7 @@ window.tryDrawWithAbility = function(callback) {
 window.handlePlayAction = function() {
     if (window.game.selectedIndices.length === 0 || window.isGameOver || window.isInitialDealing || window.isDrawing) return;
     if (window.pendingJanken) return; 
-    if (window.isProcessingPlay) return; // ★ 連打防止
+    if (window.isProcessingPlay) return; 
     window.isProcessingPlay = true;
     
     const me = window.game.players.find(p => p.id === window.game.myId);
@@ -1938,14 +1931,11 @@ window.handlePlayAction = function() {
     const isAction = !/^[0-9]$/.test(lastCard.value) && !isAbility;
     const def = isAbility && window.AbilityDef ? window.AbilityDef[selectedCards[0].value] : null;
 
-    // ▼▼▼ ここから書き換え ▼▼▼
-    // ★ 修正: 未定義エラーを回避するため、すでに定義されている window.game.selectedIndices と selectedCards を利用する
     if (isAbility && def && def.type === 'BL') {
         const indicesToSend = [...window.game.selectedIndices]; 
         const cardsToSend = [...selectedCards];
         window.game.selectedIndices = []; window.updateUI();
         
-        // ★ indices ではなく indicesToSend を渡すように修正
         window.animateSequentialPlay(indicesToSend, window.game, () => {
             if (window.isHost) {
                 if (window.socket) window.socket.emit('request_play_animation', { playerId: window.game.myId, cards: cardsToSend });
@@ -1953,7 +1943,7 @@ window.handlePlayAction = function() {
             } else if (window.socket) {
                 window.socket.emit('player_action', { action: 'play_ability', indices: indicesToSend, cards: cardsToSend, targetId: null, discardIdx: null, selectedColor: null, multiDiscardIndices: [], isHV: false, extraData: {} });
             }
-            window.isProcessingPlay = false; // ★ ロック解除
+            window.isProcessingPlay = false; 
         });
         return;
     }
@@ -2001,7 +1991,7 @@ window.handlePlayAction = function() {
             if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
                 CardAnimation.animateMultiDraw(penaltyCount, 'player-hand', () => {
                     window.isDrawing = false;
-                    window.isProcessingPlay = false; // ★ ロック解除
+                    window.isProcessingPlay = false; 
                     window.game.selectedIndices = []; window.updateUI();
                     if (window.isHost) {
                         if(window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: penaltyCount });
@@ -2014,7 +2004,7 @@ window.handlePlayAction = function() {
                 });
             } else {
                 window.isDrawing = false;
-                window.isProcessingPlay = false; // ★ ロック解除
+                window.isProcessingPlay = false; 
                 window.game.selectedIndices = []; window.updateUI();
                 if (window.isHost) {
                     if(window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: penaltyCount });
@@ -2055,7 +2045,7 @@ window.handlePlayAction = function() {
                 } else if (window.socket) {
                     window.socket.emit('player_action', { action: 'play_ability', indices: indicesToSend, cards: cardsToSend, targetId: targetId, discardIdx: discardIdx, selectedColor: selColor, multiDiscardIndices, isHV: isHVActivated, extraData });
                 }
-                window.isProcessingPlay = false; // ★ ロック解除
+                window.isProcessingPlay = false; 
             });
         };
 
@@ -2071,12 +2061,11 @@ window.handlePlayAction = function() {
             } else { finishAbilityPlay(); }
         }
 
-        window.localRaiaReturnedTurn = window.localRaiaReturnedTurn || -1;
         const stepRaia = () => {
-            // ★ 修正: 先ほど追加した me.usedRaia を判定に使用する
             if (cardValue === 'id_33' && !me.usedRaia) {
                 if (confirm("ライアの効果により、このカードを手札に戻しますか？\n(各ターン1回のみ)")) {
                     extraData.returnRaia = true;
+                    me.usedRaia = true; 
                 }
             }
             step6();
@@ -2140,7 +2129,7 @@ window.handlePlayAction = function() {
             if (window.socket) window.socket.emit('request_play_animation', { playerId: window.game.myId, cards: cardsToSend });
             window.executePlay(window.game.myId, indicesToSend);
         } else if (window.socket) window.socket.emit('player_action', { action: 'play', indices: indicesToSend, cards: cardsToSend });
-        window.isProcessingPlay = false; // ★ ロック解除
+        window.isProcessingPlay = false; 
     });
 };
 
@@ -2157,11 +2146,11 @@ window.onColorChosen = function(color) {
 };
 
 document.getElementById('draw-btn').onclick = () => {
-    if (window.pendingJanken || window.isDrawing || window.isProcessingPlay) return; // ★ 連打防止
+    if (window.pendingJanken || window.isDrawing || window.isProcessingPlay) return; 
     if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
     if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) return;
     
-    window.isDrawing = true; // ★ ロック
+    window.isDrawing = true; 
     window.tryDrawWithAbility(() => {
         window.game.hasDrawnThisTurn = true; window.updateUI();                    
         setTimeout(() => { window.isDrawing = false; }, 3000);
@@ -2186,10 +2175,10 @@ document.getElementById('draw-btn').onclick = () => {
 };
 
 document.getElementById('end-turn-btn').onclick = () => {
-    if (window.pendingJanken || window.isDrawing || window.isProcessingPlay) return; // ★ 連打防止
+    if (window.pendingJanken || window.isDrawing || window.isProcessingPlay) return; 
     if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
     
-    window.isDrawing = true; // ★ ロック
+    window.isDrawing = true; 
     if (window.isHost) {
         window.executeEndTurn(window.game.myId); 
         setTimeout(() => { window.isDrawing = false; }, 500);
@@ -2242,3 +2231,68 @@ document.addEventListener('DOMContentLoaded', () => {
     if(window.ensureModalsExist) window.ensureModalsExist();
     if(window.initVolumeControl) window.initVolumeControl(); 
 });
+window.socket.on('update_game_state', (state) => {
+    if (!window.game) return;
+    window.game.deck = state.deck; 
+    window.game.turnIndex = state.turnIndex; 
+    window.game.direction = state.direction; 
+    window.game.discardPile = state.discardPile;
+    window.game.discardRotations = state.discardRotations; 
+    window.game.drawStack = state.drawStack; 
+    window.game.currentColor = state.currentColor;
+    if(state.hasDrawnThisTurn !== undefined) window.game.hasDrawnThisTurn = state.hasDrawnThisTurn;
+    if(state.abilityGraveyard) window.game.abilityGraveyard = state.abilityGraveyard;
+    if(state.customDeck) window.game.customDeck = state.customDeck;
+    
+    if (state.playersInfo) {
+        let newPlayers = [];
+        state.playersInfo.forEach(info => {
+            let p = window.game.players.find(x => x.id === info.id);
+            if (p) { 
+                p.frozen = info.frozen; 
+                p.burnTurns = info.burnTurns; 
+                p.connected = info.connected;
+                p.invincibleTurns = info.invincibleTurns || 0;
+                p.shield = info.shield || { level: 0, turns: 0 };
+                p.evasion = info.evasion || { level: 0, turns: 0 };
+                p.usedRaia = info.usedRaia || false;
+                newPlayers.push(p);
+            }
+        });
+        if (newPlayers.length === window.game.players.length) window.game.players = newPlayers; 
+    }
+
+    if (window.isInitialDealing && !window.isHost) {
+        if (typeof window.animateInitialDeal === 'function') {
+            window.animateInitialDeal(state.hands, () => {});
+        } else {
+            window.isInitialDealing = false;
+            window.game.hands = state.hands;
+            if (typeof window.updateUI === 'function') window.updateUI();
+        }
+    } else if (!window.isInitialDealing) {
+        window.game.hands = state.hands;
+        if (typeof window.updateUI === 'function') window.updateUI(); 
+    }
+
+    const current = window.game.currentPlayer;
+    const msgEl = document.getElementById('status-message');
+    if (window.isInitialDealing) {
+        msgEl.innerText = "カードを配っています...";
+    } else if (current) {
+        const roomStr = window.currentRoomState ? ` - 部屋ID:${window.currentRoomState.id}` : "";
+        msgEl.innerText = current.id === window.myId ? `あなたの番です${roomStr}` : `${current.name} のターン${roomStr}`;
+    }
+
+    if (state.attackGuides && state.attackGuides.length > 0) {
+        state.attackGuides.forEach(g => {
+            if (typeof window.showAttackGuide === 'function') window.showAttackGuide(g.from, g.to, g.text, g.se);
+        });
+    }
+
+    if (typeof window.updatePhaseUI === 'function') {
+        window.updatePhaseUI(state);
+    }
+});
+
+// ↓↓ network.js等に本来あるべき他のソケットイベント（receive_player_action等）が上書きで消えないよう、ここより下のイベント群は既存のまま生かしておいてください。↓↓
