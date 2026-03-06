@@ -17,6 +17,7 @@ class UNOGame {
         this.unoDeclared = false;
         this.hasDrawnThisTurn = false;
         this.abilityGraveyard = []; 
+        this.customDeck = []; // ★ 能力カード専用の山札
     }
 
     get isMyTurn() { return this.currentPlayer && this.currentPlayer.id === this.myId; }
@@ -39,6 +40,7 @@ class UNOGame {
     start() {
         this.deck = UNORules.createDeck();
         this.abilityGraveyard = [];
+        this.customDeck = [];
         
         if (window.RuleSettings && window.RuleSettings.randomTurnOrder) {
             for (let i = this.players.length - 1; i > 0; i--) {
@@ -56,13 +58,14 @@ class UNOGame {
             if(p && p.id) { this.hands[p.id] = this.deck.splice(0, size); }
         });
         
+        // ★ 初期配布で余った能力カードを customDeck として保持する
         if (customSize > 0 && window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length > 0) {
-            let abilityDeck = UNORules.shuffle([...window.RuleSettings.customCards].map(id => ({ color: 'black', value: id })));
+            this.customDeck = UNORules.shuffle([...window.RuleSettings.customCards].map(id => ({ color: 'black', value: id })));
             this.players.forEach(p => {
                 if (p && p.id) {
                     for (let i = 0; i < customSize; i++) {
-                        if (abilityDeck.length > 0) {
-                            this.hands[p.id].push(abilityDeck.pop());
+                        if (this.customDeck.length > 0) {
+                            this.hands[p.id].push(this.customDeck.pop());
                         }
                     }
                 }
@@ -85,18 +88,24 @@ class UNOGame {
         this.unoDeclared = false;
     }
 
+    // ★ マリガン(交換)の処理：手札のカードを専用山札に戻して引き直す
     replaceAbilityCards(playerId, oldCardValues) {
         const hand = this.hands[playerId];
         if (!hand) return;
+        
         oldCardValues.forEach(val => {
             const idx = hand.findIndex(c => c.value === val);
             if (idx > -1) {
                 hand.splice(idx, 1);
-                const available = window.RuleSettings.customCards;
-                if (available && available.length > 0) {
-                    const newVal = available[Math.floor(Math.random() * available.length)];
-                    hand.push({ color: 'black', value: newVal });
-                }
+                this.customDeck.push({ color: 'black', value: val });
+            }
+        });
+        
+        this.customDeck = UNORules.shuffle(this.customDeck);
+
+        oldCardValues.forEach(() => {
+            if (this.customDeck.length > 0) {
+                hand.push(this.customDeck.pop());
             }
         });
     }
@@ -224,18 +233,15 @@ class UNOGame {
         return { success: false };
     }
 
-    // ★ シールドでの肩代わり（吸収）を追加
     drawCard(targetId, ignoreShield = false) {
         const t = this.players.find(p => p.id === targetId);
         
-        // 無敵中は一切ドローしない
         if (t && t.invincibleTurns > 0) return false;
         
-        // シールドがあればドローを肩代わりして手札を増やさない
         if (!ignoreShield && t && t.shield && t.shield.turns > 0 && t.shield.level > 0) {
             t.shield.level--;
             if (t.shield.level <= 0) t.shield.turns = 0;
-            return true; // 処理としては正常だが手札は増えない
+            return true; 
         }
 
         if (this.deck.length === 0) {
@@ -296,6 +302,7 @@ class UNOGame {
                 const r = Math.floor(Math.random() * candidates.length);
                 const targetCard = candidates.splice(r, 1)[0];
                 targetCard.lockedTurns = (attackerId === targetId) ? turns + 1 : turns; 
+                targetCard.lockedType = type; // ★ ロックの種類(number/symbol)を保存
             }
         }
     }

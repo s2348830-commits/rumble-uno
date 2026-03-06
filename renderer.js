@@ -88,27 +88,38 @@ const Renderer = {
             }
             if (p.type === 'bot' && window.RuleSettings && window.RuleSettings.showBotPersonality && personality) displayName += ` [${personality}]`;
 
-            // 【抜粋】 renderer.js (100行目付近・renderPlayersCircleの中)
-
             let overlayHtml = '';
             if (p.frozen) overlayHtml += '<div class="status-overlay status-frozen"></div>';
             if (p.burnTurns > 0) overlayHtml += `<div class="status-overlay status-burned"></div>`;
 
-            // ▼▼▼ ここから書き換え ▼▼▼
-            // ★ 各種ステータスアイコンとターン数表示
+            // ★ ロックされているカードの「種類別」の枚数と一番長いターン数を計算
+            let numLockTurns = 0;
+            let numLockCount = 0;
+            let symLockTurns = 0;
+            let symLockCount = 0;
+
+            const hand = game.hands[p.id] || [];
+            hand.forEach(c => {
+                if (c.lockedTurns && c.lockedTurns > 0) {
+                    if (c.lockedType === 'number') {
+                        numLockCount++;
+                        if (c.lockedTurns > numLockTurns) numLockTurns = c.lockedTurns;
+                    } else if (c.lockedType === 'symbol') {
+                        symLockCount++;
+                        if (c.lockedTurns > symLockTurns) symLockTurns = c.lockedTurns;
+                    }
+                }
+            });
+
+            // ★ 各種ステータスアイコンの表示構築
             let statusIcons = '';
             if (p.invincibleTurns > 0) statusIcons += `<span style="margin-right:3px;">🔲(${p.invincibleTurns}T)</span>`;
             if (p.shield && p.shield.turns > 0 && p.shield.level > 0) statusIcons += `<span style="margin-right:3px;">🛡️${p.shield.level}(${p.shield.turns}T)</span>`;
             if (p.frozen) statusIcons += `<span style="margin-right:3px;">❄️(1T)</span>`;
             if (p.burnTurns > 0) statusIcons += `<span style="margin-right:3px;">🔥(${p.burnTurns}T)</span>`;
             
-            // ロックされているカードの中で一番長いターン数を計算して表示
-            let maxLockTurns = 0;
-            const hand = game.hands[p.id] || [];
-            hand.forEach(c => {
-                if (c.lockedTurns && c.lockedTurns > maxLockTurns) maxLockTurns = c.lockedTurns;
-            });
-            if (maxLockTurns > 0) statusIcons += `<span style="margin-right:3px;">🗝️(${maxLockTurns}T)</span>`;
+            if (numLockCount > 0) statusIcons += `<span style="margin-right:3px;">🔒${numLockCount}(${numLockTurns}T)</span>`;
+            if (symLockCount > 0) statusIcons += `<span style="margin-right:3px;">🗝️${symLockCount}(${symLockTurns}T)</span>`;
 
             const badge = document.createElement('div');
             badge.className = `circle-player-badge other-player-badge ${isTurn ? 'active-turn' : ''} ${isPredictTurn ? 'predict-turn' : ''} ${isOffline ? 'offline' : ''} ${p.id === game.myId ? 'my-badge' : ''}`;
@@ -128,7 +139,6 @@ const Renderer = {
                 </div>
             `;
             circle.appendChild(badge);
-            // ▲▲▲ ここまで書き換え ▲▲▲
         }
     },
 
