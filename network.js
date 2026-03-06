@@ -153,7 +153,6 @@ window.socket.on('room_joined', (data) => {
     lobbyScreen.classList.remove('hidden');
     document.getElementById('display-room-id').innerText = data.roomId;
 
-    // ★ チャットの二重表示対策：ロビー時はバトルチャットを強制非表示
     const cia = document.getElementById('chat-input-area');
     if (cia) {
         cia.style.display = 'none';
@@ -317,7 +316,6 @@ window.socket.on('game_started', (roomState) => {
     const manualBtn = document.getElementById('btn-manual');
     if (manualBtn) manualBtn.classList.add('hidden');
 
-    // ★ ゲーム開始時にバトルチャットを表示する
     const cia = document.getElementById('chat-input-area');
     if (cia && window.ChatManager && window.ChatManager.enabled) {
         cia.style.display = 'flex';
@@ -344,7 +342,6 @@ window.socket.on('request_ability_reset', (data) => {
     window.broadcastGameState(true);
 });
 
-// ★ サーバーからの通信でじゃんけんのUIを同期する処理
 window.socket.on('update_game_state', (state) => {
     if (!window.game) return;
     window.game.deck = state.deck; 
@@ -401,55 +398,9 @@ window.socket.on('update_game_state', (state) => {
         });
     }
 
-    if (state.defensePhase) {
-        const { attackerId, cardValue, targets } = state.defensePhase;
-        if (targets && targets.includes(window.myId) && window.myId !== attackerId) {
-            if (!window.isDefending) {
-                window.isDefending = true;
-                if (typeof window.showDefenseModal === 'function') window.showDefenseModal(cardValue);
-            }
-            const timerText = document.getElementById('defense-timer-text');
-            if (timerText) timerText.innerText = state.defenseTimer;
-        }
-    } else {
-        window.isDefending = false;
-        const modal = document.getElementById('defense-modal');
-        const discModal = document.getElementById('discard-modal');
-        if (modal) modal.classList.add('hidden');
-        if (discModal) discModal.classList.add('hidden');
-    }
-
-    // ★ じゃんけんの同期処理
-    if (state.jankenPhase) {
-        if (!window.isJankenShowing) {
-            window.showJankenUI(state.jankenPhase.attackerId, state.jankenPhase.targetId, state.jankenPhase.loopCount);
-            window.isJankenShowing = true;
-        }
-        const jTimer = document.getElementById('janken-timer');
-        if (jTimer) jTimer.innerText = state.jankenPhase.timer;
-
-        if (window.myId === state.jankenPhase.attackerId && state.jankenPhase.attackerHand) {
-            const controls = document.getElementById('janken-controls');
-            const title = document.getElementById('janken-title');
-            if (controls) controls.style.display = 'none';
-            if (title) title.innerText = "相手を待っています...";
-        }
-        if (window.myId === state.jankenPhase.targetId && state.jankenPhase.targetHand) {
-            const controls = document.getElementById('janken-controls');
-            const title = document.getElementById('janken-title');
-            if (controls) controls.style.display = 'none';
-            if (title) title.innerText = "相手を待っています...";
-        }
-
-        if (state.jankenPhase.result && !window.jankenResultPlayed) {
-            window.jankenResultPlayed = true;
-            window.playJankenResult(state.jankenPhase.attackerId, state.jankenPhase.targetId, state.jankenPhase.attackerHand, state.jankenPhase.targetHand, state.jankenPhase.result);
-        }
-    } else {
-        window.isJankenShowing = false;
-        window.jankenResultPlayed = false;
-        const jOverlay = document.getElementById('janken-overlay');
-        if (jOverlay && !jOverlay.classList.contains('result-showing')) jOverlay.classList.add('hidden');
+    // ★ フェーズUI（防御・じゃんけん）の更新呼び出し
+    if (typeof window.updatePhaseUI === 'function') {
+        window.updatePhaseUI(state);
     }
 });
 
@@ -558,7 +509,7 @@ window.socket.on('receive_player_action', (data) => {
         if (window.pendingJanken && !window.pendingJanken.result) {
             if (playerId === window.pendingJanken.attackerId) window.pendingJanken.attackerHand = data.choice;
             if (playerId === window.pendingJanken.targetId) window.pendingJanken.targetHand = data.choice;
-            window.checkJankenReady();
+            if (typeof window.checkJankenReady === 'function') window.checkJankenReady();
         }
     }
 });

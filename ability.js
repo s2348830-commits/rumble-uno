@@ -9,7 +9,7 @@ window.AbilityDef = {
     'id_5': { rarity: 'SSR', type: 'HE', name: '瑠璃', desc: '【HE】自分の手札に+カードを2枚持ってくる。(内訳、各種+2：8割、+4：2割)' },
     'id_6': { rarity: 'SSR', type: 'AT', name: 'ラン', desc: '【AT】他全員に手札を2枚ランダムに捨てさせその後に3枚ドローさせる。' },
     'id_7': { rarity: 'SSR', type: 'AT', name: 'リリス', desc: '【AT】1人指定。燃焼(3T開始時固定1ドロー)を付与。', needsTarget: true },
-    'id_8': { rarity: 'SSR', type: 'HE', name: 'ヘラ', desc: '【HE】1人指定し1枚引かせる。手札1枚捨てる。', needsTarget: true, needsDiscard: true },
+    'id_8': { rarity: 'SSR', type: 'HE', name: 'ヘラ', desc: '【HE】1人指定し1枚引かせる。手札1枚捨てる。その後、回避Iを2ターン付与。', needsTarget: true, needsDiscard: true },
     'id_9': { rarity: 'SSR', type: 'AT_BL', name: 'レナ', desc: '【AT/BL】自分以外の他全員に1枚引かせる。防御時自分以外の他全員に固定2ドロー。' },
     'id_10': { rarity: 'SSR', type: 'HE', name: 'シャミール', desc: '【HE】1人指定。数字カード3枚を次の次ターンまでロック。', needsTarget: true },
     'id_11': { rarity: 'SSR', type: 'HE', name: 'レイ', desc: '【HE】1人指定。記号カード2枚を次の次ターンまでロック。', needsTarget: true },
@@ -17,7 +17,7 @@ window.AbilityDef = {
     'id_13': { rarity: 'SSR', type: 'HE', name: 'エリザベス', desc: '【HE】選ばれたランダムなプレイヤーに1枚引かせランダムな記号カードを1枚山札に戻す。無ければ追加で1枚引かせる。' },
     'id_14': { rarity: 'SSR', type: 'AT', name: 'ハンナ', desc: '【AT】ランダムなプレイヤーに4枚引かせる。' },
     'id_15': { rarity: 'SSR', type: 'AT', name: 'メリア', desc: '【AT】1人指定。固定で2枚引かせる。', needsTarget: true, fixedDraw: true },
-    'id_16': { rarity: 'SSR', type: 'HE', name: 'ユメゴト', desc: '【HE】手札1枚捨てる。自身のデバフ(凍結/燃焼)を全て解除。', needsDiscard: true },
+    'id_16': { rarity: 'SSR', type: 'HE', name: 'ユメゴト', desc: '【HE】手札1枚捨てる。自身のデバフ(凍結/燃焼)を全て解除。その後、回避IIを1ターン付与。', needsDiscard: true },
     'id_17': { rarity: 'SR', type: 'BL', name: 'カシウス', desc: '【BL】防御時、手札1枚選んで捨てる。', needsDiscard: true },
     'id_18': { rarity: 'SR', type: 'AT_BL', name: 'グレイス', desc: '【AT/BL】他全員に1枚引かせる。その後自分にシールドIを2ターン付与する。' },
     'id_19': { rarity: 'SR', type: 'BL', name: 'ヴィンディ', desc: '【BL】防御時手札1枚捨てる。攻撃者に1枚引かせる。', needsDiscard: true },
@@ -29,18 +29,34 @@ window.AbilityDef = {
     'id_25': { rarity: 'UR', type: 'HE', name: 'ミサ', desc: '【HE】自分のカード1枚をワイルドにし、使用されたSSR以下の能力カードを1枚手札に戻す。', needsGraveyard: true },
     'id_26': { rarity: 'UR', type: 'AT', name: '運命の三姉妹', desc: '【AT】ランダム他1人とじゃんけん。初回は結果によらず相手2ドロー。勝てば相手2ドローし再戦(最大4回)。', needsJanken: true },
     'id_27': { rarity: 'SR', type: 'HE', name: 'クララ', desc: '【HE】自分の手札をランダムに2枚捨てる。' },
-    'id_28': { rarity: 'SSR', type: 'AT', name: 'リナ', desc: '【AT】ランダムなプレイヤーに2ターン燃焼を付与する。その後そのプレイヤーに1枚引かせる(防御不可)。' }
+    'id_28': { rarity: 'SSR', type: 'AT', name: 'リナ', desc: '【AT】ランダムなプレイヤーに2ターン燃焼を付与する。その後そのプレイヤーに1枚引かせる(防御不可)。' },
+    'id_29': { rarity: 'SSR', type: 'AT', name: 'エロス', desc: '【AT】自分以外の全員に75%の確率で2枚引かせる。' },
+    'id_30': { rarity: 'SSR', type: 'BL', name: 'カシャ', desc: '【BL】防御時、ランダムなプレイヤーに燃焼を1ターン付与し、自分にシールドIを1ターン付与する。' },
+    'id_31': { rarity: 'SSR', type: 'BL', name: 'カレン', desc: '【BL】防御時、自分のシールドIIIを3ターン付与する。また、既にシールドがある場合は重複する。' },
+    'id_32': { rarity: 'SSR', type: 'AT', name: 'フェイ', desc: '【AT】自分以外のランダムなプレイヤーに燃焼(2T開始時固定1ドロー)を付与(3回発動)。既に燃焼がある場合は重複する。' },
+    'id_33': { rarity: 'SSR', type: 'AT', name: 'ライア', desc: '【AT】自分以外のプレイヤーを一人指定し1枚ドローさせる。発動後このカードを手札に戻してもよい。(各ターン1回のみ)', needsTarget: true },
+    'id_34': { rarity: 'SSR', type: 'HE', name: 'オリヴィア', desc: '【HE】自分に回避I(20%の確率で攻撃を防ぐ)を1ターン付与する。' }
 };
 
 window.AbilityEngine = {
+    // ★ 回避(Evasion)の判定関数
+    checkEvasion: function(target) {
+        if (!target || !target.evasion || target.evasion.turns <= 0 || target.evasion.level <= 0) return false;
+        let rate = 0;
+        if (target.evasion.level === 1) rate = 0.20;
+        else if (target.evasion.level === 2) rate = 0.50;
+        else if (target.evasion.level >= 3) rate = 0.80;
+        return Math.random() < rate;
+    },
+
     applyDraw: function(game, targetId, count, blockable = true) {
         const t = game.players.find(p => p.id === targetId);
         if (!t) return 0;
         if (t.invincibleTurns > 0) return 0; 
+        if (this.checkEvasion(t)) return -1; // -1は回避成功のフラグ
         
         let actualDrawn = count;
         
-        // game.drawCardに任せるため、ここでは回数を記録するだけ
         for (let i = 0; i < count; i++) {
             game.drawCard(targetId); 
         }
@@ -52,14 +68,18 @@ window.AbilityEngine = {
 
     applyBurn: function(game, targetId, turns) {
         const t = game.players.find(p => p.id === targetId);
-        if (!t || t.invincibleTurns > 0 || t.frozenBurnImmune) return;
+        if (!t || t.invincibleTurns > 0 || t.frozenBurnImmune) return 0;
+        if (this.checkEvasion(t)) return -1;
         t.burnTurns += turns;
+        return 1;
     },
 
     applyFreeze: function(game, targetId) {
         const t = game.players.find(p => p.id === targetId);
-        if (!t || t.invincibleTurns > 0 || t.frozenBurnImmune) return;
+        if (!t || t.invincibleTurns > 0 || t.frozenBurnImmune) return 0;
+        if (this.checkEvasion(t)) return -1;
         t.frozen = true;
+        return 1;
     },
 
     triggerDiscardEffect: function(game, attackerId, abilityId, isManualDiscard, discCard) {
@@ -102,11 +122,23 @@ window.AbilityEngine = {
 
         for (let m = 0; m < multiplier; m++) {
             
+            // --- フェイ(id_32)の個別ループ処理 ---
+            if (abilityId === 'id_32') {
+                for (let i = 0; i < 3; i++) {
+                    if (others.length > 0) {
+                        const tid = others[Math.floor(Math.random() * others.length)].id;
+                        const res = this.applyBurn(game, tid, 2);
+                        if (res === -1) guides.push({ from: attackerId, to: tid, text: '💨回避!' });
+                        else guides.push({ from: attackerId, to: tid, text: '🔥燃焼(2T)', se: 'fire' });
+                    }
+                }
+            }
+
             // --- 攻撃・妨害系の能力処理 ---
             if (def.type === 'AT' || def.type === 'AT_BL') {
                 let actualTargets = [];
                 if (def.needsTarget && selectedTargetId) actualTargets = [selectedTargetId];
-                else if (['id_2', 'id_6', 'id_9', 'id_18'].includes(abilityId)) actualTargets = others.map(p => p.id);
+                else if (['id_2', 'id_6', 'id_9', 'id_18', 'id_29'].includes(abilityId)) actualTargets = others.map(p => p.id);
                 else if (['id_14', 'id_24', 'id_28'].includes(abilityId)) {
                     if (others.length > 0) actualTargets = [others[Math.floor(Math.random() * others.length)].id];
                 }
@@ -122,8 +154,9 @@ window.AbilityEngine = {
                     if (abilityId === 'id_1') {
                         drawCount = 1;
                         if (Math.random() < 0.70) {
-                            this.applyFreeze(game, targetId);
-                            guides.push({ from: targetId, to: targetId, text: '❄凍結', se: 'frieze' });
+                            const fres = this.applyFreeze(game, targetId);
+                            if (fres === -1) guides.push({ from: attackerId, to: targetId, text: '💨回避!' });
+                            else guides.push({ from: targetId, to: targetId, text: '❄凍結', se: 'frieze' });
                         }
                     } else if (abilityId === 'id_2') {
                         drawCount = 1;
@@ -143,8 +176,9 @@ window.AbilityEngine = {
                         }
                         drawCount = 3;
                     } else if (abilityId === 'id_7') {
-                        this.applyBurn(game, targetId, 3);
-                        guides.push({ from: attackerId, to: targetId, text: '🔥燃焼(3T)', se: 'fire' });
+                        const bres = this.applyBurn(game, targetId, 3);
+                        if (bres === -1) guides.push({ from: attackerId, to: targetId, text: '💨回避!' });
+                        else guides.push({ from: attackerId, to: targetId, text: '🔥燃焼(3T)', se: 'fire' });
                     } else if (abilityId === 'id_9') {
                         drawCount = 1;
                     } else if (abilityId === 'id_12') {
@@ -158,17 +192,35 @@ window.AbilityEngine = {
                     } else if (abilityId === 'id_21') {
                         drawCount = 3;
                     } else if (abilityId === 'id_24') {
-                        this.applyBurn(game, targetId, 1);
-                        guides.push({ from: attackerId, to: targetId, text: '🔥燃焼(1T)', se: 'fire' });
+                        const bres = this.applyBurn(game, targetId, 1);
+                        if (bres === -1) guides.push({ from: attackerId, to: targetId, text: '💨回避!' });
+                        else guides.push({ from: attackerId, to: targetId, text: '🔥燃焼(1T)', se: 'fire' });
                     } else if (abilityId === 'id_28') {
-                        this.applyBurn(game, targetId, 2);
+                        const bres = this.applyBurn(game, targetId, 2);
+                        if (bres === -1) guides.push({ from: attackerId, to: targetId, text: '💨回避!' });
+                        else guides.push({ from: attackerId, to: targetId, text: '🔥燃焼+1枚(貫通)' });
                         drawCount = 1;
-                        guides.push({ from: attackerId, to: targetId, text: '🔥燃焼+1枚(貫通)' });
+                    } else if (abilityId === 'id_29') {
+                        if (Math.random() < 0.75) {
+                            drawCount = 2;
+                        } else {
+                            guides.push({ from: attackerId, to: targetId, text: 'ハズレ!' });
+                        }
+                    } else if (abilityId === 'id_33') {
+                        drawCount = 1;
+                        if (extraData.returnRaia) {
+                            const hand = game.hands[attackerId];
+                            if (hand) hand.push({ color: 'black', value: 'id_33' });
+                            const gIdx = game.abilityGraveyard.indexOf('id_33');
+                            if (gIdx > -1) game.abilityGraveyard.splice(gIdx, 1);
+                            guides.push({ from: attackerId, to: attackerId, text: '手札に戻る' });
+                        }
                     }
 
                     if (drawCount > 0) {
                         const actualDrawn = this.applyDraw(game, targetId, drawCount, abilityId !== 'id_28');
-                        if(actualDrawn > 0) guides.push({ from: attackerId, to: targetId, text: `${actualDrawn}枚` });
+                        if (actualDrawn === -1) guides.push({ from: attackerId, to: targetId, text: `💨回避!` });
+                        else if(actualDrawn > 0) guides.push({ from: attackerId, to: targetId, text: `${actualDrawn}枚` });
                         else guides.push({ from: attackerId, to: targetId, text: `無効化!` });
                     }
                 });
@@ -199,8 +251,13 @@ window.AbilityEngine = {
                         if (window.isHost && window.socket) window.socket.emit('request_draw_animation', { playerId: attackerId, count: 2 });
                     }
                 } else if (abilityId === 'id_8') {
-                    this.applyDraw(game, selectedTargetId, 1);
-                    guides.push({ from: attackerId, to: selectedTargetId, text: '1枚引かせる' });
+                    const res = this.applyDraw(game, selectedTargetId, 1);
+                    if (res === -1) guides.push({ from: attackerId, to: selectedTargetId, text: '💨回避!' });
+                    else guides.push({ from: attackerId, to: selectedTargetId, text: '1枚引かせる' });
+                    
+                    const self = game.players.find(p=>p.id === attackerId);
+                    if (self) self.evasion = { level: 1, turns: 2 };
+                    guides.push({ from: attackerId, to: attackerId, text: '💨回避I(2T)' });
                 } else if (abilityId === 'id_10') {
                     if (game.lockRandomCard) game.lockRandomCard(attackerId, selectedTargetId, 'number', 3, 2);
                     guides.push({ from: attackerId, to: selectedTargetId, text: '数字3枚ロック', se: 'rock' });
@@ -235,7 +292,11 @@ window.AbilityEngine = {
                     }
                 } else if (abilityId === 'id_16') {
                     const self = game.players.find(p=>p.id === attackerId);
-                    if(self) { self.frozen = false; self.burnTurns = 0; guides.push({ from: attackerId, to: attackerId, text: '✨解除' }); }
+                    if(self) { 
+                        self.frozen = false; self.burnTurns = 0; 
+                        self.evasion = { level: 2, turns: 1 };
+                        guides.push({ from: attackerId, to: attackerId, text: '✨解除＆💨回避II(1T)' }); 
+                    }
                 } else if (abilityId === 'id_22') {
                     const self = game.players.find(p=>p.id === attackerId);
                     if (self) {
@@ -243,10 +304,14 @@ window.AbilityEngine = {
                         else if (extraData.debuffToClear === 'burn') self.burnTurns = 0;
                     }
                     game.players.forEach(p => {
-                        // ★ 自分以外の全員に変更
-                        if(p.connected && p.id !== attackerId) this.applyDraw(game, p.id, 1);
+                        // 自分以外の全員に変更
+                        if(p.connected && p.id !== attackerId) {
+                            const res = this.applyDraw(game, p.id, 1);
+                            if (res === -1) guides.push({ from: attackerId, to: p.id, text: '💨回避!' });
+                            else guides.push({ from: attackerId, to: p.id, text: '1枚' });
+                        }
                     });
-                    guides.push({ from: attackerId, to: attackerId, text: 'デバフ解除＆他全員1枚' });
+                    guides.push({ from: attackerId, to: attackerId, text: 'デバフ解除' });
                 } else if (abilityId === 'id_23') {
                     const self = game.players.find(p=>p.id === attackerId);
                     if(self) {
@@ -285,6 +350,10 @@ window.AbilityEngine = {
                         }
                         guides.push({ from: attackerId, to: attackerId, text: `2枚破棄` });
                     }
+                } else if (abilityId === 'id_34') {
+                    const self = game.players.find(p=>p.id === attackerId);
+                    if(self) self.evasion = { level: 1, turns: 1 };
+                    guides.push({ from: attackerId, to: attackerId, text: '💨回避I(1T)' });
                 }
             }
         }

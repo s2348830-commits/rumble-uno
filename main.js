@@ -12,6 +12,7 @@ window.isDefending = false;
 window.pendingDrawDefenseInfo = null; 
 window.pendingJanken = null;
 
+// じゃんけん待機中用の裏面カード（画像ファイルがなくても表示できるデータ）
 window.JANKEN_BACK_IMG = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 60'%3E%3Crect width='40' height='60' rx='6' fill='%23222' stroke='%23444' stroke-width='2'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23fff' font-size='24' font-family='sans-serif' font-weight='bold'%3E?%3C/text%3E%3C/svg%3E";
 
 window.ensureModalsExist = function() {
@@ -236,6 +237,7 @@ window.SE = {
 const unlockAudioContext = () => {
     if (window.SE.unlocked) return; window.SE.unlocked = true; window.SE.initContext();
     if (window.SE.audioCtx.state === 'suspended') window.SE.audioCtx.resume();
+    // スマホ対応：すべての音声をmp3でWeb Audio API経由で読み込む
     ['win', 'win2', 'setting', 'draw', 'uno_message', 'buttonclick', 'uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6', 'frieze', 'rock', 'Distribute', 'mvp_1', 'mvp_2', 'hv/id_20(1)', 'hv/id_20(2)', 'hv/id_25', 'hv/id_26'].forEach(name => window.SE.loadSound(name, 'mp3'));
     ['fire', 'page'].forEach(name => window.SE.loadSound(name, 'wav'));
     document.removeEventListener('click', unlockAudioContext);
@@ -329,7 +331,7 @@ window.broadcastGameState = function(skipUIUpdate = false, attackGuides = []) {
     if (!window.isHost) return;
     const playersInfo = window.game.players.map(p => ({ 
         id: p.id, connected: p.connected, frozen: p.frozen, burnTurns: p.burnTurns, 
-        invincibleTurns: p.invincibleTurns, shield: p.shield 
+        invincibleTurns: p.invincibleTurns, shield: p.shield, evasion: p.evasion 
     }));
     const state = {
         deck: window.game.deck, turnIndex: window.game.turnIndex, direction: window.game.direction,
@@ -805,7 +807,7 @@ window.openGraveyardSelection = function(callback) {
         if(confirm("対象となるSSR以下のカードが墓地にありません。\n適用されない効果がありますが、それでも実行しますか？")) {
             callback(null);
         } else {
-            callback(false); // キャンセル
+            callback(false);
         }
         return;
     }
@@ -817,8 +819,7 @@ window.openGraveyardSelection = function(callback) {
     list.forEach(id => {
         const btn = document.createElement('img');
         btn.src = `card/custom/${id}.png`;
-        btn.style.width = '60px';
-        btn.style.cursor = 'pointer';
+        btn.style.width = '60px'; btn.style.cursor = 'pointer';
         btn.onclick = () => {
             modal.classList.add('hidden');
             callback(id);
@@ -904,8 +905,7 @@ window.showDefenseModal = function(attackCardValue) {
         list.innerHTML = '';
         defCards.forEach(item => {
             const btn = Renderer.createCardElement(item.card);
-            btn.style.width = '50px'; btn.style.height = '75px';
-            btn.style.margin = '5px'; btn.style.cursor = 'pointer';
+            btn.style.width = '50px'; btn.style.height = '75px'; btn.style.margin = '5px'; btn.style.cursor = 'pointer';
             btn.onclick = () => {
                 const def = window.AbilityDef[item.card.value];
                 
@@ -1065,6 +1065,23 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                 } else if (defCardId === 'id_19') {
                     window.AbilityEngine.applyDraw(window.game, attackerId, 1);
                     defenseGuides.push({ from: targetId, to: attackerId, text: 'ヴィンディ' });
+                } else if (defCardId === 'id_30') {
+                    const others = window.game.players.filter(px => px.id !== targetId && px.connected);
+                    if (others.length > 0) {
+                        const bt = others[Math.floor(Math.random() * others.length)];
+                        window.AbilityEngine.applyBurn(window.game, bt.id, 1);
+                        defenseGuides.push({ from: targetId, to: bt.id, text: '🔥燃焼(1T)' });
+                    }
+                    const targetP = window.game.players.find(p=>p.id===targetId);
+                    if (targetP) targetP.shield = { level: 1, turns: 1 };
+                } else if (defCardId === 'id_31') {
+                    const targetP = window.game.players.find(p=>p.id===targetId);
+                    if (targetP) {
+                        if (!targetP.shield) targetP.shield = { level: 0, turns: 0 };
+                        targetP.shield.level += 3;
+                        targetP.shield.turns += 3;
+                        defenseGuides.push({ from: targetId, to: targetId, text: '🛡️シールド強化!' });
+                    }
                 }
             }
 
@@ -1134,7 +1151,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
     if (def.type === 'AT' || def.type === 'AT_BL' || def.type === 'HV') {
         let targets = [];
         if (def.needsTarget && targetId) targets = [targetId];
-        else if (['id_2', 'id_6', 'id_9', 'id_18'].includes(cardValue)) targets = window.game.players.filter(p=>p.id!==playerId).map(p=>p.id);
+        else if (['id_2', 'id_6', 'id_9', 'id_18', 'id_29'].includes(cardValue)) targets = window.game.players.filter(p=>p.id!==playerId).map(p=>p.id);
         else if (['id_13', 'id_14', 'id_24', 'id_28'].includes(cardValue)) {
             const others = window.game.players.filter(p=>p.id!==playerId);
             if(others.length > 0) targets = [others[Math.floor(Math.random()*others.length)].id];
@@ -1286,6 +1303,23 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                             } else if (defCardId === 'id_19') {
                                 window.AbilityEngine.applyDraw(window.game, playerId, 1);
                                 guides.push({ from: tid, to: playerId, text: 'ヴィンディ' });
+                            } else if (defCardId === 'id_30') {
+                                const others = window.game.players.filter(px => px.id !== tid && px.connected);
+                                if (others.length > 0) {
+                                    const bt = others[Math.floor(Math.random() * others.length)];
+                                    window.AbilityEngine.applyBurn(window.game, bt.id, 1);
+                                    guides.push({ from: tid, to: bt.id, text: '🔥燃焼(1T)' });
+                                }
+                                const targetP = window.game.players.find(p=>p.id===tid);
+                                if (targetP) targetP.shield = { level: 1, turns: 1 };
+                            } else if (defCardId === 'id_31') {
+                                const targetP = window.game.players.find(p=>p.id===tid);
+                                if (targetP) {
+                                    if (!targetP.shield) targetP.shield = { level: 0, turns: 0 };
+                                    targetP.shield.level += 3;
+                                    targetP.shield.turns += 3;
+                                    guides.push({ from: tid, to: tid, text: '🛡️シールド強化!' });
+                                }
                             }
                         }
                     });
@@ -1557,6 +1591,14 @@ window.checkTurn = function() {
                 const isAbility = playedCards[0] && playedCards[0].value && String(playedCards[0].value).startsWith('id_');
                 
                 const def = isAbility && window.AbilityDef ? window.AbilityDef[playedCards[0].value] : null;
+
+                if (isAbility && def && def.type === 'BL') {
+                    const drawCount = 1;
+                    window.socket.emit('request_draw_animation', { playerId: current.id, count: drawCount });
+                    setTimeout(() => window.executeDraw(current.id, true), drawCount * 100 + 400);
+                    return;
+                }
+
                 let willDiscard = (isAbility && def && (def.needsDiscard || def.needsAbilityDiscard)) ? 1 : 0;
                 
                 let botSelectedColor = null;
@@ -1638,6 +1680,14 @@ window.checkTurn = function() {
                         const isAbility = playedCards[0] && playedCards[0].value && String(playedCards[0].value).startsWith('id_');
                         
                         const def = isAbility && window.AbilityDef ? window.AbilityDef[playedCards[0].value] : null;
+
+                        if (isAbility && def && def.type === 'BL') {
+                            const drawCount = 1;
+                            window.socket.emit('request_draw_animation', { playerId: current.id, count: drawCount });
+                            setTimeout(() => window.executeDraw(current.id, true), drawCount * 100 + 400);
+                            return;
+                        }
+
                         let willDiscard = (isAbility && def && (def.needsDiscard || def.needsAbilityDiscard)) ? 1 : 0;
                         let botSelectedColor = null;
                         let botMultiDiscardIndices = [];
@@ -1868,6 +1918,12 @@ window.handlePlayAction = function() {
 
     const isAbility = selectedCards[0] && selectedCards[0].value && String(selectedCards[0].value).startsWith('id_');
     const isAction = !/^[0-9]$/.test(lastCard.value) && !isAbility;
+    const def = isAbility && window.AbilityDef ? window.AbilityDef[selectedCards[0].value] : null;
+
+    if (isAbility && def && def.type === 'BL') {
+        alert("BL(ブロック)専用カードは手札から直接使用できません！(攻撃を受けた時の防御時のみ使用可能)");
+        window.game.selectedIndices = []; window.updateUI(); return;
+    }
 
     if (!window.game.isMyTurn && !isAbility) {
         window.game.selectedIndices = []; window.updateUI(); return;
@@ -1885,7 +1941,6 @@ window.handlePlayAction = function() {
         if (!isLegalPlay) { if (window.SE) window.SE.play('Impossible'); return; }
     }
 
-    const def = isAbility && window.AbilityDef ? window.AbilityDef[selectedCards[0].value] : null;
     let willDiscard = (isAbility && def && (def.needsDiscard || def.needsAbilityDiscard)) ? 1 : 0;
     const finalHandCount = window.game.myHand.length - selectedCards.length - willDiscard;
 
@@ -1929,11 +1984,11 @@ window.handlePlayAction = function() {
     if (isAbility) {
         let targetId = null; let discardIdx = null; let selColor = null; let multiDiscardIndices = [];
         let debuffToClear = null; let graveyardCardId = null;
+        let extraData = {};
 
         const finishAbilityPlay = () => {
             window.game.selectedIndices = []; window.updateUI();
             const indicesToSend = [...indices]; const cardsToSend = [...playedCards];
-            let extraData = {};
             if (debuffToClear) extraData.debuffToClear = debuffToClear;
             if (graveyardCardId) extraData.graveyardCardId = graveyardCardId;
 
@@ -1961,18 +2016,29 @@ window.handlePlayAction = function() {
             } else { finishAbilityPlay(); }
         }
 
+        window.localRaiaReturnedTurn = window.localRaiaReturnedTurn || -1;
+        const stepRaia = () => {
+            if (cardValue === 'id_33' && window.localRaiaReturnedTurn !== window.game.turnIndex) {
+                if (confirm("ライアの効果により、このカードを手札に戻しますか？\n(各ターン1回のみ)")) {
+                    extraData.returnRaia = true;
+                    window.localRaiaReturnedTurn = window.game.turnIndex;
+                }
+            }
+            step6();
+        }
+
         const step5 = () => {
             if (def && def.needsDebuffSelect && me.frozen && me.burnTurns > 0) {
                 window.openDebuffSelection((selected) => {
                     debuffToClear = selected;
-                    step6();
+                    stepRaia();
                 });
             } else if (def && def.needsDebuffSelect) {
                 if (me.frozen) debuffToClear = 'frozen';
                 else if (me.burnTurns > 0) debuffToClear = 'burn';
-                step6();
+                stepRaia();
             } else {
-                step6();
+                stepRaia();
             }
         };
 

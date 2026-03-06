@@ -17,7 +17,7 @@ class UNOGame {
         this.unoDeclared = false;
         this.hasDrawnThisTurn = false;
         this.abilityGraveyard = []; 
-        this.customDeck = []; // ★ 能力カード専用の山札
+        this.customDeck = []; 
     }
 
     get isMyTurn() { return this.currentPlayer && this.currentPlayer.id === this.myId; }
@@ -32,6 +32,7 @@ class UNOGame {
             p.burnTurns = 0;
             p.invincibleTurns = 0; 
             p.shield = { level: 0, turns: 0 }; 
+            p.evasion = { level: 0, turns: 0 }; // ★ 回避ステータスの追加
             p.frozenBurnImmune = false; 
         });
         this.myId = myId;
@@ -58,7 +59,6 @@ class UNOGame {
             if(p && p.id) { this.hands[p.id] = this.deck.splice(0, size); }
         });
         
-        // ★ 初期配布で余った能力カードを customDeck として保持する
         if (customSize > 0 && window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length > 0) {
             this.customDeck = UNORules.shuffle([...window.RuleSettings.customCards].map(id => ({ color: 'black', value: id })));
             this.players.forEach(p => {
@@ -88,7 +88,6 @@ class UNOGame {
         this.unoDeclared = false;
     }
 
-    // ★ マリガン(交換)の処理：手札のカードを専用山札に戻して引き直す
     replaceAbilityCards(playerId, oldCardValues) {
         const hand = this.hands[playerId];
         if (!hand) return;
@@ -120,6 +119,10 @@ class UNOGame {
                 this.currentPlayer.shield.turns--;
                 if (this.currentPlayer.shield.turns <= 0) this.currentPlayer.shield.level = 0;
             }
+            if (this.currentPlayer.evasion && this.currentPlayer.evasion.turns > 0) {
+                this.currentPlayer.evasion.turns--;
+                if (this.currentPlayer.evasion.turns <= 0) this.currentPlayer.evasion.level = 0;
+            }
 
             if (this.hands[this.currentPlayer.id]) {
                 this.hands[this.currentPlayer.id].forEach(c => {
@@ -131,6 +134,7 @@ class UNOGame {
         this.turnIndex = (this.turnIndex + (this.direction * skipCount) + this.players.length * 10) % this.players.length;
         this.hasDrawnThisTurn = false;
         this.selectedIndices = [];
+        this.raiaReturnedThisTurn = false; // ★ ターン開始時にライアのフラグをリセット
 
         if (this.currentPlayer && this.currentPlayer.burnTurns > 0) {
             if (this.currentPlayer.invincibleTurns <= 0 && !this.currentPlayer.frozenBurnImmune) {
@@ -302,7 +306,7 @@ class UNOGame {
                 const r = Math.floor(Math.random() * candidates.length);
                 const targetCard = candidates.splice(r, 1)[0];
                 targetCard.lockedTurns = (attackerId === targetId) ? turns + 1 : turns; 
-                targetCard.lockedType = type; // ★ ロックの種類(number/symbol)を保存
+                targetCard.lockedType = type; 
             }
         }
     }

@@ -92,7 +92,6 @@ const Renderer = {
             if (p.frozen) overlayHtml += '<div class="status-overlay status-frozen"></div>';
             if (p.burnTurns > 0) overlayHtml += `<div class="status-overlay status-burned"></div>`;
 
-            // ★ ロックされているカードの「種類別」の枚数と一番長いターン数を計算
             let numLockTurns = 0;
             let numLockCount = 0;
             let symLockTurns = 0;
@@ -111,10 +110,11 @@ const Renderer = {
                 }
             });
 
-            // ★ 各種ステータスアイコンの表示構築
+            // ★ 回避アイコンの追加
             let statusIcons = '';
             if (p.invincibleTurns > 0) statusIcons += `<span style="margin-right:3px;">🔲(${p.invincibleTurns}T)</span>`;
             if (p.shield && p.shield.turns > 0 && p.shield.level > 0) statusIcons += `<span style="margin-right:3px;">🛡️${p.shield.level}(${p.shield.turns}T)</span>`;
+            if (p.evasion && p.evasion.turns > 0 && p.evasion.level > 0) statusIcons += `<span style="margin-right:3px;">💨${p.evasion.level}(${p.evasion.turns}T)</span>`;
             if (p.frozen) statusIcons += `<span style="margin-right:3px;">❄️(1T)</span>`;
             if (p.burnTurns > 0) statusIcons += `<span style="margin-right:3px;">🔥(${p.burnTurns}T)</span>`;
             
