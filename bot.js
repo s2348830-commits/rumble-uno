@@ -2,17 +2,15 @@
  * bot.js
  */
 const UNOBot = {
-    play: function(game, botId, settings) {
-        let UNORulesObj = (typeof require !== 'undefined') ? require('./rule.js').UNORules : window.UNORules;
-        let AbilityDefObj = (typeof require !== 'undefined') ? require('./ability.js').AbilityDef : window.AbilityDef;
-
+    play: function(game, botId) {
         const botHand = game.hands[botId];
         const botPlayer = game.players.find(p => p.id === botId);
+        
         const difficulty = botPlayer ? botPlayer.difficulty : '普通'; 
         
         let playableIndices = [];
         for (let i = 0; i < botHand.length; i++) {
-            if (UNORulesObj.canPlaySingle(botHand[i], game.topCard, game.currentColor, game.drawStack, settings, AbilityDefObj)) {
+            if (UNORules.canPlaySingle(botHand[i], game.topCard, game.currentColor, game.drawStack)) {
                 playableIndices.push(i);
             }
         }
@@ -29,44 +27,56 @@ const UNOBot = {
 
             if (abilities.length > 0) {
                 selectedIndex = abilities[Math.floor(Math.random() * abilities.length)];
-            } else if (game.drawStack > 0) {
-                if (difficulty === '優しい') return { action: 'draw' }; 
-            } else if (difficulty === '優しい') {
-                if (numbers.length > 0) selectedIndex = numbers[Math.floor(Math.random() * numbers.length)];
-                else return { action: 'draw' };
+            } 
+            else if (game.drawStack > 0) {
+                if (difficulty === '優しい') {
+                    return { action: 'draw' }; 
+                }
+            }
+            else if (difficulty === '優しい') {
+                if (numbers.length > 0) {
+                    selectedIndex = numbers[Math.floor(Math.random() * numbers.length)];
+                } else {
+                    return { action: 'draw' };
+                }
             } else if (difficulty === '普通') {
-                if (numbers.length > 0) selectedIndex = numbers[Math.floor(Math.random() * numbers.length)];
-                else if (actions.length > 0) selectedIndex = actions[Math.floor(Math.random() * actions.length)];
+                if (numbers.length > 0) {
+                    selectedIndex = numbers[Math.floor(Math.random() * numbers.length)];
+                } else if (actions.length > 0) {
+                    selectedIndex = actions[Math.floor(Math.random() * actions.length)];
+                }
             } else if (difficulty === '強い') {
-                if (actions.length > 0) selectedIndex = actions[Math.floor(Math.random() * actions.length)];
-                else if (numbers.length > 0) selectedIndex = numbers[Math.floor(Math.random() * numbers.length)];
+                if (actions.length > 0) {
+                    selectedIndex = actions[Math.floor(Math.random() * actions.length)];
+                } else if (numbers.length > 0) {
+                    selectedIndex = numbers[Math.floor(Math.random() * numbers.length)];
+                }
             }
 
             const cardToPlay = botHand[selectedIndex];
             const isDraw = (cardToPlay.value === '+2' || cardToPlay.value === 'Wild+4');
             const isNumber = !isActionCard(cardToPlay) && !isAbilityCard(cardToPlay);
             
-            let limit = isDraw ? (settings ? parseInt(settings.maxDrawMultiPlay) : 1) : (isNumber ? (settings ? parseInt(settings.maxMultiPlay) : 1) : 1);
+            let limit = isDraw ? (window.RuleSettings ? parseInt(window.RuleSettings.maxDrawMultiPlay) : 1) : (isNumber ? (window.RuleSettings ? parseInt(window.RuleSettings.maxMultiPlay) : 1) : 1);
             if (isNaN(limit) || limit === 0) limit = 1;
-            if (difficulty === '強い' && isDraw && limit > 1) limit = 1;
+
+            if (difficulty === '強い' && isDraw && limit > 1) {
+                limit = 1;
+            }
 
             let sameCardsIndices = [selectedIndex];
+            
             for (let i = 0; i < botHand.length; i++) {
                 if (i !== selectedIndex && botHand[i].value === cardToPlay.value) {
                     sameCardsIndices.push(i);
                 }
             }
+
             if (limit !== -1) sameCardsIndices = sameCardsIndices.slice(0, limit);
 
-            return { action: 'play', indices: sameCardsIndices, count: 1 };
+            return { action: 'play', indices: sameCardsIndices };
         } else {
-            return { action: 'draw', count: 1 };
+            return { action: 'draw' };
         }
     }
 };
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { UNOBot };
-} else {
-    window.UNOBot = UNOBot;
-}

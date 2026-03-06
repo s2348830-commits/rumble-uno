@@ -12,34 +12,40 @@ class UNOGame {
         this.discardRotations = [];
         this.drawStack = 0;
         this.currentColor = "";
+        this.myId = null; 
+        this.selectedIndices = [];
+        this.unoDeclared = false;
+        this.hasDrawnThisTurn = false;
         this.abilityGraveyard = []; 
         this.customDeck = []; 
-        this.settings = {}; // サーバーから注入される設定を保持
     }
 
+    get isMyTurn() { return this.currentPlayer && this.currentPlayer.id === this.myId; }
     get currentPlayer() { return this.players[this.turnIndex]; }
     get topCard() { return this.discardPile[this.discardPile.length - 1]; }
+    get myHand() { return this.hands[this.myId] || []; }
 
-    setup(slots, settings) {
+    setup(slots, myId) {
         this.players = slots.filter(s => s.type === 'host' || s.type === 'player' || s.type === 'bot');
         this.players.forEach(p => {
-            p.frozen = false; p.burnTurns = 0; p.invincibleTurns = 0; 
-            p.shield = { level: 0, turns: 0 }; p.evasion = { level: 0, turns: 0 }; 
-            p.frozenBurnImmune = false; p.usedRaia = false; p.raiaReturnPending = false;
+            p.frozen = false;
+            p.burnTurns = 0;
+            p.invincibleTurns = 0; 
+            p.shield = { level: 0, turns: 0 }; 
+            p.evasion = { level: 0, turns: 0 }; 
+            p.frozenBurnImmune = false; 
+            p.usedRaia = false; 
+            p.raiaReturnPending = false; // ★ 追加
         });
-        this.settings = settings || {};
+        this.myId = myId;
     }
 
     start() {
-        let UNORulesObj;
-        if (typeof require !== 'undefined') { UNORulesObj = require('./rule.js').UNORules; }
-        else { UNORulesObj = window.UNORules; }
-
-        this.deck = UNORulesObj.createDeck();
+        this.deck = UNORules.createDeck();
         this.abilityGraveyard = [];
         this.customDeck = [];
         
-        if (this.settings && this.settings.randomTurnOrder) {
+        if (window.RuleSettings && window.RuleSettings.randomTurnOrder) {
             for (let i = this.players.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [this.players[i], this.players[j]] = [this.players[j], this.players[i]];
@@ -47,16 +53,16 @@ class UNOGame {
         }
         this.turnIndex = 0; 
 
-        const size = this.settings.initialHandSize ? parseInt(this.settings.initialHandSize) : 7; 
-        const customSize = (this.settings.customCards && this.settings.customCards.length > 0) ? (parseInt(this.settings.initialCustomHandSize) || 2) : 0;
+        const size = (window.RuleSettings && window.RuleSettings.initialHandSize) ? parseInt(window.RuleSettings.initialHandSize) : 7; 
+        const customSize = (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length > 0) ? (parseInt(window.RuleSettings.initialCustomHandSize) || 2) : 0;
                             
         this.hands = {};
         this.players.forEach(p => {
             if(p && p.id) { this.hands[p.id] = this.deck.splice(0, size); }
         });
         
-        if (customSize > 0 && this.settings.customCards && this.settings.customCards.length > 0) {
-            this.customDeck = UNORulesObj.shuffle([...this.settings.customCards].map(id => ({ color: 'black', value: id })));
+        if (customSize > 0 && window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length > 0) {
+            this.customDeck = UNORules.shuffle([...window.RuleSettings.customCards].map(id => ({ color: 'black', value: id })));
             this.players.forEach(p => {
                 if (p && p.id) {
                     for (let i = 0; i < customSize; i++) {
@@ -73,7 +79,7 @@ class UNOGame {
             first = this.deck.pop();
             const isNumber = /^[0-9]$/.test(first.value);
             if (isNumber && first.color !== 'black' && !(first.value && String(first.value).startsWith('id_'))) break;
-            else { this.deck.unshift(first); this.deck = UNORulesObj.shuffle(this.deck); }
+            else { this.deck.unshift(first); this.deck = UNORules.shuffle(this.deck); }
         }
         this.discardPile.push(first);
         this.discardRotations = [0];
@@ -81,10 +87,10 @@ class UNOGame {
         
         this.direction = 1;
         this.drawStack = 0;
+        this.unoDeclared = false;
     }
 
     replaceAbilityCards(playerId, oldCardValues) {
-        let UNORulesObj = (typeof require !== 'undefined') ? require('./rule.js').UNORules : window.UNORules;
         const hand = this.hands[playerId];
         if (!hand) return;
         
@@ -96,7 +102,7 @@ class UNOGame {
             }
         });
         
-        this.customDeck = UNORulesObj.shuffle(this.customDeck);
+        this.customDeck = UNORules.shuffle(this.customDeck);
 
         oldCardValues.forEach(() => {
             if (this.customDeck.length > 0) {
@@ -129,9 +135,12 @@ class UNOGame {
 
         this.turnIndex = (this.turnIndex + (this.direction * skipCount) + this.players.length * 10) % this.players.length;
         this.hasDrawnThisTurn = false;
+        this.selectedIndices = [];
 
         if (this.currentPlayer) {
             this.currentPlayer.usedRaia = false;
+            
+            // ★ ライア回収処理（次のターン開始時）
             if (this.currentPlayer.raiaReturnPending) {
                 const gIdx = this.abilityGraveyard.indexOf('id_33');
                 if (gIdx > -1) {
@@ -147,36 +156,51 @@ class UNOGame {
         if (this.currentPlayer && this.currentPlayer.burnTurns > 0) {
             if (this.currentPlayer.invincibleTurns <= 0 && !this.currentPlayer.frozenBurnImmune) {
                 this.drawCard(this.currentPlayer.id);
+                if (window.isHost && window.socket) {
+                    window.socket.emit('request_draw_animation', { playerId: this.currentPlayer.id, count: 1 });
+                }
             }
             this.currentPlayer.burnTurns--;
         }
     }
 
-    playCards(playerId, indices, settings) {
-        let UNORulesObj = (typeof require !== 'undefined') ? require('./rule.js').UNORules : window.UNORules;
-        let AbilityDefObj = (typeof require !== 'undefined') ? require('./ability.js').AbilityDef : window.AbilityDef;
+    toggleSelect(index) {
+        const card = this.myHand[index];
+        if (!card) return;
+        const foundPos = this.selectedIndices.indexOf(index);
+        if (foundPos > -1) {
+            this.selectedIndices.splice(foundPos, 1);
+        } else {
+            if (this.selectedIndices.length > 0) {
+                const first = this.myHand[this.selectedIndices[0]];
+                if (card.value === first.value) this.selectedIndices.push(index);
+                else this.selectedIndices = [index];
+            } else this.selectedIndices.push(index);
+        }
+    }
 
+    playCards(playerId, indices) {
         const hand = this.hands[playerId];
         const selectedCards = indices.map(i => hand[i]).filter(c => c !== undefined);
         if (selectedCards.length === 0) return { success: false };
 
-        if (UNORulesObj.canPlaySelected(selectedCards, this.topCard, this.currentColor, this.drawStack, settings, AbilityDefObj)) {
+        if (UNORules.canPlaySelected(selectedCards, this.topCard, this.currentColor, this.drawStack)) {
             const lastCard = selectedCards[selectedCards.length - 1];
             
             const isAbility = lastCard.value && String(lastCard.value).startsWith('id_');
             const isAction = !/^[0-9]$/.test(lastCard.value) && !isAbility;
             
-            const willBeActionFinishPenalty = (hand.length === selectedCards.length && isAction && settings && !settings.allowActionFinish);
-            const willBeAbilityFinishPenalty = (hand.length === selectedCards.length && isAbility && settings && !settings.allowAbilityFinish);
+            const willBeActionFinishPenalty = (hand.length === selectedCards.length && isAction && window.RuleSettings && !window.RuleSettings.allowActionFinish);
+            const willBeAbilityFinishPenalty = (hand.length === selectedCards.length && isAbility && window.RuleSettings && !window.RuleSettings.allowAbilityFinish);
             
             if (willBeActionFinishPenalty || willBeAbilityFinishPenalty) {
-                const penalty = willBeActionFinishPenalty ? (parseInt(settings.actionFinishPenalty) || 3) : (parseInt(settings.abilityFinishPenalty) || 3);
+                const penalty = willBeActionFinishPenalty ? (parseInt(window.RuleSettings.actionFinishPenalty) || 3) : (parseInt(window.RuleSettings.abilityFinishPenalty) || 3);
                 for (let i = 0; i < penalty; i++) this.drawCard(playerId);
                 this.nextTurn(1);
                 return { success: false, penalty: true, penaltyReason: willBeActionFinishPenalty ? '記号' : '能力' };
             }
 
-            if (this.drawStack > 0 && isAbility && AbilityDefObj && AbilityDefObj[lastCard.value].type.includes('BL')) {
+            if (this.drawStack > 0 && isAbility && window.AbilityDef && window.AbilityDef[lastCard.value].type.includes('BL')) {
                 this.drawStack = 0;
             }
 
@@ -195,6 +219,8 @@ class UNOGame {
 
             const sortedIndices = [...indices].sort((a, b) => b - a);
             sortedIndices.forEach(i => hand.splice(i, 1));
+            
+            if (playerId === this.myId) this.selectedIndices = [];
 
             if (isAbility) {
                 return { success: true, lastCard: lastCard, isAbility: true };
@@ -206,12 +232,16 @@ class UNOGame {
             const actionCount = selectedCards.length;
 
             if (lastCard.value === 'Skip') {
-                if (this.players.length === 2) this.nextTurn(actionCount * 2); 
-                else this.nextTurn(1 + actionCount);
+                if (this.players.length === 2) {
+                    this.nextTurn(actionCount * 2); 
+                } else {
+                    this.nextTurn(1 + actionCount);
+                }
             }
             else if (lastCard.value === 'Reverse') {
-                if (this.players.length === 2) this.nextTurn(actionCount * 2); 
-                else {
+                if (this.players.length === 2) {
+                    this.nextTurn(actionCount * 2); 
+                } else {
                     if (actionCount % 2 !== 0) this.direction *= -1;
                     this.nextTurn(1);
                 }
@@ -226,9 +256,8 @@ class UNOGame {
     }
 
     drawCard(targetId, ignoreShield = false) {
-        let UNORulesObj = (typeof require !== 'undefined') ? require('./rule.js').UNORules : window.UNORules;
-
         const t = this.players.find(p => p.id === targetId);
+        
         if (t && t.invincibleTurns > 0) return false;
         
         if (!ignoreShield && t && t.shield && t.shield.turns > 0 && t.shield.level > 0) {
@@ -238,7 +267,11 @@ class UNOGame {
         }
 
         if (this.deck.length === 0) {
-            if (this.discardPile.length <= 1) { return false; }
+            if (this.discardPile.length <= 1) {
+                if (typeof window !== 'undefined') window.isGameOver = true; 
+                if (window.isHost && typeof window.socket !== 'undefined') window.socket.emit('announce_draw');
+                return false;
+            }
             const top = this.discardPile.pop();
             const topRot = this.discardRotations.pop();
 
@@ -256,7 +289,7 @@ class UNOGame {
                 }
             }
             
-            this.deck = UNORulesObj.shuffle(newDeck);
+            this.deck = UNORules.shuffle(newDeck);
             this.discardPile = newDiscardPile;
             this.discardRotations = newDiscardRotations;
             
@@ -266,6 +299,9 @@ class UNOGame {
 
         if (this.hands[targetId] && this.deck.length > 0) {
             this.hands[targetId].push(this.deck.pop());
+            if (targetId === this.myId && this.hands[targetId].length > 1) {
+                this.unoDeclared = false;
+            }
             return true;
         }
         return false;
@@ -292,10 +328,4 @@ class UNOGame {
             }
         }
     }
-}
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { UNOGame };
-} else {
-    window.UNOGame = UNOGame;
 }

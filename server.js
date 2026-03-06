@@ -4,25 +4,24 @@ const fs = require('fs');
 const path = require('path');
 const { Server } = require('socket.io');
 
-// サーバー側でゲームロジックを読み込む
-const { UNORules } = require('./rule.js');
-const { AbilityDef, AbilityEngine } = require('./ability.js');
-const { UNOGame } = require('./game.js');
-const { UNOBot } = require('./bot.js');
-
 const PORT = process.env.PORT || 3000;
 
 const mimeTypes = {
     '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
     '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpg', '.gif': 'image/gif',
-    '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.mov': 'video/quicktime', '.mp4': 'video/mp4'
+    '.mp3': 'audio/mpeg', 
+    '.wav': 'audio/wav',
+    '.mov': 'video/quicktime', // ★ 追加: movファイルを許可
+    '.mp4': 'video/mp4'
 };
 
 const server = http.createServer((req, res) => {
+    // ★ 追加: ngrokのヘッダー通信を許可するCORS設定（403エラー対策）
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'ngrok-skip-browser-warning, Content-Type');
     
+    // ブラウザからの事前確認(OPTIONS)にはOK(204)を返す
     if (req.method === 'OPTIONS') {
         res.writeHead(204);
         res.end();
@@ -30,6 +29,7 @@ const server = http.createServer((req, res) => {
     }
 
     let filePath = '.' + req.url.split('?')[0];
+    
     if (filePath === './') filePath = './index.html';
     const extname = String(path.extname(filePath)).toLowerCase();
     const contentType = mimeTypes[extname] || 'application/octet-stream';
@@ -57,40 +57,13 @@ const io = new Server(server, {
 
 let rooms = {};
 
-// サーバー側からの状態同期用関数
-function broadcastGameState(roomId, attackGuides = []) {
-    const room = rooms[roomId];
-    if (!room || !room.game) return;
-    
-    const playersInfo = room.game.players.map(p => ({ 
-        id: p.id, connected: p.connected, frozen: p.frozen, burnTurns: p.burnTurns, 
-        invincibleTurns: p.invincibleTurns, shield: p.shield, evasion: p.evasion, usedRaia: p.usedRaia 
-    }));
-    
-    const state = {
-        deck: room.game.deck, turnIndex: room.game.turnIndex, direction: room.game.direction,
-        hands: room.game.hands, discardPile: room.game.discardPile, discardRotations: room.game.discardRotations,
-        drawStack: room.game.drawStack, currentColor: room.game.currentColor, playersInfo: playersInfo,
-        hasDrawnThisTurn: room.game.hasDrawnThisTurn,
-        defensePhase: room.game.pendingDefense ? room.game.pendingDefense.info : null,
-        defenseTimer: room.game.pendingDefense ? room.game.pendingDefense.timer : 0,
-        attackGuides: attackGuides,
-        abilityGraveyard: room.game.abilityGraveyard,
-        jankenPhase: room.game.pendingJanken,
-        customDeck: room.game.customDeck 
-    };
-    
-    io.to(roomId).emit('update_game_state', state);
-}
-
 io.on('connection', (socket) => {
     socket.on('create_room', (userData) => {
         const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
         rooms[roomId] = {
             id: roomId, host: socket.id, gameStarted: false,
             slots: [{ id: socket.id, userId: userData.userId, type: 'host', name: userData.name, icon: userData.icon, ready: true, connected: true }],
-            settings: null,
-            game: new UNOGame() // サーバー側でゲームを管理
+            settings: null 
         };
         socket.join(roomId);
         socket.roomId = roomId; socket.userId = userData.userId;
@@ -110,22 +83,9 @@ io.on('connection', (socket) => {
                 const isHostUser = (slot.type === 'host');
                 if (isHostUser) room.host = socket.id;
 
-                // ゲーム中の復帰処理
-                if (room.gameStarted && room.game) {
-                    const p = room.game.players.find(p => p.id === oldId);
-                    if (p) p.id = socket.id;
-                    if (room.game.hands[oldId]) {
-                        room.game.hands[socket.id] = room.game.hands[oldId];
-                        delete room.game.hands[oldId];
-                    }
-                }
-
                 socket.emit('room_joined', { roomId, isHost: isHostUser, myId: socket.id, state: room });
                 socket.to(roomId).emit('player_reconnected', { oldId, newId: socket.id, newName: userData.name, newIcon: userData.icon });
-                
-                if (room.gameStarted) broadcastGameState(roomId);
-                else io.to(roomId).emit('room_state_update', room);
-
+                io.to(roomId).emit('room_state_update', room);
             } else if (!room.gameStarted) {
                 const emptySlotIndex = room.slots.findIndex(s => s.type === 'empty');
                 if (emptySlotIndex !== -1) {
@@ -171,11 +131,17 @@ io.on('connection', (socket) => {
             const personalities = ['破天荒', '慎重', '攻撃的', '統制'];
 
             if (slot.type === 'empty') {
+                const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
                 room.slots[index] = { 
                     id: 'bot_' + Math.random().toString(36).substring(2), 
                     userId: 'bot_user_' + Math.random(), 
-                    type: 'bot', name: botNames[Math.floor(Math.random() * botNames.length)], icon: botIcons[0], 
-                    ready: true, connected: true, personality: personalities[Math.floor(Math.random() * personalities.length)], difficulty: '普通' 
+                    type: 'bot', 
+                    name: botNames[Math.floor(Math.random() * botNames.length)], 
+                    icon: botIcons[0], 
+                    ready: true, 
+                    connected: true,
+                    personality: randomPersonality,
+                    difficulty: '普通' 
                 };
             } else if (slot.type === 'bot') {
                 room.slots[index] = { id: null, userId: null, type: 'empty', name: '空き枠', icon: null, ready: false, connected: false };
@@ -225,20 +191,13 @@ io.on('connection', (socket) => {
         }
     });
 
-    // ゲーム開始（サーバー主導）
     socket.on('start_game', () => {
         const room = rooms[socket.roomId];
         if (room && room.host === socket.id && !room.gameStarted) {
             const allReady = room.slots.filter(s => s.type === 'player').every(s => s.ready);
             if (allReady) {
                 room.gameStarted = true;
-                room.game.setup(room.slots, room.settings);
-                room.game.start();
-                
-                // 送信時にはgameインスタンス全体を送らない（クライアントにはdeckやhandsだけ送る）
-                const stateToSend = { ...room, game: undefined };
-                io.to(socket.roomId).emit('game_started', stateToSend);
-                broadcastGameState(socket.roomId);
+                io.to(socket.roomId).emit('game_started', room);
             }
         }
     });
@@ -252,100 +211,25 @@ io.on('connection', (socket) => {
         }
     });
 
-    // クライアントからのアクション（プレイ・ドローなど）をサーバーで処理
+    socket.on('sync_game_state', (state) => socket.to(socket.roomId).emit('update_game_state', state));
+    socket.on('request_sync_state', () => {
+        const room = rooms[socket.roomId];
+        if (room && room.host) io.to(room.host).emit('force_sync_state');
+    });
+
     socket.on('player_action', (data) => {
         const room = rooms[socket.roomId];
-        if (!room || !room.gameStarted) return;
-        const game = room.game;
-        const playerId = socket.id;
-
-        if (data.action === 'play') {
-            io.to(socket.roomId).emit('play_animation', { playerId: playerId, cards: data.cards });
-            const result = game.playCards(playerId, data.indices, room.settings);
-            if (result.success) {
-                // 能力等の解決ロジックをここに組み込む（今回はgame.js内で完結させる設計に寄せます）
-                if (result.lastCard.color === 'black') {
-                    io.to(playerId).emit('show_color_selector');
-                }
-            }
-            broadcastGameState(socket.roomId);
-        } else if (data.action === 'play_ability') {
-            io.to(socket.roomId).emit('play_animation', { playerId: playerId, cards: data.cards, isHV: data.isHV });
-            // ここで AbilityEngine.resolve などを呼び出す
-            broadcastGameState(socket.roomId);
-        } else if (data.action === 'draw') {
-            io.to(socket.roomId).emit('draw_animation', { playerId: playerId, count: data.count });
-            for(let i=0; i<data.count; i++) game.drawCard(playerId);
-            broadcastGameState(socket.roomId);
-        } else if (data.action === 'end_turn') {
-            game.nextTurn(1);
-            broadcastGameState(socket.roomId);
-        } else if (data.action === 'color') {
-            game.currentColor = data.color;
-            game.nextTurn(1);
-            broadcastGameState(socket.roomId);
+        if (room && room.host) {
+            data.playerId = socket.id;
+            io.to(room.host).emit('receive_player_action', data);
         }
     });
 
-    socket.on('janken_choice', (data) => {
-        const room = rooms[socket.roomId];
-        if (!room || !room.gameStarted || !room.game || !room.game.pendingJanken) return;
-
-        const janken = room.game.pendingJanken;
-
-        // プレイヤーの選択を記録
-        if (socket.id === janken.attackerId) janken.attackerHand = data.choice;
-        if (socket.id === janken.targetId) janken.targetHand = data.choice;
-
-        // 両者の手が揃ったら勝敗判定
-        if (janken.attackerHand && janken.targetHand) {
-            const aHand = janken.attackerHand;
-            const tHand = janken.targetHand;
-            let result = ''; // attacker視点
-
-            if (aHand === tHand) result = 'draw';
-            else if ((aHand === 'gu' && tHand === 'choki') || 
-                     (aHand === 'choki' && tHand === 'pa') || 
-                     (aHand === 'pa' && tHand === 'gu')) {
-                result = 'win';
-            } else {
-                result = 'lose';
-            }
-
-            janken.result = result;
-            const AbilityEngineObj = require('./ability.js').AbilityEngine;
-
-            // アニメーション用に一旦結果をブロードキャスト
-            broadcastGameState(socket.roomId);
-
-            // 演出待ちをしてから結果を適用
-            setTimeout(() => {
-                // 初回は結果に関わらずターゲットが2ドロー
-                if (janken.loopCount === 1) {
-                    AbilityEngineObj.applyDraw(room.game, janken.targetId, 2, false);
-                } 
-                // 2回目以降で勝った場合はターゲットが2ドロー
-                else if (result === 'win') {
-                    AbilityEngineObj.applyDraw(room.game, janken.targetId, 2, false);
-                }
-
-                // 勝った場合で、まだ最大回数(4回)に達していないなら再戦（ループ）
-                if (result === 'win' && janken.loopCount < 4) {
-                    janken.loopCount++;
-                    janken.attackerHand = null;
-                    janken.targetHand = null;
-                    janken.result = null;
-                } else {
-                    // 負けた、あいこ、または最大回数に達した場合はループ終了
-                    room.game.pendingJanken = null;
-                }
-                
-                // 次のフェーズへ状態を更新して送信（ここで pendingJanken が null ならクライアント側のUIが消える）
-                broadcastGameState(socket.roomId);
-            }, 3000); // 3秒間結果を表示してから次の処理へ（時間はUIに合わせて調整してください）
-        }
-    });
-
+    socket.on('declare_uno', (data) => io.to(socket.roomId).emit('broadcast_uno', data));
+    socket.on('request_play_animation', (data) => io.to(socket.roomId).emit('play_animation', data));
+    socket.on('request_draw_animation', (data) => io.to(socket.roomId).emit('draw_animation', data));
+    socket.on('request_color_select', (targetId) => io.to(targetId).emit('show_color_selector'));
+    
     socket.on('send_chat', (data) => {
         io.to(data.roomId).emit('receive_chat', data);
     });
@@ -364,7 +248,7 @@ io.on('connection', (socket) => {
                 if (slot) {
                     if (room.gameStarted) {
                         slot.connected = false;
-                        broadcastGameState(roomId);
+                        io.to(roomId).emit('room_state_update', room);
                     } else {
                         const slotIndex = room.slots.indexOf(slot);
                         room.slots[slotIndex] = { id: null, userId: null, type: 'empty', name: '空き枠', icon: null, ready: false, connected: false };
@@ -378,7 +262,7 @@ io.on('connection', (socket) => {
 
 server.listen(PORT, '0.0.0.0', () => {
     console.log('===================================================');
-    console.log(`✅ サーバー主導(Authoritative) UNO サーバー起動！`);
-    console.log(`http://localhost:${PORT}`);
+    console.log(`✅ サーバー起動！`);
+    console.log(`http://localhost:3000`);
     console.log('===================================================');
 });
