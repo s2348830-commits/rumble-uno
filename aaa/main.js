@@ -50,9 +50,6 @@ window.ensureModalsExist = function() {
             <button id="btn-cancel-graveyard" style="margin-top:15px; padding:8px 15px; background:#777; color:white; border:none; border-radius:8px; cursor:pointer;">キャンセル</button>
         `;
         document.body.appendChild(gyModal);
-        document.getElementById('btn-cancel-graveyard').onclick = () => {
-            gyModal.classList.add('hidden');
-        };
     }
     if (!document.getElementById('debuff-modal')) {
         const dbModal = document.createElement('div');
@@ -201,7 +198,6 @@ window.SE = {
         
         let ext = 'mp3';
         if (name === 'fire' || name === 'page') ext = 'wav';
-        // ★ 削除: .movの例外処理と new Audio() を消去し、すべて安全なWeb Audio APIで鳴らすように統一
 
         if (!this.audioCtx) this.initContext();
         if (!this.buffers[name]) {
@@ -240,13 +236,8 @@ window.SE = {
 const unlockAudioContext = () => {
     if (window.SE.unlocked) return; window.SE.unlocked = true; window.SE.initContext();
     if (window.SE.audioCtx.state === 'suspended') window.SE.audioCtx.resume();
-    
-    // ★ 修正: .mp3のリストに hv/id_20(1), hv/id_20(2), hv/id_25, hv/id_26 を追加
     ['win', 'win2', 'setting', 'draw', 'uno_message', 'buttonclick', 'uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6', 'frieze', 'rock', 'Distribute', 'mvp_1', 'mvp_2', 'hv/id_20(1)', 'hv/id_20(2)', 'hv/id_25', 'hv/id_26'].forEach(name => window.SE.loadSound(name, 'mp3'));
     ['fire', 'page'].forEach(name => window.SE.loadSound(name, 'wav'));
-    
-    // ★ 削除: ['hv/id_20(1)', ...].forEach(name => window.SE.loadSound(name, 'mov')); の行を消す
-    
     document.removeEventListener('click', unlockAudioContext);
     document.removeEventListener('touchstart', unlockAudioContext);
 };
@@ -349,7 +340,8 @@ window.broadcastGameState = function(skipUIUpdate = false, attackGuides = []) {
         defenseTimer: window.pendingDefense ? window.pendingDefense.timer : 0,
         attackGuides: attackGuides,
         abilityGraveyard: window.game.abilityGraveyard,
-        jankenPhase: window.pendingJanken 
+        jankenPhase: window.pendingJanken,
+        customDeck: window.game.customDeck 
     };
     if (window.socket) window.socket.emit('sync_game_state', state);
     if (!skipUIUpdate) window.updateUI();
@@ -684,9 +676,9 @@ window.showAbilityCutin = function(cardValue, isHVActivated = false) {
         const rand = Math.random() < 0.5 ? 1 : 2;
         if (window.SE) window.SE.play(`hv/id_20(${rand})`);
     } else if (cardValue === 'id_25') {
-        if (window.SE) window.SE.play(`hv/id_26`);
-    } else if (cardValue === 'id_26') {
         if (window.SE) window.SE.play(`hv/id_25`);
+    } else if (cardValue === 'id_26') {
+        if (window.SE) window.SE.play(`hv/id_26`);
     } else {
         const randMvp = Math.random() < 0.5 ? 1 : 2;
         if (window.SE) window.SE.play(`mvp_${randMvp}`);
@@ -813,7 +805,7 @@ window.openGraveyardSelection = function(callback) {
         if(confirm("対象となるSSR以下のカードが墓地にありません。\n適用されない効果がありますが、それでも実行しますか？")) {
             callback(null);
         } else {
-            callback(false);
+            callback(false); // キャンセル
         }
         return;
     }
@@ -825,7 +817,8 @@ window.openGraveyardSelection = function(callback) {
     list.forEach(id => {
         const btn = document.createElement('img');
         btn.src = `card/custom/${id}.png`;
-        btn.style.width = '60px'; btn.style.cursor = 'pointer';
+        btn.style.width = '60px';
+        btn.style.cursor = 'pointer';
         btn.onclick = () => {
             modal.classList.add('hidden');
             callback(id);
@@ -911,7 +904,8 @@ window.showDefenseModal = function(attackCardValue) {
         list.innerHTML = '';
         defCards.forEach(item => {
             const btn = Renderer.createCardElement(item.card);
-            btn.style.width = '50px'; btn.style.height = '75px'; btn.style.margin = '5px'; btn.style.cursor = 'pointer';
+            btn.style.width = '50px'; btn.style.height = '75px';
+            btn.style.margin = '5px'; btn.style.cursor = 'pointer';
             btn.onclick = () => {
                 const def = window.AbilityDef[item.card.value];
                 
@@ -1015,7 +1009,6 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                     if (actualDefDiscardIdx !== null && cIdx < actualDefDiscardIdx) actualDefDiscardIdx--;
                     const playedDefCard = tHand.splice(cIdx, 1)[0];
                     
-                    // ★ 修正: 防御で使った能力カードは墓地へ送る
                     if(!window.game.abilityGraveyard) window.game.abilityGraveyard = [];
                     window.game.abilityGraveyard.push(playedDefCard.value);
 
@@ -1029,7 +1022,6 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                     blocked = true;
                 }
                 
-                // コストの破棄処理
                 if (actualDefDiscardIdx !== null && tHand && tHand.length > actualDefDiscardIdx) {
                     const discCard = tHand.splice(actualDefDiscardIdx, 1)[0];
                     if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: targetId, cards: [discCard] });
@@ -1227,7 +1219,6 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                 
                 let guides = [];
 
-                // ★ 追加: 能力に対する各プレイヤーの防御カードを消費・処理する
                 if (finalResponses) {
                     Object.keys(finalResponses).forEach(tid => {
                         const resp = finalResponses[tid];
@@ -1252,7 +1243,6 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                                 guides.push({ from: tid, to: tid, text: '防ぐ!' });
                             }
                             
-                            // コストの処理
                             if (actualDefDiscardIdx !== null && tHand && tHand.length > actualDefDiscardIdx) {
                                 const discCard = tHand.splice(actualDefDiscardIdx, 1)[0];
                                 if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: tid, cards: [discCard] });
@@ -1429,7 +1419,7 @@ window.resolveJanken = function() {
         if (!someoneWon) {
             const nextLoop = pJ.loopCount + 1;
             const aId = pJ.attackerId;
-            const tId = pJ.targetId;
+            const tId = pJ.targetId; 
             window.pendingJanken = null;
             window.broadcastGameState();
 
@@ -1514,14 +1504,16 @@ window.playJankenResult = function(attackerId, targetId, aH, tH, result) {
         if (p1Card) p1Card.style.borderTop = '10px solid #fbc02d';
         if (p2Res) { p2Res.innerText = 'Lose'; p2Res.style.color = '#7e57c2'; }
         if (p2Card) p2Card.style.borderTop = '10px solid #7e57c2';
+        
         if (window.myId === attackerId) { if(window.SE) window.SE.play('win'); }
         else if (window.myId === targetId) { if(window.SE) window.SE.play('win2'); }
         
         if (window.SE) {
             setTimeout(() => {
-                window.SE.play('hv/id_25'); 
-            }, 1500); 
+                window.SE.play('hv/id_26'); 
+            }, 500); 
         }
+
     } else if (result === 'lose') {
         if (p1Res) { p1Res.innerText = 'Lose'; p1Res.style.color = '#7e57c2'; }
         if (p1Card) p1Card.style.borderTop = '10px solid #7e57c2';
@@ -1821,7 +1813,7 @@ window.executeEndTurn = function(playerId) {
 window.checkWin = function(playerId) {
     if (window.game.hands[playerId] && window.game.hands[playerId].length === 0) {
         window.isGameOver = true; 
-        if (window.SE) window.SE.stopLoop('final_sprint');
+        if (window.SE) window.SE.stopLoop('final_sprint'); 
         window.broadcastGameState(); 
         const winner = window.game.players.find(p => p.id === playerId);
         let winnerName = winner ? winner.name : "不明なプレイヤー";
