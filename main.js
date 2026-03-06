@@ -1939,11 +1939,14 @@ window.handlePlayAction = function() {
     const def = isAbility && window.AbilityDef ? window.AbilityDef[selectedCards[0].value] : null;
 
     // ▼▼▼ ここから書き換え ▼▼▼
-    // ★ 修正: BL専用カードは直接使用できるが効果は発動せず空打ちになる
+    // ★ 修正: 未定義エラーを回避するため、すでに定義されている window.game.selectedIndices と selectedCards を利用する
     if (isAbility && def && def.type === 'BL') {
+        const indicesToSend = [...window.game.selectedIndices]; 
+        const cardsToSend = [...selectedCards];
         window.game.selectedIndices = []; window.updateUI();
-        const indicesToSend = [...indices]; const cardsToSend = [...playedCards];
-        window.animateSequentialPlay(indices, window.game, () => {
+        
+        // ★ indices ではなく indicesToSend を渡すように修正
+        window.animateSequentialPlay(indicesToSend, window.game, () => {
             if (window.isHost) {
                 if (window.socket) window.socket.emit('request_play_animation', { playerId: window.game.myId, cards: cardsToSend });
                 window.executeAbilityPlay(window.game.myId, indicesToSend, null, null, null, [], {});
