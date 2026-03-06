@@ -12,8 +12,11 @@ window.isDefending = false;
 window.pendingDrawDefenseInfo = null; 
 window.pendingJanken = null;
 
-// 連打防止用のロックフラグ
 window.isProcessingPlay = false;
+
+window.currentDefensePhaseId = null;
+window.hasRespondedDefense = false;
+window.currentJankenLoopId = null; 
 
 window.JANKEN_BACK_IMG = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 60'%3E%3Crect width='40' height='60' rx='6' fill='%23222' stroke='%23444' stroke-width='2'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23fff' font-size='24' font-family='sans-serif' font-weight='bold'%3E?%3C/text%3E%3C/svg%3E";
 
@@ -130,7 +133,7 @@ window.ensureModalsExist = function() {
         const jOverlay = document.createElement('div');
         jOverlay.id = 'janken-overlay';
         jOverlay.className = 'hidden';
-        jOverlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.95); z-index:110000; display:flex; flex-direction:column; justify-content:center; align-items:center;";
+        jOverlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.95); z-index:110000; display:flex; flex-direction:column; justify-content:center; align-items:center; padding-bottom: 10vh; box-sizing: border-box;";
         jOverlay.innerHTML = `
             <h2 id="janken-title" style="color:white; font-style:italic; margin-bottom: 5px;">じゃんけん 勝負！</h2>
             <div id="janken-subtitle" style="color:#aaa; font-size:14px; margin-bottom:15px;">Loop: 1/4</div>
@@ -278,16 +281,27 @@ window.checkFinalSprint = function() {
 
 window.updatePhaseUI = function(state) {
     if (state.defensePhase) {
-        const { attackerId, cardValue, targets } = state.defensePhase;
+        const { attackerId, cardValue, targets, phaseId } = state.defensePhase;
         if (targets && targets.includes(window.myId) && window.myId !== attackerId) {
-            if (!window.isDefending) {
+            if (window.currentDefensePhaseId !== phaseId) {
+                window.currentDefensePhaseId = phaseId;
+                window.hasRespondedDefense = false;
                 window.isDefending = true;
                 if (typeof window.showDefenseModal === 'function') window.showDefenseModal(cardValue);
             }
-            const timerText = document.getElementById('defense-timer-text');
-            if (timerText) timerText.innerText = state.defenseTimer;
+            if (window.hasRespondedDefense) {
+                const modal = document.getElementById('defense-modal');
+                const discModal = document.getElementById('discard-modal');
+                if (modal) modal.classList.add('hidden');
+                if (discModal) discModal.classList.add('hidden');
+            } else {
+                const timerText = document.getElementById('defense-timer-text');
+                if (timerText) timerText.innerText = state.defenseTimer;
+            }
         }
     } else {
+        window.currentDefensePhaseId = null;
+        window.hasRespondedDefense = false;
         window.isDefending = false;
         const modal = document.getElementById('defense-modal');
         const discModal = document.getElementById('discard-modal');
@@ -323,6 +337,7 @@ window.updatePhaseUI = function(state) {
     } else {
         window.isJankenShowing = false;
         window.jankenResultPlayed = false;
+        window.currentJankenLoopId = null; 
         const jOverlay = document.getElementById('janken-overlay');
         if (jOverlay && !jOverlay.classList.contains('result-showing')) jOverlay.classList.add('hidden');
     }
@@ -353,7 +368,10 @@ window.broadcastGameState = function(skipUIUpdate = false, attackGuides = []) {
 
     if (attackGuides && attackGuides.length > 0) {
         attackGuides.forEach(g => {
-            if (typeof window.showAttackGuide === 'function') window.showAttackGuide(g.from, g.to, g.text, g.se);
+            const delay = g.delay || 0;
+            setTimeout(() => {
+                if (typeof window.showAttackGuide === 'function') window.showAttackGuide(g.from, g.to, g.text, g.se);
+            }, delay);
         });
     }
 };
@@ -808,7 +826,7 @@ window.openGraveyardSelection = function(callback) {
         if(confirm("対象となるSSR以下のカードが墓地にありません。\n適用されない効果がありますが、それでも実行しますか？")) {
             callback(null);
         } else {
-            callback(false);
+            callback(false); 
         }
         return;
     }
@@ -900,6 +918,7 @@ window.showDefenseModal = function(attackCardValue) {
             alert('手札に防御カード(BL)がありません！');
             return;
         }
+        window.hasRespondedDefense = true; 
         qArea.classList.add('hidden');
         sArea.classList.remove('hidden');
         
@@ -931,12 +950,14 @@ window.showDefenseModal = function(attackCardValue) {
     };
 
     btnNo.onclick = () => {
+        window.hasRespondedDefense = true; 
         modal.classList.add('hidden'); 
         if(window.socket) window.socket.emit('player_action', { action: 'defense_response', targetId: window.game.myId, cardValue: null, discardIdx: null });
         window.isDefending = false;
     };
 
     btnCancel.onclick = () => {
+        window.hasRespondedDefense = false;
         qArea.classList.remove('hidden');
         sArea.classList.add('hidden');
     };
@@ -976,7 +997,7 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
     window.pendingDefense = { 
         timer: 30, 
         responses: responses,
-        info: { attackerId: attackerId, cardValue: cardValue, targets: [targetId] }
+        info: { attackerId: attackerId, cardValue: cardValue, targets: [targetId], phaseId: Date.now() }
     };
 
     if (Object.keys(responses).length >= 1) window.pendingDefense.timer = 0;
@@ -1019,7 +1040,7 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                         window.showAbilityCutin(defCardId);
                     }
 
-                    defenseGuides.push({ from: targetId, to: targetId, text: '防ぐ!' });
+                    defenseGuides.push({ from: targetId, to: targetId, text: '防ぐ!', delay: 2500 });
                     blocked = true;
                 }
                 
@@ -1065,13 +1086,13 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                     if(targetP) targetP.shield = { level: 1, turns: 2 };
                 } else if (defCardId === 'id_19') {
                     window.AbilityEngine.applyDraw(window.game, attackerId, 1);
-                    defenseGuides.push({ from: targetId, to: attackerId, text: 'ヴィンディ' });
+                    defenseGuides.push({ from: targetId, to: attackerId, text: 'ヴィンディ', delay: 2500 });
                 } else if (defCardId === 'id_30') {
                     const others = window.game.players.filter(px => px.id !== targetId && px.connected);
                     if (others.length > 0) {
                         const bt = others[Math.floor(Math.random() * others.length)];
                         window.AbilityEngine.applyBurn(window.game, bt.id, 1);
-                        defenseGuides.push({ from: targetId, to: bt.id, text: '🔥燃焼(1T)' });
+                        defenseGuides.push({ from: targetId, to: bt.id, text: '🔥燃焼(1T)', delay: 2500 });
                     }
                     const targetP = window.game.players.find(p=>p.id===targetId);
                     if (targetP) targetP.shield = { level: 1, turns: 1 };
@@ -1081,7 +1102,7 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                         if (!targetP.shield) targetP.shield = { level: 0, turns: 0 };
                         targetP.shield.level += 3;
                         targetP.shield.turns += 3;
-                        defenseGuides.push({ from: targetId, to: targetId, text: '🛡️シールド強化!' });
+                        defenseGuides.push({ from: targetId, to: targetId, text: '🛡️シールド強化!', delay: 2500 });
                     }
                 }
             }
@@ -1201,6 +1222,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
         if (cardValue === 'id_28' || !needsDefense) {
             let guides = [];
             if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, responses, multiplier, selectedColor, multiCards, extraData);
+            guides.forEach(g => { if(g.delay === undefined) g.delay = 2500; });
             window.broadcastGameState(false, guides);
 
             let someoneWon = false;
@@ -1216,7 +1238,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
         window.pendingDefense = { 
             timer: 30, 
             responses: responses,
-            info: { attackerId: playerId, cardValue: cardValue, targets: targets }
+            info: { attackerId: playerId, cardValue: cardValue, targets: targets, phaseId: Date.now() }
         };
 
         if (Object.keys(responses).length >= targets.length) window.pendingDefense.timer = 0;
@@ -1259,7 +1281,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                                 if (tid !== window.game.myId && typeof window.showAbilityCutin === 'function') {
                                     window.showAbilityCutin(defCardId);
                                 }
-                                guides.push({ from: tid, to: tid, text: '防ぐ!' });
+                                guides.push({ from: tid, to: tid, text: '防ぐ!', delay: 2500 });
                             }
                             
                             if (actualDefDiscardIdx !== null && tHand && tHand.length > actualDefDiscardIdx) {
@@ -1304,13 +1326,13 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                                 if(targetP) targetP.shield = { level: 1, turns: 2 };
                             } else if (defCardId === 'id_19') {
                                 window.AbilityEngine.applyDraw(window.game, playerId, 1);
-                                guides.push({ from: tid, to: playerId, text: 'ヴィンディ' });
+                                guides.push({ from: tid, to: playerId, text: 'ヴィンディ', delay: 2500 });
                             } else if (defCardId === 'id_30') {
                                 const others = window.game.players.filter(px => px.id !== tid && px.connected);
                                 if (others.length > 0) {
                                     const bt = others[Math.floor(Math.random() * others.length)];
                                     window.AbilityEngine.applyBurn(window.game, bt.id, 1);
-                                    guides.push({ from: tid, to: bt.id, text: '🔥燃焼(1T)' });
+                                    guides.push({ from: tid, to: bt.id, text: '🔥燃焼(1T)', delay: 2500 });
                                 }
                                 const targetP = window.game.players.find(p=>p.id===tid);
                                 if (targetP) targetP.shield = { level: 1, turns: 1 };
@@ -1320,14 +1342,19 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                                     if (!targetP.shield) targetP.shield = { level: 0, turns: 0 };
                                     targetP.shield.level += 3;
                                     targetP.shield.turns += 3;
-                                    guides.push({ from: tid, to: tid, text: '🛡️シールド強化!' });
+                                    guides.push({ from: tid, to: tid, text: '🛡️シールド強化!', delay: 2500 });
                                 }
                             }
                         }
                     });
                 }
 
-                if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, finalResponses, multiplier, selectedColor, multiCards, extraData).concat(guides);
+                if (window.AbilityEngine) {
+                    let resolveGuides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, finalResponses, multiplier, selectedColor, multiCards, extraData);
+                    guides = resolveGuides.concat(guides);
+                }
+                guides.forEach(g => { if(g.delay === undefined) g.delay = 2500; });
+
                 window.broadcastGameState(false, guides);
 
                 let someoneWon = false;
@@ -1346,6 +1373,8 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
     } else {
         let guides = [];
         if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, {}, multiplier, selectedColor, multiCards, extraData);
+        guides.forEach(g => { if(g.delay === undefined) g.delay = 2500; });
+        
         window.broadcastGameState(false, guides);
 
         let someoneWon = false;
@@ -1441,7 +1470,7 @@ window.resolveJanken = function() {
         
         if (drawCount > 0) {
             window.AbilityEngine.applyDraw(window.game, pJ.targetId, drawCount, false);
-            const guides = [{ from: pJ.attackerId, to: pJ.targetId, text: 'じゃんけんドロー!' }];
+            const guides = [{ from: pJ.attackerId, to: pJ.targetId, text: 'じゃんけんドロー!', delay: 0 }];
             window.broadcastGameState(false, guides);
         }
 
@@ -1475,7 +1504,14 @@ window.showJankenUI = function(attackerId, targetId, loopCount) {
     let overlay = document.getElementById('janken-overlay');
     if (!overlay) return;
 
+    const jankenLoopId = `${attackerId}-${targetId}-${loopCount}`;
+    if (window.currentJankenLoopId !== jankenLoopId) {
+        window.currentJankenLoopId = jankenLoopId;
+        if (window.SE) window.SE.play('hv/id_26');
+    }
+
     overlay.classList.remove('result-showing');
+    overlay.classList.remove('hidden');
     
     const title = document.getElementById('janken-title');
     const subtitle = document.getElementById('janken-subtitle');
@@ -1508,8 +1544,6 @@ window.showJankenUI = function(attackerId, targetId, loopCount) {
             if (title) title.innerText = "じゃんけん観戦中...";
         }
     }
-    
-    overlay.classList.remove('hidden');
 };
 
 window.playJankenResult = function(attackerId, targetId, aH, tH, result) {
@@ -1543,12 +1577,6 @@ window.playJankenResult = function(attackerId, targetId, aH, tH, result) {
         
         if (window.myId === attackerId) { if(window.SE) window.SE.play('win'); }
         else if (window.myId === targetId) { if(window.SE) window.SE.play('win2'); }
-        
-        if (window.SE) {
-            setTimeout(() => {
-                window.SE.play('hv/id_26'); 
-            }, 500); 
-        }
 
     } else if (result === 'lose') {
         if (p1Res) { p1Res.innerText = 'Lose'; p1Res.style.color = '#7e57c2'; }
@@ -1563,13 +1591,6 @@ window.playJankenResult = function(attackerId, targetId, aH, tH, result) {
         if (p2Res) { p2Res.innerText = 'Draw'; p2Res.style.color = '#aaa'; }
         if (p2Card) p2Card.style.borderTop = '10px solid #aaa';
     }
-    
-    setTimeout(() => {
-        if (overlay) {
-            overlay.classList.remove('result-showing');
-            overlay.classList.add('hidden');
-        }
-    }, 4500);
 };
 
 window.checkTurn = function() {
@@ -1807,7 +1828,7 @@ window.executePlay = function(playerId, indices, isBot = false) {
         } else { 
             if (isDrawAttack) {
                 targetId = window.game.currentPlayer.id;
-                guides.push({ from: playerId, to: targetId, text: attackCardVal });
+                guides.push({ from: playerId, to: targetId, text: attackCardVal, delay: 0 }); 
                 if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length > 0) {
                     window.startDrawDefensePhase(playerId, targetId, attackCardVal, guides);
                 } else {
@@ -1837,7 +1858,7 @@ window.executeColor = function(playerId, color) {
     
     if (info) {
         const targetId = window.game.currentPlayer.id;
-        const guides = [{ from: info.attackerId, to: targetId, text: info.cardValue }];
+        const guides = [{ from: info.attackerId, to: targetId, text: info.cardValue, delay: 0 }];
         if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length > 0) {
             window.startDrawDefensePhase(info.attackerId, targetId, info.cardValue, guides);
         } else {
@@ -2061,9 +2082,10 @@ window.handlePlayAction = function() {
             } else { finishAbilityPlay(); }
         }
 
+        window.localRaiaReturnedTurn = window.localRaiaReturnedTurn || -1;
         const stepRaia = () => {
             if (cardValue === 'id_33' && !me.usedRaia) {
-                if (confirm("ライアの効果により、このカードを手札に戻しますか？\n(各ターン1回のみ)")) {
+                if (confirm("ライアの効果により、次の自分のターン開始時にこのカードを手札に戻しますか？\n(各ターン1回のみ)")) {
                     extraData.returnRaia = true;
                     me.usedRaia = true; 
                 }
@@ -2231,6 +2253,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(window.ensureModalsExist) window.ensureModalsExist();
     if(window.initVolumeControl) window.initVolumeControl(); 
 });
+
 window.socket.on('update_game_state', (state) => {
     if (!window.game) return;
     window.game.deck = state.deck; 
@@ -2295,4 +2318,139 @@ window.socket.on('update_game_state', (state) => {
     }
 });
 
-// ↓↓ network.js等に本来あるべき他のソケットイベント（receive_player_action等）が上書きで消えないよう、ここより下のイベント群は既存のまま生かしておいてください。↓↓
+window.socket.on('broadcast_uno', (data) => {
+    if (window.SE) {
+        const unoSounds = ['uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6'];
+        window.SE.play(unoSounds[Math.floor(Math.random() * unoSounds.length)]);
+    }
+    const target = (data.id === window.myId) ? document.getElementById('my-player-info') : document.querySelector(`.circle-player-badge[data-id="${data.id}"]`);
+    if(target) { target.classList.add('uno-pop-badge'); setTimeout(() => target.classList.remove('uno-pop-badge'), 2500); }
+});
+
+window.socket.on('game_over', (data) => {
+    window.isGameOver = true;
+    if (window.SE) window.SE.stopLoop('final_sprint');
+    if (data.isDraw) {
+        if (window.SE) window.SE.play('draw');
+        setTimeout(() => document.getElementById('draw-curtain').classList.add('show'), 100);
+        setTimeout(() => { const b = document.getElementById('winner-banner'); b.innerText = "DRAW"; b.classList.add('show'); }, 3000);
+    } else {
+        if (window.SE) window.SE.play(Math.random() < 0.5 ? 'win' : 'win2');
+        const { winnerId, winnerName } = data;
+        const target = (winnerId === window.myId) ? document.getElementById('my-player-info') : document.querySelector(`.circle-player-badge[data-id="${winnerId}"]`);
+        if(target) target.classList.add('winner-crown');
+        setTimeout(() => {
+            const b = document.getElementById('winner-banner');
+            b.innerText = `${winnerName} が勝ちました。`; b.classList.add('show');
+            if (typeof confetti === 'function') confetti({ particleCount: 150, spread: 80, origin: { x: 0.5, y: 0.5 } });
+        }, 5000);
+    }
+    setTimeout(() => { if (window.isHost) window.socket.emit('return_to_lobby'); }, 8000);
+});
+
+window.socket.on('back_to_lobby', (roomState) => {
+    window.currentRoomState = roomState;
+    window.isGameOver = false; window.isInitialDealing = false;
+    document.getElementById('winner-banner').classList.remove('show');
+    document.getElementById('draw-curtain').classList.remove('show');
+    document.getElementById('game-container').classList.add('hidden'); 
+    document.getElementById('lobby-screen').classList.remove('hidden');
+    
+    const manualBtn = document.getElementById('btn-manual');
+    if (manualBtn) manualBtn.classList.remove('hidden');
+
+    const cia = document.getElementById('chat-input-area');
+    if (cia) {
+        cia.style.display = 'none';
+        cia.classList.add('hidden');
+    }
+    
+    const lcia = document.getElementById('lobby-chat-container');
+    if (lcia && window.ChatManager && window.ChatManager.enabled) lcia.style.display = 'block';
+    
+    if (typeof renderSlots === 'function') renderSlots(roomState);
+});
+
+window.socket.on('receive_player_action', (data) => {
+    if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
+    const playerId = data.playerId;
+    
+    if (data.action === 'play') {
+        window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards });
+        const delay = data.cards.length * 100 + 400;
+        setTimeout(() => {
+            if (typeof window.executePlay === 'function') window.executePlay(playerId, data.indices);
+        }, delay);
+    } else if (data.action === 'play_ability') {
+        window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards, isHV: data.isHV });
+        const delay = data.cards.length * 100 + 400;
+        setTimeout(() => {
+            if (typeof window.executeAbilityPlay === 'function') window.executeAbilityPlay(playerId, data.indices, data.targetId, data.discardIdx, data.selectedColor, data.multiDiscardIndices, data.extraData);
+        }, delay);
+    } else if (data.action === 'defense_response') {
+        if (window.pendingDefense && window.pendingDefense.responses) {
+            window.pendingDefense.responses[data.targetId] = { cardValue: data.cardValue || null, discardIdx: data.discardIdx !== undefined ? data.discardIdx : null };
+            if (window.pendingDefense.info && window.pendingDefense.info.targets) {
+                const targetCount = window.pendingDefense.info.targets.length;
+                const responseCount = Object.keys(window.pendingDefense.responses).length;
+                if (responseCount >= targetCount) {
+                    window.pendingDefense.timer = 0;
+                }
+            }
+        }
+    } else if (data.action === 'draw') {
+        window.socket.emit('request_draw_animation', { playerId: playerId, count: data.count });
+        const delay = data.count * 100 + 400;
+        setTimeout(() => { if (typeof window.executeDraw === 'function') window.executeDraw(playerId); }, delay);
+    } else if (data.action === 'end_turn') {
+        if (typeof window.executeEndTurn === 'function') window.executeEndTurn(playerId);
+    } else if (data.action === 'color') {
+        if (typeof window.executeColor === 'function') window.executeColor(playerId, data.color);
+    } else if (data.action === 'draw_penalty') {
+        window.socket.emit('request_draw_animation', { playerId: playerId, count: data.count });
+        const delay = data.count * 100 + 400;
+        setTimeout(() => {
+            if (typeof window.game !== 'undefined' && typeof window.game.drawCard === 'function') {
+                for(let i=0; i<data.count; i++) window.game.drawCard(playerId);
+                if (typeof window.executeEndTurn === 'function') window.executeEndTurn(playerId); // ペナルティ後はターン終了
+            }
+        }, delay);
+    } else if (data.action === 'ability_reset') {
+        if (window.game && typeof window.game.replaceAbilityCards === 'function') {
+            window.game.replaceAbilityCards(playerId, data.cards);
+            if (typeof window.broadcastGameState === 'function') window.broadcastGameState(true);
+        }
+    } 
+    else if (data.action === 'janken_choice') {
+        if (window.pendingJanken && !window.pendingJanken.result) {
+            if (playerId === window.pendingJanken.attackerId) window.pendingJanken.attackerHand = data.choice;
+            if (playerId === window.pendingJanken.targetId) window.pendingJanken.targetHand = data.choice;
+            if (typeof window.checkJankenReady === 'function') window.checkJankenReady();
+        }
+    }
+});
+
+window.socket.on('play_animation', (data) => {
+    if (data.playerId !== window.myId) {
+        if (typeof window.playOpponentAnimation === 'function') window.playOpponentAnimation(data.playerId, data.cards);
+        if (data.cards && data.cards.length > 0 && data.cards[0].value && String(data.cards[0].value).startsWith('id_')) {
+            if (typeof window.showAbilityCutin === 'function') window.showAbilityCutin(data.cards[0].value, data.isHV); 
+        }
+    }
+});
+
+window.socket.on('draw_animation', (data) => {
+    if (data.playerId !== window.myId) {
+        if (typeof window.drawOpponentAnimation === 'function') window.drawOpponentAnimation(data.playerId, data.count);
+    }
+});
+
+window.socket.on('show_color_selector', () => {
+    if (typeof ColorUI !== 'undefined' && ColorUI.show) ColorUI.show();
+});
+
+window.socket.on('receive_chat', (data) => {
+    if (window.ChatManager && typeof window.ChatManager.showMsg === 'function') {
+        window.ChatManager.showMsg(data.message, data.senderName);
+    }
+});

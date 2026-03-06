@@ -110,7 +110,6 @@ const Renderer = {
                 }
             });
 
-            // ★ 回避アイコンの追加
             let statusIcons = '';
             if (p.invincibleTurns > 0) statusIcons += `<span style="margin-right:3px;">🔲(${p.invincibleTurns}T)</span>`;
             if (p.shield && p.shield.turns > 0 && p.shield.level > 0) statusIcons += `<span style="margin-right:3px;">🛡️${p.shield.level}(${p.shield.turns}T)</span>`;

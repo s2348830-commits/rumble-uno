@@ -39,7 +39,6 @@ window.AbilityDef = {
 };
 
 window.AbilityEngine = {
-    // ★ 回避(Evasion)の判定関数
     checkEvasion: function(target) {
         if (!target || !target.evasion || target.evasion.turns <= 0 || target.evasion.level <= 0) return false;
         let rate = 0;
@@ -53,7 +52,7 @@ window.AbilityEngine = {
         const t = game.players.find(p => p.id === targetId);
         if (!t) return 0;
         if (t.invincibleTurns > 0) return 0; 
-        if (this.checkEvasion(t)) return -1; // -1は回避成功のフラグ
+        if (this.checkEvasion(t)) return -1; 
         
         let actualDrawn = count;
         
@@ -122,7 +121,6 @@ window.AbilityEngine = {
 
         for (let m = 0; m < multiplier; m++) {
             
-            // --- フェイ(id_32)の個別ループ処理 ---
             if (abilityId === 'id_32') {
                 for (let i = 0; i < 3; i++) {
                     if (others.length > 0) {
@@ -134,7 +132,6 @@ window.AbilityEngine = {
                 }
             }
 
-            // --- 攻撃・妨害系の能力処理 ---
             if (def.type === 'AT' || def.type === 'AT_BL') {
                 let actualTargets = [];
                 if (def.needsTarget && selectedTargetId) actualTargets = [selectedTargetId];
@@ -146,7 +143,7 @@ window.AbilityEngine = {
                 actualTargets.forEach(t => {
                     let targetId = t;
                     const resp = defenseResponses[targetId];
-                    if (resp && resp.cardValue) return; // 防御成功時はスキップ
+                    if (resp && resp.cardValue) return;
 
                     let reduceDraw = false;
                     let drawCount = 0;
@@ -209,15 +206,12 @@ window.AbilityEngine = {
                     } else if (abilityId === 'id_33') {
                         drawCount = 1;
                         if (extraData.returnRaia) {
-                            const hand = game.hands[attackerId];
-                            if (hand) hand.push({ color: 'black', value: 'id_33' });
-                            const gIdx = game.abilityGraveyard.indexOf('id_33');
-                            if (gIdx > -1) game.abilityGraveyard.splice(gIdx, 1);
-                            guides.push({ from: attackerId, to: attackerId, text: '手札に戻る' });
-                            
-                            // ★ 追加: 回収後は、リセットされるまで再回収できないようにフラグを立てる
                             const attacker = game.players.find(p => p.id === attackerId);
-                            if (attacker) attacker.usedRaia = true;
+                            if (attacker) {
+                                attacker.usedRaia = true;
+                                attacker.raiaReturnPending = true; // ★ 次のターンに戻るフラグ
+                            }
+                            guides.push({ from: attackerId, to: attackerId, text: '回収待機' });
                         }
                     }
 
@@ -229,7 +223,6 @@ window.AbilityEngine = {
                     }
                 });
 
-                // 攻撃者の自己バフ付与など
                 if (abilityId === 'id_2') {
                     const self = game.players.find(p=>p.id===attackerId);
                     if(self) self.shield = { level: 1, turns: 1 };
@@ -239,7 +232,6 @@ window.AbilityEngine = {
                 }
             }
 
-            // --- 回復・特殊系の能力処理 ---
             if (def.type === 'HE' || def.type === 'HE_BL') {
                 if (abilityId === 'id_3' && costPaid) {
                     guides.push({ from: attackerId, to: attackerId, text: '1枚捨てる' });
@@ -308,7 +300,6 @@ window.AbilityEngine = {
                         else if (extraData.debuffToClear === 'burn') self.burnTurns = 0;
                     }
                     game.players.forEach(p => {
-                        // 自分以外の全員に変更
                         if(p.connected && p.id !== attackerId) {
                             const res = this.applyDraw(game, p.id, 1);
                             if (res === -1) guides.push({ from: attackerId, to: p.id, text: '💨回避!' });

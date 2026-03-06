@@ -34,7 +34,8 @@ class UNOGame {
             p.shield = { level: 0, turns: 0 }; 
             p.evasion = { level: 0, turns: 0 }; 
             p.frozenBurnImmune = false; 
-            p.usedRaia = false; // ★ 追加: ライアの回収済みフラグ
+            p.usedRaia = false; 
+            p.raiaReturnPending = false; // ★ 追加
         });
         this.myId = myId;
     }
@@ -135,8 +136,21 @@ class UNOGame {
         this.turnIndex = (this.turnIndex + (this.direction * skipCount) + this.players.length * 10) % this.players.length;
         this.hasDrawnThisTurn = false;
         this.selectedIndices = [];
+
         if (this.currentPlayer) {
             this.currentPlayer.usedRaia = false;
+            
+            // ★ ライア回収処理（次のターン開始時）
+            if (this.currentPlayer.raiaReturnPending) {
+                const gIdx = this.abilityGraveyard.indexOf('id_33');
+                if (gIdx > -1) {
+                    this.abilityGraveyard.splice(gIdx, 1);
+                    if (this.hands[this.currentPlayer.id]) {
+                        this.hands[this.currentPlayer.id].push({ color: 'black', value: 'id_33' });
+                    }
+                }
+                this.currentPlayer.raiaReturnPending = false;
+            }
         }
 
         if (this.currentPlayer && this.currentPlayer.burnTurns > 0) {
@@ -182,10 +196,7 @@ class UNOGame {
             if (willBeActionFinishPenalty || willBeAbilityFinishPenalty) {
                 const penalty = willBeActionFinishPenalty ? (parseInt(window.RuleSettings.actionFinishPenalty) || 3) : (parseInt(window.RuleSettings.abilityFinishPenalty) || 3);
                 for (let i = 0; i < penalty; i++) this.drawCard(playerId);
-                
-                // ★ ホスト側の処理：ペナルティを受けた場合は強制的に次の人にターンを回す
                 this.nextTurn(1);
-                
                 return { success: false, penalty: true, penaltyReason: willBeActionFinishPenalty ? '記号' : '能力' };
             }
 

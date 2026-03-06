@@ -60,7 +60,6 @@ body {
 .cp-name { font-size: 11px; color: #ddd; font-weight: bold; }
 .cp-cards { font-size: 10px; background: #d32f2f; color: white; padding: 2px 5px; border-radius: 10px; margin-top: 2px; }
 
-/* ★ アイコンを右横に配置するスタイルに変更 */
 .cp-status-icons { 
     position: absolute; 
     left: 105%; 
@@ -173,7 +172,17 @@ body {
 .deck-layer:nth-child(1) { transform: translate(0, 0); z-index: 4; } .deck-layer:nth-child(2) { transform: translate(var(--deck-offset), var(--deck-offset)); z-index: 3; } .deck-layer:nth-child(3) { transform: translate(calc(var(--deck-offset)*2), calc(var(--deck-offset)*2)); z-index: 2; } .deck-layer:nth-child(4) { transform: translate(calc(var(--deck-offset)*3), calc(var(--deck-offset)*3)); z-index: 1; }
 .deck-count-badge { margin-top: 3px; font-size: 9px; color: #aaa; background: #111; padding: 2px 6px; border-radius: 8px; border: 1px solid #333; }
 
-.red-glow { box-shadow: 0 0 10px var(--red); } .blue-glow { box-shadow: 0 0 10px var(--blue); } .green-glow { box-shadow: 0 0 10px var(--green); } .yellow-glow { box-shadow: 0 0 10px var(--yellow); }
+/* ★ ワイルドカードの色指定用CSSオーバーレイ */
+.red-glow { box-shadow: 0 0 10px var(--red); border-color: var(--red) !important; }
+.blue-glow { box-shadow: 0 0 10px var(--blue); border-color: var(--blue) !important; }
+.green-glow { box-shadow: 0 0 10px var(--green); border-color: var(--green) !important; }
+.yellow-glow { box-shadow: 0 0 10px var(--yellow); border-color: var(--yellow) !important; }
+
+.card.red-glow::after { content: ''; position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(211, 47, 47, 0.4); pointer-events: none; border-radius: 6px; }
+.card.blue-glow::after { content: ''; position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(25, 118, 210, 0.4); pointer-events: none; border-radius: 6px; }
+.card.green-glow::after { content: ''; position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(56, 142, 60, 0.4); pointer-events: none; border-radius: 6px; }
+.card.yellow-glow::after { content: ''; position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(251, 192, 45, 0.4); pointer-events: none; border-radius: 6px; }
+
 .card.selected { border: 2px solid #f1c40f; transform: translateY(calc(var(--fan-y, 0px) + var(--sel-transform))) rotate(var(--fan-rot, 0deg)); z-index: 1000 !important; }
 .card.suggested { border: 2px solid var(--suggest-color); box-shadow: 0 0 6px var(--suggest-color); }
 
@@ -349,7 +358,6 @@ button.disabled-btn { opacity: 0.5; cursor: not-allowed; }
 
 #ability-info { position: fixed; bottom: 150px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.95); border: 2px solid #4caf50; color: white; padding: 8px 15px; border-radius: 8px; font-size: 13px; font-weight: bold; z-index: 10000; pointer-events: none; white-space: pre-wrap; text-align: left; box-shadow: 0 4px 15px rgba(0,0,0,0.8); width: 80%; max-width: 300px; }
 
-/* 場のハイライト用CSS */
 .discard-area {
     position: relative;
     padding: 10px;
