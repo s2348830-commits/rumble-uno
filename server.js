@@ -3,7 +3,6 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { Server } = require('socket.io');
-const url = require('url'); // ★ 追加
 
 const UNORules = require('./rule.js');
 const { AbilityDef, AbilityEngine } = require('./ability.js');
@@ -32,18 +31,22 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // ★ 修正箇所: クエリパラメータ（?v=25 など）を取り除いて純粋なパスを取得する
-    const parsedUrl = url.parse(req.url);
-    let filePath = '.' + parsedUrl.pathname;
-    if (filePath === './') filePath = './index.html';
+    // ★ 修正: URLからクエリパラメータ（?v=25など）を確実に除去する標準的な方法
+    const requestUrl = new URL(req.url, `http://${req.headers.host}`);
+    let pathname = requestUrl.pathname;
+    
+    // ルートアクセスの場合は index.html を指定
+    if (pathname === '/') pathname = '/index.html';
 
+    // ファイルの物理パスを作成
+    const filePath = path.join(__dirname, pathname);
     const extname = String(path.extname(filePath)).toLowerCase();
     const contentType = mimeTypes[extname] || 'application/octet-stream';
 
     fs.readFile(filePath, (err, content) => {
         if (err) {
             if (err.code === 'ENOENT') {
-                console.log(`[404] File not found: ${filePath}`); // サーバーログで確認用
+                console.error(`[404] Not Found: ${pathname}`); // どこを探して失敗したかログに出す
                 res.writeHead(404, { 'Content-Type': 'text/html' });
                 res.end("404 Not Found", 'utf-8');
             } else {
