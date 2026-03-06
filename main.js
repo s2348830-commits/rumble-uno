@@ -2254,203 +2254,217 @@ document.addEventListener('DOMContentLoaded', () => {
     if(window.initVolumeControl) window.initVolumeControl(); 
 });
 
-window.socket.on('update_game_state', (state) => {
-    if (!window.game) return;
-    window.game.deck = state.deck; 
-    window.game.turnIndex = state.turnIndex; 
-    window.game.direction = state.direction; 
-    window.game.discardPile = state.discardPile;
-    window.game.discardRotations = state.discardRotations; 
-    window.game.drawStack = state.drawStack; 
-    window.game.currentColor = state.currentColor;
-    if(state.hasDrawnThisTurn !== undefined) window.game.hasDrawnThisTurn = state.hasDrawnThisTurn;
-    if(state.abilityGraveyard) window.game.abilityGraveyard = state.abilityGraveyard;
-    if(state.customDeck) window.game.customDeck = state.customDeck;
-    
-    if (state.playersInfo) {
-        let newPlayers = [];
-        state.playersInfo.forEach(info => {
-            let p = window.game.players.find(x => x.id === info.id);
-            if (p) { 
-                p.frozen = info.frozen; 
-                p.burnTurns = info.burnTurns; 
-                p.connected = info.connected;
-                p.invincibleTurns = info.invincibleTurns || 0;
-                p.shield = info.shield || { level: 0, turns: 0 };
-                p.evasion = info.evasion || { level: 0, turns: 0 };
-                p.usedRaia = info.usedRaia || false;
-                newPlayers.push(p);
-            }
-        });
-        if (newPlayers.length === window.game.players.length) window.game.players = newPlayers; 
+function initMainSocketEvents() {
+    // ★ 修正: 通信(socket)の準備ができるまで待機する安全処理
+    if (typeof window.socket === 'undefined') {
+        setTimeout(initMainSocketEvents, 100);
+        return;
     }
 
-    if (window.isInitialDealing && !window.isHost) {
-        if (typeof window.animateInitialDeal === 'function') {
-            window.animateInitialDeal(state.hands, () => {});
-        } else {
-            window.isInitialDealing = false;
-            window.game.hands = state.hands;
-            if (typeof window.updateUI === 'function') window.updateUI();
+    window.socket.on('update_game_state', (state) => {
+        if (!window.game) return;
+        window.game.deck = state.deck; 
+        window.game.turnIndex = state.turnIndex; 
+        window.game.direction = state.direction; 
+        window.game.discardPile = state.discardPile;
+        window.game.discardRotations = state.discardRotations; 
+        window.game.drawStack = state.drawStack; 
+        window.game.currentColor = state.currentColor;
+        if(state.hasDrawnThisTurn !== undefined) window.game.hasDrawnThisTurn = state.hasDrawnThisTurn;
+        if(state.abilityGraveyard) window.game.abilityGraveyard = state.abilityGraveyard;
+        if(state.customDeck) window.game.customDeck = state.customDeck;
+        
+        if (state.playersInfo) {
+            let newPlayers = [];
+            state.playersInfo.forEach(info => {
+                let p = window.game.players.find(x => x.id === info.id);
+                if (p) { 
+                    p.frozen = info.frozen; 
+                    p.burnTurns = info.burnTurns; 
+                    p.connected = info.connected;
+                    p.invincibleTurns = info.invincibleTurns || 0;
+                    p.shield = info.shield || { level: 0, turns: 0 };
+                    p.evasion = info.evasion || { level: 0, turns: 0 };
+                    p.usedRaia = info.usedRaia || false;
+                    newPlayers.push(p);
+                }
+            });
+            if (newPlayers.length === window.game.players.length) window.game.players = newPlayers; 
         }
-    } else if (!window.isInitialDealing) {
-        window.game.hands = state.hands;
-        if (typeof window.updateUI === 'function') window.updateUI(); 
-    }
 
-    const current = window.game.currentPlayer;
-    const msgEl = document.getElementById('status-message');
-    if (window.isInitialDealing) {
-        msgEl.innerText = "カードを配っています...";
-    } else if (current) {
-        const roomStr = window.currentRoomState ? ` - 部屋ID:${window.currentRoomState.id}` : "";
-        msgEl.innerText = current.id === window.myId ? `あなたの番です${roomStr}` : `${current.name} のターン${roomStr}`;
-    }
+        if (window.isInitialDealing && !window.isHost) {
+            if (typeof window.animateInitialDeal === 'function') {
+                window.animateInitialDeal(state.hands, () => {});
+            } else {
+                window.isInitialDealing = false;
+                window.game.hands = state.hands;
+                if (typeof window.updateUI === 'function') window.updateUI();
+            }
+        } else if (!window.isInitialDealing) {
+            window.game.hands = state.hands;
+            if (typeof window.updateUI === 'function') window.updateUI(); 
+        }
 
-    if (state.attackGuides && state.attackGuides.length > 0) {
-        state.attackGuides.forEach(g => {
-            if (typeof window.showAttackGuide === 'function') window.showAttackGuide(g.from, g.to, g.text, g.se);
-        });
-    }
+        const current = window.game.currentPlayer;
+        const msgEl = document.getElementById('status-message');
+        if (window.isInitialDealing) {
+            msgEl.innerText = "カードを配っています...";
+        } else if (current) {
+            const roomStr = window.currentRoomState ? ` - 部屋ID:${window.currentRoomState.id}` : "";
+            msgEl.innerText = current.id === window.myId ? `あなたの番です${roomStr}` : `${current.name} のターン${roomStr}`;
+        }
 
-    if (typeof window.updatePhaseUI === 'function') {
-        window.updatePhaseUI(state);
-    }
-});
+        if (state.attackGuides && state.attackGuides.length > 0) {
+            state.attackGuides.forEach(g => {
+                const delay = g.delay || 0;
+                setTimeout(() => {
+                    if (typeof window.showAttackGuide === 'function') window.showAttackGuide(g.from, g.to, g.text, g.se);
+                }, delay);
+            });
+        }
 
-window.socket.on('broadcast_uno', (data) => {
-    if (window.SE) {
-        const unoSounds = ['uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6'];
-        window.SE.play(unoSounds[Math.floor(Math.random() * unoSounds.length)]);
-    }
-    const target = (data.id === window.myId) ? document.getElementById('my-player-info') : document.querySelector(`.circle-player-badge[data-id="${data.id}"]`);
-    if(target) { target.classList.add('uno-pop-badge'); setTimeout(() => target.classList.remove('uno-pop-badge'), 2500); }
-});
+        if (typeof window.updatePhaseUI === 'function') {
+            window.updatePhaseUI(state);
+        }
+    });
 
-window.socket.on('game_over', (data) => {
-    window.isGameOver = true;
-    if (window.SE) window.SE.stopLoop('final_sprint');
-    if (data.isDraw) {
-        if (window.SE) window.SE.play('draw');
-        setTimeout(() => document.getElementById('draw-curtain').classList.add('show'), 100);
-        setTimeout(() => { const b = document.getElementById('winner-banner'); b.innerText = "DRAW"; b.classList.add('show'); }, 3000);
-    } else {
-        if (window.SE) window.SE.play(Math.random() < 0.5 ? 'win' : 'win2');
-        const { winnerId, winnerName } = data;
-        const target = (winnerId === window.myId) ? document.getElementById('my-player-info') : document.querySelector(`.circle-player-badge[data-id="${winnerId}"]`);
-        if(target) target.classList.add('winner-crown');
-        setTimeout(() => {
-            const b = document.getElementById('winner-banner');
-            b.innerText = `${winnerName} が勝ちました。`; b.classList.add('show');
-            if (typeof confetti === 'function') confetti({ particleCount: 150, spread: 80, origin: { x: 0.5, y: 0.5 } });
-        }, 5000);
-    }
-    setTimeout(() => { if (window.isHost) window.socket.emit('return_to_lobby'); }, 8000);
-});
+    window.socket.on('broadcast_uno', (data) => {
+        if (window.SE) {
+            const unoSounds = ['uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6'];
+            window.SE.play(unoSounds[Math.floor(Math.random() * unoSounds.length)]);
+        }
+        const target = (data.id === window.myId) ? document.getElementById('my-player-info') : document.querySelector(`.circle-player-badge[data-id="${data.id}"]`);
+        if(target) { target.classList.add('uno-pop-badge'); setTimeout(() => target.classList.remove('uno-pop-badge'), 2500); }
+    });
 
-window.socket.on('back_to_lobby', (roomState) => {
-    window.currentRoomState = roomState;
-    window.isGameOver = false; window.isInitialDealing = false;
-    document.getElementById('winner-banner').classList.remove('show');
-    document.getElementById('draw-curtain').classList.remove('show');
-    document.getElementById('game-container').classList.add('hidden'); 
-    document.getElementById('lobby-screen').classList.remove('hidden');
-    
-    const manualBtn = document.getElementById('btn-manual');
-    if (manualBtn) manualBtn.classList.remove('hidden');
+    window.socket.on('game_over', (data) => {
+        window.isGameOver = true;
+        if (window.SE) window.SE.stopLoop('final_sprint');
+        if (data.isDraw) {
+            if (window.SE) window.SE.play('draw');
+            setTimeout(() => document.getElementById('draw-curtain').classList.add('show'), 100);
+            setTimeout(() => { const b = document.getElementById('winner-banner'); b.innerText = "DRAW"; b.classList.add('show'); }, 3000);
+        } else {
+            if (window.SE) window.SE.play(Math.random() < 0.5 ? 'win' : 'win2');
+            const { winnerId, winnerName } = data;
+            const target = (winnerId === window.myId) ? document.getElementById('my-player-info') : document.querySelector(`.circle-player-badge[data-id="${winnerId}"]`);
+            if(target) target.classList.add('winner-crown');
+            setTimeout(() => {
+                const b = document.getElementById('winner-banner');
+                b.innerText = `${winnerName} が勝ちました。`; b.classList.add('show');
+                if (typeof confetti === 'function') confetti({ particleCount: 150, spread: 80, origin: { x: 0.5, y: 0.5 } });
+            }, 5000);
+        }
+        setTimeout(() => { if (window.isHost) window.socket.emit('return_to_lobby'); }, 8000);
+    });
 
-    const cia = document.getElementById('chat-input-area');
-    if (cia) {
-        cia.style.display = 'none';
-        cia.classList.add('hidden');
-    }
-    
-    const lcia = document.getElementById('lobby-chat-container');
-    if (lcia && window.ChatManager && window.ChatManager.enabled) lcia.style.display = 'block';
-    
-    if (typeof renderSlots === 'function') renderSlots(roomState);
-});
+    window.socket.on('back_to_lobby', (roomState) => {
+        window.currentRoomState = roomState;
+        window.isGameOver = false; window.isInitialDealing = false;
+        document.getElementById('winner-banner').classList.remove('show');
+        document.getElementById('draw-curtain').classList.remove('show');
+        document.getElementById('game-container').classList.add('hidden'); 
+        document.getElementById('lobby-screen').classList.remove('hidden');
+        
+        const manualBtn = document.getElementById('btn-manual');
+        if (manualBtn) manualBtn.classList.remove('hidden');
 
-window.socket.on('receive_player_action', (data) => {
-    if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
-    const playerId = data.playerId;
-    
-    if (data.action === 'play') {
-        window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards });
-        const delay = data.cards.length * 100 + 400;
-        setTimeout(() => {
-            if (typeof window.executePlay === 'function') window.executePlay(playerId, data.indices);
-        }, delay);
-    } else if (data.action === 'play_ability') {
-        window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards, isHV: data.isHV });
-        const delay = data.cards.length * 100 + 400;
-        setTimeout(() => {
-            if (typeof window.executeAbilityPlay === 'function') window.executeAbilityPlay(playerId, data.indices, data.targetId, data.discardIdx, data.selectedColor, data.multiDiscardIndices, data.extraData);
-        }, delay);
-    } else if (data.action === 'defense_response') {
-        if (window.pendingDefense && window.pendingDefense.responses) {
-            window.pendingDefense.responses[data.targetId] = { cardValue: data.cardValue || null, discardIdx: data.discardIdx !== undefined ? data.discardIdx : null };
-            if (window.pendingDefense.info && window.pendingDefense.info.targets) {
-                const targetCount = window.pendingDefense.info.targets.length;
-                const responseCount = Object.keys(window.pendingDefense.responses).length;
-                if (responseCount >= targetCount) {
-                    window.pendingDefense.timer = 0;
+        const cia = document.getElementById('chat-input-area');
+        if (cia) {
+            cia.style.display = 'none';
+            cia.classList.add('hidden');
+        }
+        
+        const lcia = document.getElementById('lobby-chat-container');
+        if (lcia && window.ChatManager && window.ChatManager.enabled) lcia.style.display = 'block';
+        
+        if (typeof renderSlots === 'function') renderSlots(roomState);
+    });
+
+    window.socket.on('receive_player_action', (data) => {
+        if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
+        const playerId = data.playerId;
+        
+        if (data.action === 'play') {
+            window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards });
+            const delay = data.cards.length * 100 + 400;
+            setTimeout(() => {
+                if (typeof window.executePlay === 'function') window.executePlay(playerId, data.indices);
+            }, delay);
+        } else if (data.action === 'play_ability') {
+            window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards, isHV: data.isHV });
+            const delay = data.cards.length * 100 + 400;
+            setTimeout(() => {
+                if (typeof window.executeAbilityPlay === 'function') window.executeAbilityPlay(playerId, data.indices, data.targetId, data.discardIdx, data.selectedColor, data.multiDiscardIndices, data.extraData);
+            }, delay);
+        } else if (data.action === 'defense_response') {
+            if (window.pendingDefense && window.pendingDefense.responses) {
+                window.pendingDefense.responses[data.targetId] = { cardValue: data.cardValue || null, discardIdx: data.discardIdx !== undefined ? data.discardIdx : null };
+                if (window.pendingDefense.info && window.pendingDefense.info.targets) {
+                    const targetCount = window.pendingDefense.info.targets.length;
+                    const responseCount = Object.keys(window.pendingDefense.responses).length;
+                    if (responseCount >= targetCount) {
+                        window.pendingDefense.timer = 0;
+                    }
                 }
             }
-        }
-    } else if (data.action === 'draw') {
-        window.socket.emit('request_draw_animation', { playerId: playerId, count: data.count });
-        const delay = data.count * 100 + 400;
-        setTimeout(() => { if (typeof window.executeDraw === 'function') window.executeDraw(playerId); }, delay);
-    } else if (data.action === 'end_turn') {
-        if (typeof window.executeEndTurn === 'function') window.executeEndTurn(playerId);
-    } else if (data.action === 'color') {
-        if (typeof window.executeColor === 'function') window.executeColor(playerId, data.color);
-    } else if (data.action === 'draw_penalty') {
-        window.socket.emit('request_draw_animation', { playerId: playerId, count: data.count });
-        const delay = data.count * 100 + 400;
-        setTimeout(() => {
-            if (typeof window.game !== 'undefined' && typeof window.game.drawCard === 'function') {
-                for(let i=0; i<data.count; i++) window.game.drawCard(playerId);
-                if (typeof window.executeEndTurn === 'function') window.executeEndTurn(playerId); // ペナルティ後はターン終了
+        } else if (data.action === 'draw') {
+            window.socket.emit('request_draw_animation', { playerId: playerId, count: data.count });
+            const delay = data.count * 100 + 400;
+            setTimeout(() => { if (typeof window.executeDraw === 'function') window.executeDraw(playerId); }, delay);
+        } else if (data.action === 'end_turn') {
+            if (typeof window.executeEndTurn === 'function') window.executeEndTurn(playerId);
+        } else if (data.action === 'color') {
+            if (typeof window.executeColor === 'function') window.executeColor(playerId, data.color);
+        } else if (data.action === 'draw_penalty') {
+            window.socket.emit('request_draw_animation', { playerId: playerId, count: data.count });
+            const delay = data.count * 100 + 400;
+            setTimeout(() => {
+                if (typeof window.game !== 'undefined' && typeof window.game.drawCard === 'function') {
+                    for(let i=0; i<data.count; i++) window.game.drawCard(playerId);
+                    if (typeof window.executeEndTurn === 'function') window.executeEndTurn(playerId); // ペナルティ後はターン終了
+                }
+            }, delay);
+        } else if (data.action === 'ability_reset') {
+            if (window.game && typeof window.game.replaceAbilityCards === 'function') {
+                window.game.replaceAbilityCards(playerId, data.cards);
+                if (typeof window.broadcastGameState === 'function') window.broadcastGameState(true);
             }
-        }, delay);
-    } else if (data.action === 'ability_reset') {
-        if (window.game && typeof window.game.replaceAbilityCards === 'function') {
-            window.game.replaceAbilityCards(playerId, data.cards);
-            if (typeof window.broadcastGameState === 'function') window.broadcastGameState(true);
+        } 
+        else if (data.action === 'janken_choice') {
+            if (window.pendingJanken && !window.pendingJanken.result) {
+                if (playerId === window.pendingJanken.attackerId) window.pendingJanken.attackerHand = data.choice;
+                if (playerId === window.pendingJanken.targetId) window.pendingJanken.targetHand = data.choice;
+                if (typeof window.checkJankenReady === 'function') window.checkJankenReady();
+            }
         }
-    } 
-    else if (data.action === 'janken_choice') {
-        if (window.pendingJanken && !window.pendingJanken.result) {
-            if (playerId === window.pendingJanken.attackerId) window.pendingJanken.attackerHand = data.choice;
-            if (playerId === window.pendingJanken.targetId) window.pendingJanken.targetHand = data.choice;
-            if (typeof window.checkJankenReady === 'function') window.checkJankenReady();
+    });
+
+    window.socket.on('play_animation', (data) => {
+        if (data.playerId !== window.myId) {
+            if (typeof window.playOpponentAnimation === 'function') window.playOpponentAnimation(data.playerId, data.cards);
+            if (data.cards && data.cards.length > 0 && data.cards[0].value && String(data.cards[0].value).startsWith('id_')) {
+                if (typeof window.showAbilityCutin === 'function') window.showAbilityCutin(data.cards[0].value, data.isHV); 
+            }
         }
-    }
-});
+    });
 
-window.socket.on('play_animation', (data) => {
-    if (data.playerId !== window.myId) {
-        if (typeof window.playOpponentAnimation === 'function') window.playOpponentAnimation(data.playerId, data.cards);
-        if (data.cards && data.cards.length > 0 && data.cards[0].value && String(data.cards[0].value).startsWith('id_')) {
-            if (typeof window.showAbilityCutin === 'function') window.showAbilityCutin(data.cards[0].value, data.isHV); 
+    window.socket.on('draw_animation', (data) => {
+        if (data.playerId !== window.myId) {
+            if (typeof window.drawOpponentAnimation === 'function') window.drawOpponentAnimation(data.playerId, data.count);
         }
-    }
-});
+    });
 
-window.socket.on('draw_animation', (data) => {
-    if (data.playerId !== window.myId) {
-        if (typeof window.drawOpponentAnimation === 'function') window.drawOpponentAnimation(data.playerId, data.count);
-    }
-});
+    window.socket.on('show_color_selector', () => {
+        if (typeof ColorUI !== 'undefined' && ColorUI.show) ColorUI.show();
+    });
 
-window.socket.on('show_color_selector', () => {
-    if (typeof ColorUI !== 'undefined' && ColorUI.show) ColorUI.show();
-});
+    window.socket.on('receive_chat', (data) => {
+        if (window.ChatManager && typeof window.ChatManager.showMsg === 'function') {
+            window.ChatManager.showMsg(data.message, data.senderName);
+        }
+    });
+}
 
-window.socket.on('receive_chat', (data) => {
-    if (window.ChatManager && typeof window.ChatManager.showMsg === 'function') {
-        window.ChatManager.showMsg(data.message, data.senderName);
-    }
-});
+// 最後に処理を呼び出す
+initMainSocketEvents();
