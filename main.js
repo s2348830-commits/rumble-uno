@@ -332,7 +332,8 @@ window.broadcastGameState = function(skipUIUpdate = false, attackGuides = []) {
     if (!window.isHost) return;
     const playersInfo = window.game.players.map(p => ({ 
         id: p.id, connected: p.connected, frozen: p.frozen, burnTurns: p.burnTurns, 
-        invincibleTurns: p.invincibleTurns, shield: p.shield, evasion: p.evasion 
+        invincibleTurns: p.invincibleTurns, shield: p.shield, evasion: p.evasion,
+        usedRaia: p.usedRaia // ★ 追加
     }));
     const state = {
         deck: window.game.deck, turnIndex: window.game.turnIndex, direction: window.game.direction,
@@ -1597,9 +1598,10 @@ window.checkTurn = function() {
 
                 // ★ 追加: BOTが誤ってBLカードを選んだ場合はドローに変換する
                 if (isAbility && def && def.type === 'BL') {
-                    const drawCount = 1;
-                    window.socket.emit('request_draw_animation', { playerId: current.id, count: drawCount });
-                    setTimeout(() => window.executeDraw(current.id, true), drawCount * 100 + 400);
+                    window.socket.emit('request_play_animation', { playerId: current.id, cards: playedCards });
+                    setTimeout(() => {
+                        window.executeAbilityPlay(current.id, result.indices, null, null, null, [], {});
+                    }, playedCards.length * 100 + 400);
                     return;
                 }
 
@@ -1936,9 +1938,21 @@ window.handlePlayAction = function() {
     const isAction = !/^[0-9]$/.test(lastCard.value) && !isAbility;
     const def = isAbility && window.AbilityDef ? window.AbilityDef[selectedCards[0].value] : null;
 
+    // ▼▼▼ ここから書き換え ▼▼▼
+    // ★ 修正: BL専用カードは直接使用できるが効果は発動せず空打ちになる
     if (isAbility && def && def.type === 'BL') {
-        alert("BL(ブロック)専用カードは手札から直接使用できません！(攻撃を受けた時の防御時のみ使用可能)");
-        window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return;
+        window.game.selectedIndices = []; window.updateUI();
+        const indicesToSend = [...indices]; const cardsToSend = [...playedCards];
+        window.animateSequentialPlay(indices, window.game, () => {
+            if (window.isHost) {
+                if (window.socket) window.socket.emit('request_play_animation', { playerId: window.game.myId, cards: cardsToSend });
+                window.executeAbilityPlay(window.game.myId, indicesToSend, null, null, null, [], {});
+            } else if (window.socket) {
+                window.socket.emit('player_action', { action: 'play_ability', indices: indicesToSend, cards: cardsToSend, targetId: null, discardIdx: null, selectedColor: null, multiDiscardIndices: [], isHV: false, extraData: {} });
+            }
+            window.isProcessingPlay = false; // ★ ロック解除
+        });
+        return;
     }
 
     if (!window.game.isMyTurn && !isAbility) {
@@ -2056,10 +2070,10 @@ window.handlePlayAction = function() {
 
         window.localRaiaReturnedTurn = window.localRaiaReturnedTurn || -1;
         const stepRaia = () => {
-            if (cardValue === 'id_33' && window.localRaiaReturnedTurn !== window.game.turnIndex) {
+            // ★ 修正: 先ほど追加した me.usedRaia を判定に使用する
+            if (cardValue === 'id_33' && !me.usedRaia) {
                 if (confirm("ライアの効果により、このカードを手札に戻しますか？\n(各ターン1回のみ)")) {
                     extraData.returnRaia = true;
-                    window.localRaiaReturnedTurn = window.game.turnIndex;
                 }
             }
             step6();

@@ -214,6 +214,10 @@ window.AbilityEngine = {
                             const gIdx = game.abilityGraveyard.indexOf('id_33');
                             if (gIdx > -1) game.abilityGraveyard.splice(gIdx, 1);
                             guides.push({ from: attackerId, to: attackerId, text: '手札に戻る' });
+                            
+                            // ★ 追加: 回収後は、リセットされるまで再回収できないようにフラグを立てる
+                            const attacker = game.players.find(p => p.id === attackerId);
+                            if (attacker) attacker.usedRaia = true;
                         }
                     }
 

@@ -34,6 +34,7 @@ class UNOGame {
             p.shield = { level: 0, turns: 0 }; 
             p.evasion = { level: 0, turns: 0 }; 
             p.frozenBurnImmune = false; 
+            p.usedRaia = false; // ★ 追加: ライアの回収済みフラグ
         });
         this.myId = myId;
     }
@@ -113,6 +114,7 @@ class UNOGame {
         if (this.currentPlayer) {
             this.currentPlayer.frozen = false;
             this.currentPlayer.frozenBurnImmune = false;
+            this.currentPlayer.usedRaia = false; //
             
             if (this.currentPlayer.invincibleTurns > 0) this.currentPlayer.invincibleTurns--;
             if (this.currentPlayer.shield && this.currentPlayer.shield.turns > 0) {
