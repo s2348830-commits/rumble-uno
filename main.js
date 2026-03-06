@@ -201,14 +201,7 @@ window.SE = {
         
         let ext = 'mp3';
         if (name === 'fire' || name === 'page') ext = 'wav';
-        if (name.includes('id_20') || name.includes('id_25') || name.includes('id_26')) ext = 'mov'; 
-
-        if (ext === 'mov') {
-            const audio = new Audio(`se/${name}.${ext}`);
-            audio.volume = this.volume;
-            audio.play().catch(e => console.log('Audio playback error:', e));
-            return;
-        }
+        // ★ 削除: .movの例外処理と new Audio() を消去し、すべて安全なWeb Audio APIで鳴らすように統一
 
         if (!this.audioCtx) this.initContext();
         if (!this.buffers[name]) {
@@ -247,9 +240,13 @@ window.SE = {
 const unlockAudioContext = () => {
     if (window.SE.unlocked) return; window.SE.unlocked = true; window.SE.initContext();
     if (window.SE.audioCtx.state === 'suspended') window.SE.audioCtx.resume();
-    ['win', 'win2', 'setting', 'draw', 'uno_message', 'buttonclick', 'uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6', 'frieze', 'rock', 'Distribute', 'mvp_1', 'mvp_2'].forEach(name => window.SE.loadSound(name, 'mp3'));
+    
+    // ★ 修正: .mp3のリストに hv/id_20(1), hv/id_20(2), hv/id_25, hv/id_26 を追加
+    ['win', 'win2', 'setting', 'draw', 'uno_message', 'buttonclick', 'uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6', 'frieze', 'rock', 'Distribute', 'mvp_1', 'mvp_2', 'hv/id_20(1)', 'hv/id_20(2)', 'hv/id_25', 'hv/id_26'].forEach(name => window.SE.loadSound(name, 'mp3'));
     ['fire', 'page'].forEach(name => window.SE.loadSound(name, 'wav'));
-    ['hv/id_20(1)', 'hv/id_20(2)', 'hv/id_25', 'hv/id_26'].forEach(name => window.SE.loadSound(name, 'mov')); 
+    
+    // ★ 削除: ['hv/id_20(1)', ...].forEach(name => window.SE.loadSound(name, 'mov')); の行を消す
+    
     document.removeEventListener('click', unlockAudioContext);
     document.removeEventListener('touchstart', unlockAudioContext);
 };
