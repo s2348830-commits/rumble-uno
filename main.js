@@ -8,10 +8,7 @@ window.JANKEN_BACK_IMG = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://
 
 window.showConfirm = function(message, callback) {
     window.ensureModalsExist();
-    const modal = document.getElementById('custom-confirm-modal');
-    const text = document.getElementById('custom-confirm-text');
-    const btnYes = document.getElementById('btn-custom-confirm-yes');
-    const btnNo = document.getElementById('btn-custom-confirm-no');
+    const modal = document.getElementById('custom-confirm-modal'), text = document.getElementById('custom-confirm-text'), btnYes = document.getElementById('btn-custom-confirm-yes'), btnNo = document.getElementById('btn-custom-confirm-no');
     text.innerText = message; modal.classList.remove('hidden');
     btnYes.onclick = () => { modal.classList.add('hidden'); callback(true); }; 
     btnNo.onclick = () => { modal.classList.add('hidden'); callback(false); };
@@ -345,6 +342,8 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
 
 window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, selectedColor = null, multiDiscardIndices = [], extraData = {}) {
     if (!window.isHost) return;
+    if (playerId !== window.game.currentPlayer.id) return;
+    
     const hand = window.game.hands[playerId]; if (!hand || !hand[indices[0]]) return; 
     const originalHand = [...hand]; const playedCards = indices.map(i => originalHand[i]); const cardValue = playedCards[0].value; const def = window.AbilityDef ? window.AbilityDef[cardValue] : null;
     if (!def) { window.executePlay(playerId, indices, false); return; }
@@ -484,10 +483,9 @@ window.resolveJanken = function() {
         let someoneWon = false; window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
         if (!someoneWon) {
             const nextLoop = pJ.loopCount + 1; const aId = pJ.attackerId; const tId = pJ.targetId; 
-            window.pendingJanken = null; window.broadcastGameState();
-            if (result === 'win' && nextLoop < 4) { setTimeout(() => window.startJankenPhase(aId, nextLoop), 1000); } 
+            if (result === 'win' && nextLoop < 4) { setTimeout(() => window.startJankenPhase(aId, nextLoop, tId), 1000); } 
             else if (result === 'draw') { setTimeout(() => window.startJankenPhase(aId, pJ.loopCount, tId), 1000); } 
-            else { window.game.nextTurn(1); setTimeout(() => window.checkTurn(), 1000); }
+            else { window.pendingJanken = null; window.broadcastGameState(); window.game.nextTurn(1); setTimeout(() => window.checkTurn(), 1000); }
         }
     }, 4500); 
 };
@@ -595,6 +593,7 @@ window.checkTurn = function() {
 
 window.executePlay = function(playerId, indices, isBot = false) {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
+    if (playerId !== window.game.currentPlayer.id) return;
     clearInterval(window.turnTimer); if(window.playerAfkTimes) window.playerAfkTimes[playerId] = 0; 
     const result = window.game.playCards(playerId, indices);
     if (result.penalty) { document.getElementById('status-message').innerText = `${result.penaltyReason}上がり禁止ペナルティ！`; window.broadcastGameState(); setTimeout(window.checkTurn, 1000); return; }
@@ -682,15 +681,10 @@ window.handlePlayAction = function() {
     const isAbility = selectedCards[0] && selectedCards[0].value && String(selectedCards[0].value).startsWith('id_'); const isAction = !/^[0-9]$/.test(lastCard.value) && !isAbility; const def = isAbility && window.AbilityDef ? window.AbilityDef[selectedCards[0].value] : null;
 
     if (isAbility && def && def.type === 'BL') {
-        const indicesToSend = [...window.game.selectedIndices]; const cardsToSend = [...selectedCards]; window.game.selectedIndices = []; window.updateUI();
-        window.animateSequentialPlay(indicesToSend, window.game, () => {
-            if (window.isHost) { if (window.socket) window.socket.emit('request_play_animation', { playerId: window.game.myId, cards: cardsToSend }); window.executeAbilityPlay(window.game.myId, indicesToSend, null, null, null, [], {}); } 
-            else if (window.socket) { window.socket.emit('player_action', { action: 'play_ability', indices: indicesToSend, cards: cardsToSend, targetId: null, discardIdx: null, selectedColor: null, multiDiscardIndices: [], isHV: false, extraData: {} }); }
-            window.isProcessingPlay = false; 
-        }); return;
+        alert("防御カード(BL)は攻撃を受けた時にのみ使用できます。"); window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return;
     }
 
-    if (!window.game.isMyTurn && !isAbility) { window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; }
+    if (!window.game.isMyTurn) { window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; }
     if (me.frozen && !isAbility) { alert("凍結中は能力カードしか使用できません！"); window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; }
     if (selectedCards.some(c => c.lockedTurns && c.lockedTurns > 0)) { alert("ロックされているカードは使用できません！"); window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; }
 
@@ -860,9 +854,11 @@ function initMainSocketEvents() {
         const playerId = data.playerId;
         if (data.action === 'play') {
             if (window.pendingDefense || window.pendingJanken) return;
+            if (playerId !== window.game.currentPlayer.id) return;
             window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards }); const delay = data.cards.length * 100 + 400; setTimeout(() => { if (typeof window.executePlay === 'function') window.executePlay(playerId, data.indices); }, delay);
         } else if (data.action === 'play_ability') {
             if (window.pendingDefense || window.pendingJanken) return;
+            if (playerId !== window.game.currentPlayer.id) return;
             window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards, isHV: data.isHV }); const delay = data.cards.length * 100 + 400; setTimeout(() => { if (typeof window.executeAbilityPlay === 'function') window.executeAbilityPlay(playerId, data.indices, data.targetId, data.discardIdx, data.selectedColor, data.multiDiscardIndices, data.extraData); }, delay);
         } else if (data.action === 'defense_response') {
             if (window.pendingDefense && window.pendingDefense.responses) {
