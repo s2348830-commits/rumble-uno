@@ -2325,7 +2325,7 @@ window.onColorChosen = function(color) {
     }
 };
 
-// ★修正: エラーを防止するため、画面読み込み後にボタンの存在を確認してからイベントを付与する
+// ★修正: すべてのボタン処理とマニュアル処理を、画面読み込み完了後（DOMContentLoaded）に実行するように保護しました
 document.addEventListener('DOMContentLoaded', () => { 
     if(window.ensureModalsExist) window.ensureModalsExist();
     if(window.initVolumeControl) window.initVolumeControl(); 
@@ -2349,7 +2349,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const s = window.game.drawStack; 
                 let count = s > 0 ? s : 1;
                 const me = window.game.players.find(p=>p.id===window.game.myId);
-                if (me && me.laceration > 0) count += 1; // 裂傷の場合は+1枚
+                if (me && me.laceration > 0) count += 1; 
                 
                 if (window.isHost) {
                     if (window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: count }); 
@@ -2405,9 +2405,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (unoBtn) {
         unoBtn.onclick = window.declareUno;
     }
-});
 
-(() => {
+    // マニュアル画面の処理
     const btnManual = document.getElementById('btn-manual');
     const manualOverlay = document.getElementById('manual-overlay');
     const manualImage = document.getElementById('manual-image');
@@ -2442,11 +2441,6 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (endX > touchStartX + 50 && currentManualPage > 1) { if(window.SE) window.SE.play('page'); currentManualPage--; updateManualUI(); }
         }, { passive: true });
     }
-})();
-
-document.addEventListener('DOMContentLoaded', () => { 
-    if(window.ensureModalsExist) window.ensureModalsExist();
-    if(window.initVolumeControl) window.initVolumeControl(); 
 });
 
 function initMainSocketEvents() {
