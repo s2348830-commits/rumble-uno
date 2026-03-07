@@ -32,6 +32,7 @@ class UNOGame {
             p.frozen = false; p.burnTurns = 0; p.invincibleTurns = 0; 
             p.shield = { level: 0, turns: 0 }; p.evasion = { level: 0, turns: 0 }; 
             p.frozenBurnImmune = false; p.usedRaia = false; p.raiaReturnPending = false;
+            // ★追加: 裂傷と蘇生のステータス
             p.laceration = 0; p.usedReviveMisa = 0; p.hasReviveMisa = false; p.usedReviveEve = 0; p.hasReviveEve = false;
         });
         this.myId = myId;

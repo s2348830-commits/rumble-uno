@@ -367,7 +367,10 @@ window.AbilityEngine = {
                     const hand = game.hands[attackerId];
                     if (hand && hand.length > 0) {
                         const rIdx = Math.floor(Math.random() * hand.length);
-                        hand[rIdx] = { color: 'black', value: 'Wild' };
+                        // ★修正：配列の要素そのものを入れ替えるのではなく、プロパティを直接書き換えてUIに即反映させる
+                        hand[rIdx].color = 'black';
+                        hand[rIdx].value = 'Wild';
+                        delete hand[rIdx].lockedTurns;
                     }
                     if (extraData.graveyardCardId) {
                         if (hand) hand.push({ color: 'black', value: extraData.graveyardCardId });
