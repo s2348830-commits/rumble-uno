@@ -96,7 +96,7 @@ if (typeof window !== 'undefined' && !window.RuleUIManager) {
                 infoIcon.onmouseenter = (e) => {
                     const info = document.getElementById('ability-info');
                     if(info) {
-                        info.innerText = `${def.name}\\n${def.desc}`;
+                        info.innerText = `${def.name}\n${def.desc}`;
                         info.style.opacity = 1;
                     }
                 };
@@ -109,7 +109,7 @@ if (typeof window !== 'undefined' && !window.RuleUIManager) {
                     const info = document.getElementById('ability-info');
                     if(info) {
                         if (info.style.opacity == 1) { info.style.opacity = 0; } 
-                        else { info.innerText = `${def.name}\\n${def.desc}`; info.style.opacity = 1; }
+                        else { info.innerText = `${def.name}\n${def.desc}`; info.style.opacity = 1; }
                     }
                 };
 
