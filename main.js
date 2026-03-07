@@ -1817,33 +1817,43 @@ document.getElementById('draw-btn').onclick = function() {
     if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) return;
     
     window.isDrawing = true; 
-    this.style.pointerEvents = 'none'; // 物理的にもクリック不能にする
+    this.style.pointerEvents = 'none'; // 連打防止ロック
     
     window.tryDrawWithAbility(() => {
-        window.game.hasDrawnThisTurn = true; window.updateUI();                    
+        window.game.hasDrawnThisTurn = true; 
+        window.updateUI(); // 先にローカルのUIを更新してボタンをグレーアウトする
         
-        const s = window.game.drawStack; const count = s > 0 ? s : 1;
+        const s = window.game.drawStack; 
+        const count = s > 0 ? s : 1;
         if (window.SE) window.SE.playMultiple('Distribute', count, 500);
         
-        const finishDraw = () => {
+        // ★最重要修正：アニメーションの完了を待たずに、即座にサーバーへドロー要求を送る！
+        // （これで参加者側の「引けない」「遅延する」「ボタンが固まる」問題が解消されます）
+        if (window.isHost) {
+            if (window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: count }); 
+            window.executeDraw(window.game.myId); 
+        } else if (window.socket) {
+            window.socket.emit('player_action', { action: 'draw', count: count });
+        }
+
+        // ここから下は「画面上の見た目（アニメーション）」だけを処理する
+        const unlockUI = () => {
             window.isDrawing = false; 
-            document.getElementById('draw-btn').style.pointerEvents = 'auto'; // ロック解除
-            if (window.isHost) {
-                if (window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: count }); 
-                window.executeDraw(window.game.myId); 
-            } else if (window.socket) window.socket.emit('player_action', { action: 'draw', count: count });
+            const btn = document.getElementById('draw-btn');
+            if (btn) btn.style.pointerEvents = 'auto'; // ロック解除
         };
 
         if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
-            CardAnimation.animateMultiDraw(count, 'player-hand', finishDraw);
-            setTimeout(() => { window.isDrawing = false; document.getElementById('draw-btn').style.pointerEvents = 'auto'; }, 3000);
+            CardAnimation.animateMultiDraw(count, 'player-hand', unlockUI);
+            // 何らかの理由でアニメーションが途中で止まっても、3秒後に必ず動けるようにする安全装置
+            setTimeout(unlockUI, 3000); 
         } else {
-            finishDraw();
+            unlockUI();
         }
     });
 };
 
-// ★修正1: ターン終了ボタンの二重操作をロックで完全阻止
+// ★ついでに「ターン終了」ボタンの安全装置も強化しておきます
 document.getElementById('end-turn-btn').onclick = function() {
     if (window.pendingJanken || window.isDrawing || window.isProcessingPlay) return; 
     if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
@@ -1853,11 +1863,16 @@ document.getElementById('end-turn-btn').onclick = function() {
 
     if (window.isHost) {
         window.executeEndTurn(window.game.myId); 
-        setTimeout(() => { window.isDrawing = false; this.style.pointerEvents = 'auto'; }, 500);
     } else if (window.socket) {
         window.socket.emit('player_action', { action: 'end_turn' });
-        setTimeout(() => { window.isDrawing = false; this.style.pointerEvents = 'auto'; }, 500);
     }
+    
+    // すぐにロックを解除して次の人に備える
+    setTimeout(() => { 
+        window.isDrawing = false; 
+        const btn = document.getElementById('end-turn-btn');
+        if (btn) btn.style.pointerEvents = 'auto'; 
+    }, 500);
 };
 
 document.getElementById('uno-btn').onclick = window.declareUno;
