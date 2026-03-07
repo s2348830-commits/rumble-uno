@@ -209,7 +209,7 @@ window.AbilityEngine = {
                             const attacker = game.players.find(p => p.id === attackerId);
                             if (attacker) {
                                 attacker.usedRaia = true;
-                                attacker.raiaReturnPending = true;
+                                attacker.raiaReturnPending = true; // ★ 次のターンに戻るフラグ
                             }
                             guides.push({ from: attackerId, to: attackerId, text: '回収待機' });
                         }
@@ -324,18 +324,8 @@ window.AbilityEngine = {
                 } else if (abilityId === 'id_25') {
                     const hand = game.hands[attackerId];
                     if (hand && hand.length > 0) {
-                        const candidateIndices = [];
-                        for (let i = 0; i < hand.length; i++) {
-                            const c = hand[i];
-                            // 能力カード以外だけを候補にする
-                            if (!(c.value && String(c.value).startsWith('id_'))) {
-                                candidateIndices.push(i);
-                            }
-                        }
-                        if (candidateIndices.length > 0) {
-                            const rIdx = candidateIndices[Math.floor(Math.random() * candidateIndices.length)];
-                            hand[rIdx] = { color: 'black', value: 'Wild' };
-                        }
+                        const rIdx = Math.floor(Math.random() * hand.length);
+                        hand[rIdx] = { color: 'black', value: 'Wild' };
                     }
                     if (extraData.graveyardCardId) {
                         if (hand) hand.push({ color: 'black', value: extraData.graveyardCardId });
