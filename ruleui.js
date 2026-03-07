@@ -184,7 +184,7 @@ if (typeof window.RuleSettings === 'undefined') {
                     div.dataset.count = 0;
                     
                     const descSafe = c.desc.replace(/\n/g, '\\n').replace(/'/g, "\\'");
-                    const maxCount = (c.id === 'id_20' || c.id === 'id_25' || c.id === 'id_26') ? 1 : 4; 
+                    const maxCount = (c.id === 'id_20' || c.id === 'id_25' || c.id === 'id_26' || c.id === 'id_35') ? 1 : 4;
                     
                     let rarityColor = '#ccc';
                     let rarityText = 'SSR';

@@ -695,6 +695,9 @@ window.showAbilityCutin = function(cardValue, isHVActivated = false) {
         if (window.SE) window.SE.play(`hv/id_26`);
     } else if (cardValue === 'id_26') {
         if (window.SE) window.SE.play(`hv/id_25`);
+    } else if (cardValue === 'id_35') {
+        // ★追加: イヴ(id_35)の専用SEを再生
+        if (window.SE) window.SE.play(`hv/id_35`);
     } else {
         const randMvp = Math.random() < 0.5 ? 1 : 2;
         if (window.SE) window.SE.play(`mvp_${randMvp}`);
