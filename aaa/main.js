@@ -8,7 +8,8 @@ if (window.AbilityDef && window.AbilityDef['id_33']) {
 
 window.game = new UNOGame(); window.playerAfkTimes = {}; window.turnTimer = null; window.isGameOver = false; window.isDrawing = false; window.isInitialDealing = false; window.isDefending = false; window.isDealAnimationRunning = false; window.isServerProcessingAbility = false;
 window.pendingDrawDefenseInfo = null; window.pendingJanken = null; window.isProcessingPlay = false; window.currentDefensePhaseId = null; window.hasRespondedDefense = false; window.currentJankenLoopId = null; 
-window.lastGameStateFingerprint = ""; window.hostSyncInterval = null; 
+window.lastGameStateFingerprint = ""; window.hostSyncInterval = null; window.waitingForServerResponse = false;
+
 window.JANKEN_BACK_IMG = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 60'%3E%3Crect width='40' height='60' rx='6' fill='%23222' stroke='%23444' stroke-width='2'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23fff' font-size='24' font-family='sans-serif' font-weight='bold'%3E?%3C/text%3E%3C/svg%3E";
 
 window.showConfirm = function(message, callback) {
@@ -49,7 +50,21 @@ window.ensureModalsExist = function() {
         const jOverlay = document.createElement('div'); jOverlay.id = 'janken-overlay'; jOverlay.className = 'hidden'; jOverlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.95); z-index:110000; display:flex; flex-direction:column; justify-content:center; align-items:center; padding-bottom: 10vh; box-sizing: border-box;";
         jOverlay.innerHTML = `<h2 id="janken-title" style="color:white; font-style:italic; margin-bottom: 5px;">じゃんけん 勝負！</h2><div id="janken-subtitle" style="color:#aaa; font-size:14px; margin-bottom:15px;">Loop: 1/4</div><div style="color:#fbc02d; font-size:36px; font-weight:bold; margin-bottom:20px;">残り <span id="janken-timer">10</span> 秒</div><div style="display:flex; gap:30px; align-items:center; margin-bottom:30px; width: 90%; max-width: 500px; justify-content: center;"><div id="janken-player1" style="text-align:center; color:white; flex: 1;"><div id="janken-p1-result" style="font-size:24px; font-weight:bold; height:35px; text-shadow: 2px 2px 4px #000;"></div><div id="janken-p1-name" style="margin-bottom:10px; font-weight:bold; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Player1</div><img id="janken-p1-card" src="${window.JANKEN_BACK_IMG}" style="width:80px; max-width: 100%; border-radius:10px; transition:0.3s; border-top: 10px solid transparent;"></div><div style="color:white; font-size:30px; font-weight:bold; font-style:italic;">VS</div><div id="janken-player2" style="text-align:center; color:white; flex: 1;"><div id="janken-p2-result" style="font-size:24px; font-weight:bold; height:35px; text-shadow: 2px 2px 4px #000;"></div><div id="janken-p2-name" style="margin-bottom:10px; font-weight:bold; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Player2</div><img id="janken-p2-card" src="${window.JANKEN_BACK_IMG}" style="width:80px; max-width: 100%; border-radius:10px; transition:0.3s; border-top: 10px solid transparent;"></div></div><div id="janken-controls" style="display:flex; gap:15px;"><button class="janken-btn" data-hand="1" style="background:none; border:none; cursor:pointer; transition:transform 0.2s;"><img src="card/custom/jyanken1.png" style="width:70px;" onerror="this.outerHTML='<div style=\\'width:70px;height:70px;background:#fbc02d;color:black;border-radius:50%;display:flex;justify-content:center;align-items:center;font-weight:bold;font-size:18px;\\'>グー</div>'"></button><button class="janken-btn" data-hand="2" style="background:none; border:none; cursor:pointer; transition:transform 0.2s;"><img src="card/custom/jyanken2.png" style="width:70px;" onerror="this.outerHTML='<div style=\\'width:70px;height:70px;background:#fbc02d;color:black;border-radius:50%;display:flex;justify-content:center;align-items:center;font-weight:bold;font-size:18px;\\'>チョキ</div>'"></button><button class="janken-btn" data-hand="3" style="background:none; border:none; cursor:pointer; transition:transform 0.2s;"><img src="card/custom/jyanken3.png" style="width:70px;" onerror="this.outerHTML='<div style=\\'width:70px;height:70px;background:#fbc02d;color:black;border-radius:50%;display:flex;justify-content:center;align-items:center;font-weight:bold;font-size:18px;\\'>パー</div>'"></button></div>`;
         document.body.appendChild(jOverlay);
-        document.querySelectorAll('.janken-btn').forEach(btn => { btn.onclick = () => { const choice = parseInt(btn.dataset.hand); if (window.socket) window.socket.emit('player_action', { action: 'janken_choice', playerId: window.myId, choice }); document.getElementById('janken-controls').style.display = 'none'; document.getElementById('janken-title').innerText = "相手を待っています..."; }; });
+        document.querySelectorAll('.janken-btn').forEach(btn => { 
+            btn.onclick = () => { 
+                const choice = parseInt(btn.dataset.hand); 
+                if (window.isHost) {
+                    if (window.pendingJanken && !window.pendingJanken.result) {
+                        if (window.myId === window.pendingJanken.attackerId) window.pendingJanken.attackerHand = choice;
+                        if (window.myId === window.pendingJanken.targetId) window.pendingJanken.targetHand = choice;
+                        window.checkJankenReady();
+                    }
+                } else {
+                    if (window.socket) window.socket.emit('player_action', { action: 'janken_choice', playerId: window.myId, choice }); 
+                }
+                document.getElementById('janken-controls').style.display = 'none'; document.getElementById('janken-title').innerText = "相手を待っています..."; 
+            }; 
+        });
     }
 };
 
@@ -93,6 +108,8 @@ window.updatePhaseUI = function(state) {
         if (targets && targets.includes(window.myId) && window.myId !== attackerId) {
             if (window.currentDefensePhaseId !== phaseId) { window.currentDefensePhaseId = phaseId; window.hasRespondedDefense = false; window.isDefending = true; if (typeof window.showDefenseModal === 'function') window.showDefenseModal(cardValue); }
             if (window.hasRespondedDefense) { const modal = document.getElementById('defense-modal'); const discModal = document.getElementById('discard-modal'); if (modal) modal.classList.add('hidden'); if (discModal) discModal.classList.add('hidden'); }
+            const timerText = document.getElementById('defense-timer-text');
+            if (timerText && state.defenseTimer !== undefined) timerText.innerText = state.defenseTimer;
         }
     } else {
         window.currentDefensePhaseId = null; window.hasRespondedDefense = false; window.isDefending = false;
@@ -102,6 +119,9 @@ window.updatePhaseUI = function(state) {
     if (state.jankenPhase) {
         if (!window.isJankenShowing) { if (typeof window.showJankenUI === 'function') window.showJankenUI(state.jankenPhase.attackerId, state.jankenPhase.targetId, state.jankenPhase.loopCount); window.isJankenShowing = true; }
         
+        const jTimer = document.getElementById('janken-timer');
+        if (jTimer && state.jankenPhase.timer !== undefined) jTimer.innerText = state.jankenPhase.timer;
+
         if (!state.jankenPhase.result) {
             window.jankenResultPlayed = false;
             const jOverlay = document.getElementById('janken-overlay'); if (jOverlay) jOverlay.classList.remove('result-showing');
@@ -367,22 +387,41 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
     }, 1000);
 };
 
-window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, selectedColor = null, multiDiscardIndices = [], extraData = {}) {
+window.executeAbilityPlay = function(playerId, playedCardsData, targetId, discardIdx, selectedColor = null, multiDiscardIndices = [], extraData = {}) {
     if (!window.isHost) return;
+    const hand = window.game.hands[playerId]; if (!hand) return; 
     
     const wasMyTurn = (playerId === window.game.currentPlayer.id);
-    const hand = window.game.hands[playerId]; if (!hand || !hand[indices[0]]) return; 
-    const originalHand = [...hand]; const playedCards = indices.map(i => originalHand[i]); const cardValue = playedCards[0].value; const def = window.AbilityDef ? window.AbilityDef[cardValue] : null;
-    if (!def) { window.executePlay(playerId, indices, false); return; }
+    const cardValue = playedCardsData[0].value; const def = window.AbilityDef ? window.AbilityDef[cardValue] : null;
 
-    const multiplier = indices.length; const discCard = discardIdx !== null ? originalHand[discardIdx] : null;
+    if (extraData && extraData.isBlankPlay) {
+        if (!wasMyTurn) return;
+        playedCardsData.forEach(pc => { const idx = hand.findIndex(c => c.value === pc.value && c.color === pc.color); if(idx > -1) { const removed = hand.splice(idx, 1)[0]; if(!window.game.abilityGraveyard) window.game.abilityGraveyard = []; window.game.abilityGraveyard.push(removed.value); } });
+        let someoneWon = false; window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
+        if (!someoneWon) { window.broadcastGameState(false); }
+        return;
+    }
+
+    const multiplier = playedCardsData.length; 
+    const discCard = discardIdx !== null ? hand[discardIdx] : null;
     let safeMultiDiscardIndices = [];
-    if (multiDiscardIndices && multiDiscardIndices.length > 0) { safeMultiDiscardIndices = multiDiscardIndices.filter(i => { const c = originalHand[i]; return c && c.color === selectedColor && !(c.value && String(c.value).startsWith('id_')); }); }
-    const multiCards = safeMultiDiscardIndices.map(i => originalHand[i]);
-    let allRemoveIndices = [...indices]; if (discardIdx !== null) allRemoveIndices.push(discardIdx); if (safeMultiDiscardIndices.length > 0) allRemoveIndices.push(...safeMultiDiscardIndices);
+    if (multiDiscardIndices && multiDiscardIndices.length > 0) { safeMultiDiscardIndices = multiDiscardIndices.filter(i => { const c = hand[i]; return c && c.color === selectedColor && !(c.value && String(c.value).startsWith('id_')); }); }
+    const multiCards = safeMultiDiscardIndices.map(i => hand[i]);
+
+    let allRemoveIndices = [];
+    if (discardIdx !== null) allRemoveIndices.push(discardIdx);
+    if (safeMultiDiscardIndices.length > 0) allRemoveIndices.push(...safeMultiDiscardIndices);
     allRemoveIndices = [...new Set(allRemoveIndices)].sort((a,b) => b - a); allRemoveIndices.forEach(i => hand.splice(i, 1));
 
-    playedCards.forEach(c => { const isAb = c.value && String(c.value).startsWith('id_'); if (isAb) { if(!window.game.abilityGraveyard) window.game.abilityGraveyard = []; window.game.abilityGraveyard.push(c.value); } else { window.game.discardPile.push(c); window.game.discardRotations.push(0); } });
+    playedCardsData.forEach(pc => {
+        const idx = hand.findIndex(c => c.value === pc.value && c.color === pc.color);
+        if(idx > -1) {
+            const removed = hand.splice(idx, 1)[0];
+            const isAb = removed.value && String(removed.value).startsWith('id_'); 
+            if (isAb) { if(!window.game.abilityGraveyard) window.game.abilityGraveyard = []; window.game.abilityGraveyard.push(removed.value); } 
+            else { window.game.discardPile.push(removed); window.game.discardRotations.push(0); }
+        }
+    });
 
     if (cardValue === 'id_26') { setTimeout(() => { window.startJankenPhase(playerId, 0, null, wasMyTurn); }, 2500); return; }
 
@@ -418,13 +457,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
             let guides = []; if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, responses, multiplier, selectedColor, multiCards, extraData);
             guides.forEach(g => { if(g.delay === undefined) g.delay = 2500; }); 
             let someoneWon = false; window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
-            if (!someoneWon) { 
-                if(wasMyTurn) window.game.nextTurn(1); 
-                window.broadcastGameState(false, guides); 
-                if(wasMyTurn) setTimeout(() => window.checkTurn(), 500); 
-            } else {
-                window.broadcastGameState(false, guides);
-            }
+            if (!someoneWon) { if(wasMyTurn) { window.game.nextTurn(1); } window.broadcastGameState(false, guides); if(wasMyTurn) { setTimeout(() => window.checkTurn(), 500); } } else { window.broadcastGameState(false, guides); }
             return;
         }
 
@@ -471,26 +504,14 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                 guides.forEach(g => { if(g.delay === undefined) g.delay = 2500; }); 
                 
                 let someoneWon = false; window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
-                if (!someoneWon) { 
-                    if(wasMyTurn) window.game.nextTurn(1); 
-                    window.broadcastGameState(false, guides); 
-                    if(wasMyTurn) setTimeout(() => window.checkTurn(), 500); 
-                } else {
-                    window.broadcastGameState(false, guides);
-                }
+                if (!someoneWon) { if(wasMyTurn) { window.game.nextTurn(1); } window.broadcastGameState(false, guides); if(wasMyTurn) { setTimeout(() => window.checkTurn(), 500); } } else { window.broadcastGameState(false, guides); }
             } else { window.pendingDefense.timer--; window.broadcastGameState(true); }
         }, 1000);
     } else {
         let guides = []; if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, {}, multiplier, selectedColor, multiCards, extraData);
         guides.forEach(g => { if(g.delay === undefined) g.delay = 2500; }); 
         let someoneWon = false; window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
-        if (!someoneWon) { 
-            if(wasMyTurn) window.game.nextTurn(1); 
-            window.broadcastGameState(false, guides); 
-            if(wasMyTurn) setTimeout(() => window.checkTurn(), 500); 
-        } else {
-            window.broadcastGameState(false, guides);
-        }
+        if (!someoneWon) { if(wasMyTurn) { window.game.nextTurn(1); } window.broadcastGameState(false, guides); if(wasMyTurn){ setTimeout(() => window.checkTurn(), 500); } } else { window.broadcastGameState(false, guides); }
     }
 };
 
@@ -530,14 +551,9 @@ window.resolveJanken = function() {
         let someoneWon = false; window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
         if (!someoneWon) {
             const nextLoop = pJ.loopCount + 1; const aId = pJ.attackerId; const tId = pJ.targetId; const wasMyTurn = pJ.wasMyTurn;
-            if (result === 'win' && nextLoop < 4) { setTimeout(() => window.startJankenPhase(aId, nextLoop, tId, wasMyTurn), 1000); } 
-            else if (result === 'draw') { setTimeout(() => window.startJankenPhase(aId, pJ.loopCount, tId, wasMyTurn), 1000); } 
-            else { 
-                window.pendingJanken = null; 
-                if(wasMyTurn){ window.game.nextTurn(1); }
-                window.broadcastGameState(); 
-                if(wasMyTurn){ setTimeout(() => window.checkTurn(), 1000); }
-            }
+            if (result === 'win' && nextLoop < 4) { window.pendingJanken.attackerHand = null; window.pendingJanken.targetHand = null; window.pendingJanken.result = null; window.pendingJanken.timer = 10; window.pendingJanken.loopCount = nextLoop; window.broadcastGameState(); window.startJankenPhase(aId, nextLoop, tId, wasMyTurn); } 
+            else if (result === 'draw') { window.pendingJanken.attackerHand = null; window.pendingJanken.targetHand = null; window.pendingJanken.result = null; window.pendingJanken.timer = 10; window.broadcastGameState(); window.startJankenPhase(aId, pJ.loopCount, tId, wasMyTurn); } 
+            else { window.pendingJanken = null; if(wasMyTurn){ window.game.nextTurn(1); } window.broadcastGameState(); if(wasMyTurn){ setTimeout(() => window.checkTurn(), 1000); } }
         }
     }, 4500); 
 };
@@ -580,7 +596,7 @@ window.checkTurn = function() {
             const result = UNOBot.play(window.game, current.id);
             if (result.action === 'play') {
                 const playedCards = result.indices.map(i => window.game.hands[current.id][i]); const isAbility = playedCards[0] && playedCards[0].value && String(playedCards[0].value).startsWith('id_'); const def = isAbility && window.AbilityDef ? window.AbilityDef[playedCards[0].value] : null;
-                if (isAbility && def && def.type === 'BL') { window.socket.emit('request_play_animation', { playerId: current.id, cards: playedCards }); setTimeout(() => { window.executeAbilityPlay(current.id, result.indices, null, null, null, [], {}); }, playedCards.length * 100 + 400); return; }
+                if (isAbility && def && def.type === 'BL') { window.socket.emit('request_play_animation', { playerId: current.id, cards: playedCards }); setTimeout(() => { window.executeAbilityPlay(current.id, result.indices, null, null, null, [], { isBlankPlay: true }); }, playedCards.length * 100 + 400); return; }
                 
                 let willDiscard = (isAbility && def && (def.needsDiscard || def.needsAbilityDiscard)) ? 1 : 0; let botSelectedColor = null, botMultiDiscardIndices = [], botDiscardIdx = null;
                 if (isAbility && def) {
@@ -615,7 +631,7 @@ window.checkTurn = function() {
                     const result = UNOBot.play(window.game, current.id);
                     if (result.action === 'play') {
                         const playedCards = result.indices.map(i => window.game.hands[current.id][i]); const isAbility = playedCards[0] && playedCards[0].value && String(playedCards[0].value).startsWith('id_'); const def = isAbility && window.AbilityDef ? window.AbilityDef[playedCards[0].value] : null;
-                        if (isAbility && def && def.type === 'BL') { window.socket.emit('request_play_animation', { playerId: current.id, cards: playedCards }); setTimeout(() => { window.executeAbilityPlay(current.id, result.indices, null, null, null, [], {}); }, playedCards.length * 100 + 400); return; }
+                        if (isAbility && def && def.type === 'BL') { window.socket.emit('request_play_animation', { playerId: current.id, cards: playedCards }); setTimeout(() => { window.executeAbilityPlay(current.id, result.indices, null, null, null, [], { isBlankPlay: true }); }, playedCards.length * 100 + 400); return; }
                         
                         let willDiscard = (isAbility && def && (def.needsDiscard || def.needsAbilityDiscard)) ? 1 : 0; let botSelectedColor = null, botMultiDiscardIndices = [], botDiscardIdx = null;
                         if (isAbility && def) {
@@ -687,6 +703,7 @@ window.executeDraw = function(playerId, isBot = false) {
     for(let i=0; i<count; i++) { if(!window.game.drawCard(playerId)) { if(window.isGameOver) return; break; } }
     if (stack > 0) { window.game.drawStack = 0; window.game.nextTurn(1); window.checkTurn(); } 
     else { if (isBot) { window.game.nextTurn(1); window.checkTurn(); } else { window.game.hasDrawnThisTurn = true; window.broadcastGameState(); } }
+    window.waitingForServerResponse = false;
 };
 
 window.executeEndTurn = function(playerId) {
@@ -846,12 +863,12 @@ window.onColorChosen = function(color) {
 };
 
 document.getElementById('draw-btn').onclick = () => {
-    if (window.pendingJanken || window.isDrawing || window.isProcessingPlay) return; 
+    if (window.pendingJanken || window.isDrawing || window.isProcessingPlay || window.waitingForServerResponse) return; 
     if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
     if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) return;
-    window.isDrawing = true; 
+    window.isDrawing = true; window.waitingForServerResponse = true;
     window.tryDrawWithAbility(() => {
-        window.game.hasDrawnThisTurn = true; window.updateUI(); setTimeout(() => { window.isDrawing = false; }, 3000);
+        window.game.hasDrawnThisTurn = true; window.updateUI(); setTimeout(() => { window.isDrawing = false; window.waitingForServerResponse = false; }, 3000);
         const s = window.game.drawStack; const count = s > 0 ? s : 1;
         if (window.SE) window.SE.playMultiple('Distribute', count, 500);
         if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) { CardAnimation.animateMultiDraw(count, 'player-hand', () => { window.isDrawing = false; if (window.isHost) { if (window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: count }); window.executeDraw(window.game.myId); } else if (window.socket) window.socket.emit('player_action', { action: 'draw', count: count }); }); } 
@@ -891,6 +908,7 @@ function initMainSocketEvents() {
 
     window.socket.on('sync_game_state', (state) => {
         if (!window.game) return;
+        window.waitingForServerResponse = false;
         const isChoosing = (!window.isHost && window.game.myId) && ((window.game.selectedIndices && window.game.selectedIndices.length > 0) || window.isProcessingPlay || window.isDrawing || document.querySelector('.action-popup:not(.hidden)'));
         const currentFingerprint = JSON.stringify(state);
         if (window.lastGameStateFingerprint === currentFingerprint && !window.isInitialDealing) return;
