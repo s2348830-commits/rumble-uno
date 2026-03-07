@@ -913,7 +913,10 @@ window.showDefenseModal = function(attackCardValue) {
             alert('手札に防御カード(BL)がありません！');
             return;
         }
-        window.hasRespondedDefense = true; 
+        
+        // ❌ 削除: ここで true にしてしまうと、カードを選ぶ前に1秒ごとの更新で画面が閉じてしまう！
+        // window.hasRespondedDefense = true; 
+        
         qArea.classList.add('hidden');
         sArea.classList.remove('hidden');
         
@@ -931,11 +934,13 @@ window.showDefenseModal = function(attackCardValue) {
                 if (def && (def.needsDiscard || def.needsAbilityDiscard)) {
                     modal.classList.add('hidden'); 
                     window.openDiscardSelection(myHand, [item.idx], def, (discIdx) => {
+                        window.hasRespondedDefense = true; // ✅ 実際にカードと捨てるカードを確定した「ここ」でフラグを立てる！
                         window.socket.emit('player_action', { action: 'defense_response', targetId: window.game.myId, cardValue: item.card.value, discardIdx: discIdx });
                         window.isDefending = false;
                     });
                 } else {
                     modal.classList.add('hidden'); 
+                    window.hasRespondedDefense = true; // ✅ 捨てる必要がないカードの場合も、「ここ」でフラグを立てる！
                     window.socket.emit('player_action', { action: 'defense_response', targetId: window.game.myId, cardValue: item.card.value, discardIdx: null });
                     window.isDefending = false;
                 }
