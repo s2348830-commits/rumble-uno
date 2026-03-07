@@ -1221,8 +1221,6 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
     }, 1000);
 };
 
-// ...（後半へ続く）...
-
 window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, selectedColor = null, multiDiscardIndices = [], extraData = {}) {
     if (!window.isHost) return;
     
@@ -1773,6 +1771,13 @@ window.checkTurn = function() {
                         const discIdx = bHand.findIndex((c, i) => !result.indices.includes(i) && !(c.value && String(c.value).startsWith('id_')));
                         botDiscardIdx = discIdx > -1 ? discIdx : (bHand.length > result.indices.length ? bHand.findIndex((c,i)=>!result.indices.includes(i)) : null);
                     }
+                    if (playedCards[0].value === 'id_20' && botSelectedColor) {
+                        const bHand = window.game.hands[current.id];
+                        bHand.forEach((c, i) => {
+                            if (!result.indices.includes(i) && c.color === botSelectedColor) botMultiDiscardIndices.push(i);
+                        });
+                        willDiscard += botMultiDiscardIndices.length;
+                    }
                 }
 
                 const remainingCards = window.game.hands[current.id].length - playedCards.length - willDiscard;
@@ -2281,10 +2286,25 @@ window.handlePlayAction = function() {
             }
         };
 
+        const step4 = () => {
+            if (def && cardValue === 'id_20' && selColor) {
+                const validIndices = [];
+                window.game.myHand.forEach((c, i) => {
+                    if (!indices.includes(i) && i !== discardIdx && c.color === selColor) validIndices.push(i);
+                });
+                if (validIndices.length > 0) {
+                    window.openMultiDiscardSelection(window.game.myHand, validIndices, (selectedMulti) => {
+                        multiDiscardIndices = selectedMulti;
+                        step5();
+                    });
+                } else { step5(); }
+            } else { step5(); }
+        };
+
         const step3 = () => {
             if (def && def.needsColor) {
-                ColorUI.show((color) => { selColor = color; step5(); });
-            } else { step5(); }
+                ColorUI.show((color) => { selColor = color; step4(); });
+            } else { step4(); }
         };
 
         const step2 = () => {
@@ -2325,7 +2345,6 @@ window.onColorChosen = function(color) {
     }
 };
 
-// ★修正: すべてのボタン処理とマニュアル処理を、画面読み込み完了後（DOMContentLoaded）に実行するように保護しました
 document.addEventListener('DOMContentLoaded', () => { 
     if(window.ensureModalsExist) window.ensureModalsExist();
     if(window.initVolumeControl) window.initVolumeControl(); 
@@ -2406,7 +2425,6 @@ document.addEventListener('DOMContentLoaded', () => {
         unoBtn.onclick = window.declareUno;
     }
 
-    // マニュアル画面の処理
     const btnManual = document.getElementById('btn-manual');
     const manualOverlay = document.getElementById('manual-overlay');
     const manualImage = document.getElementById('manual-image');
