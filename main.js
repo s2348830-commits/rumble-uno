@@ -324,9 +324,14 @@ window.updatePhaseUI = function(state) {
             if (title && !state.jankenPhase.result) title.innerText = "相手を待っています...";
         }
 
-        if (state.jankenPhase.result && !window.jankenResultPlayed) {
-            window.jankenResultPlayed = true;
-            if (typeof window.playJankenResult === 'function') window.playJankenResult(state.jankenPhase.attackerId, state.jankenPhase.targetId, state.jankenPhase.attackerHand, state.jankenPhase.targetHand, state.jankenPhase.result);
+        if (state.jankenPhase.result) {
+            if (!window.jankenResultPlayed) {
+                window.jankenResultPlayed = true;
+                if (typeof window.playJankenResult === 'function') window.playJankenResult(state.jankenPhase.attackerId, state.jankenPhase.targetId, state.jankenPhase.attackerHand, state.jankenPhase.targetHand, state.jankenPhase.result);
+            }
+        } else {
+            // ★追加: 次の再戦(ループ)が始まったら、結果再生フラグをfalseに戻す！
+            window.jankenResultPlayed = false;
         }
     } else {
         window.isJankenShowing = false;
