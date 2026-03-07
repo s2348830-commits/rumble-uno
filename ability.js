@@ -8,7 +8,7 @@ window.AbilityDef = {
     'id_4': { rarity: 'SSR', type: 'HE_BL', name: 'ヘイゼル', desc: '【BL/受動】捨てられた時・場に出た時、自分にシールドIIを2ターン付与する。また15%の確率でカードが消費されず、手札に残る。' },
     'id_5': { rarity: 'SSR', type: 'HE', name: '瑠璃', desc: '【HE】自分の手札に+カードを2枚持ってくる。(内訳、各種+2：8割、+4：2割)' },
     'id_6': { rarity: 'SSR', type: 'AT', name: 'ラン', desc: '【AT】他全員に手札を2枚ランダムに捨てさせその後に3枚ドローさせる。' },
-    'id_7': { rarity: 'SSR', type: 'AT', name: 'リリス', desc: '【AT】1人指定。燃焼(3T開始時固定1ドロー)を付与。', needsTarget: true },
+    'id_7': { rarity: 'SSR', type: 'AT', name: 'リリス', desc: '【AT】1人指定。燃焼(5T開始時固定1ドロー)を付与。既に燃焼がある場合はターン数が重複(加算)する。', needsTarget: true },
     'id_8': { rarity: 'SSR', type: 'HE', name: 'ヘラ', desc: '【HE】1人指定し1枚引かせる。手札1枚捨てる。その後、回避Iを2ターン付与。', needsTarget: true, needsDiscard: true },
     'id_9': { rarity: 'SSR', type: 'AT_BL', name: 'レナ', desc: '【AT/BL】自分以外の他全員に1枚引かせる。防御時自分以外の他全員に固定2ドロー。' },
     'id_10': { rarity: 'SSR', type: 'HE', name: 'シャミール', desc: '【HE】1人指定。数字カード3枚を次の次ターンまでロック。', needsTarget: true },
@@ -231,9 +231,9 @@ window.AbilityEngine = {
                         }
                         drawCount = 3;
                     } else if (abilityId === 'id_7') {
-                        const bres = this.applyBurn(game, targetId, 3);
+                        const bres = this.applyBurn(game, targetId, 5);
                         if (bres === -1) guides.push({ from: attackerId, to: targetId, text: '💨回避!' });
-                        else guides.push({ from: attackerId, to: targetId, text: '🔥燃焼(3T)', se: 'fire' });
+                        else guides.push({ from: attackerId, to: targetId, text: '🔥燃焼(5T)', se: 'fire' });
                     } else if (abilityId === 'id_9') drawCount = 1;
                     else if (abilityId === 'id_12') drawCount = 2;
                     else if (abilityId === 'id_14') drawCount = 4;

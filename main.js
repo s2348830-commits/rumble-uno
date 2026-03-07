@@ -341,7 +341,11 @@ window.broadcastGameState = function(skipUIUpdate = false, attackGuides = []) {
     if (!window.isHost) return;
     const playersInfo = window.game.players.map(p => ({ 
         id: p.id, connected: p.connected, frozen: p.frozen, burnTurns: p.burnTurns, 
-        invincibleTurns: p.invincibleTurns, shield: p.shield, evasion: p.evasion, usedRaia: p.usedRaia 
+        invincibleTurns: p.invincibleTurns, shield: p.shield, evasion: p.evasion, usedRaia: p.usedRaia,
+        // ★追加: 裂傷と蘇生の情報を他プレイヤーにも送る
+        lacerationTurns: p.lacerationTurns, 
+        resurrectionEveCount: p.resurrectionEveCount, 
+        resurrectionMisaCount: p.resurrectionMisaCount
     }));
     const state = {
         deck: window.game.deck, turnIndex: window.game.turnIndex, direction: window.game.direction,
@@ -2377,6 +2381,10 @@ function initMainSocketEvents() {
                     p.shield = info.shield || { level: 0, turns: 0 };
                     p.evasion = info.evasion || { level: 0, turns: 0 };
                     p.usedRaia = info.usedRaia || false;
+                    // ★追加: 受け取ったデータをプレイヤーに反映させる
+                    p.lacerationTurns = info.lacerationTurns || 0;
+                    p.resurrectionEveCount = info.resurrectionEveCount !== undefined ? info.resurrectionEveCount : -1;
+                    p.resurrectionMisaCount = info.resurrectionMisaCount !== undefined ? info.resurrectionMisaCount : -1;
                     newPlayers.push(p);
                 }
             });
