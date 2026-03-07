@@ -415,7 +415,6 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
             let someoneWon = false; window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
             if (!someoneWon) {
                 // 能力カード以外（+2, +4等）による発動なら次のターンへ
-                if (cardValue === '+2' || cardValue === 'Wild+4') window.game.nextTurn(1);
                 setTimeout(() => window.checkTurn(), 500); 
             }
         } else { window.pendingDefense.timer--; window.broadcastGameState(true); }
@@ -716,7 +715,7 @@ window.executePlay = function(playerId, indices, isBot = false) {
         let guides = []; let isDrawAttack = false; let attackCardVal = null; let targetId = null;
         if (result.lastCard && (result.lastCard.value === '+2' || result.lastCard.value === 'Wild+4')) { attackCardVal = result.lastCard.value; isDrawAttack = true; }
         if (window.checkWin(playerId)) return;
-        if (result.isAbility) { window.broadcastGameState(false, guides); window.game.nextTurn(1); setTimeout(() => { window.checkTurn(); }, 500); return; }
+        if (result.isAbility) { window.broadcastGameState(false, guides); setTimeout(() => { window.checkTurn(); }, 500); return; }
 
         if (result.needsColor) {
             if (isDrawAttack) { if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length === 0) {} else { window.pendingDrawDefenseInfo = { attackerId: playerId, cardValue: attackCardVal }; } }
@@ -977,26 +976,23 @@ function initMainSocketEvents() {
     if (typeof window.socket === 'undefined') { setTimeout(initMainSocketEvents, 100); return; }
 
     window.socket.on('sync_game_state', (state) => {
-        if (!window.game) return;
+    if (!window.game) return;
+    window.waitingForServerResponse = false;
+    
+    if (state.defensePhase === null && state.jankenPhase === null) {
+        window.isServerProcessingAbility = false;
+        window.isDefending = false;
+        window.currentDefensePhaseId = null;
+        window.hasRespondedDefense = false;
+        window.isAnimating = false;
         
-        window.waitingForServerResponse = false;
-        
-        // ★重要: サーバーが防御/じゃんけん中でないなら、クライアント側の全てのロックを強制リセット（フェイルセーフ）
-        if (state.defensePhase === null && state.jankenPhase === null) {
-            window.isServerProcessingAbility = false;
-            window.isDefending = false;
-            window.currentDefensePhaseId = null;
-            window.hasRespondedDefense = false;
-            window.isAnimating = false; 
-            window.pendingJanken = null;
-            window.pendingDefense = null;
-            
-            if (!document.querySelector('.action-popup:not(.hidden)')) {
-                window.isProcessingPlay = false;
-            }
-        } else {
-            window.isServerProcessingAbility = true;
+        // ★修正: ポップアップが画面に出ていないなら、プレイ中ロックを強制解除する
+        if (!document.querySelector('.action-popup:not(.hidden)')) {
+            window.isProcessingPlay = false;
         }
+    } else {
+        window.isServerProcessingAbility = true;
+    }
         
         if (typeof window.updatePhaseUI === 'function') { window.updatePhaseUI(state); }
         
