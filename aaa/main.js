@@ -319,7 +319,23 @@ window.openDebuffSelection = function(callback) {
 
 window.showDefenseModal = function(attackCardValue) {
     window.ensureModalsExist(); const modal = document.getElementById('defense-modal'), list = document.getElementById('defense-modal-list'), title = document.getElementById('defense-title'), desc = document.getElementById('defense-desc'), qArea = document.getElementById('defense-question-area'), sArea = document.getElementById('defense-select-area'), btnYes = document.getElementById('btn-defense-yes'), btnNo = document.getElementById('btn-defense-no'), btnCancel = document.getElementById('btn-cancel-defense');
-    if (!modal || !list) { if (window.socket) window.socket.emit('player_action', { action: 'defense_response', targetId: window.myId, cardValue: null, discardIdx: null }); window.isDefending = false; return; }
+    
+    // ★修正: ホスト自身が防御対象の場合、通信せずに直接pendingDefenseを更新してフリーズを防ぐ
+    const sendResponse = (cardValue, discardIdx) => {
+        window.hasRespondedDefense = true; modal.classList.add('hidden');
+        if (window.isHost) {
+            if (window.pendingDefense && window.pendingDefense.responses) { 
+                window.pendingDefense.responses[window.game.myId] = { cardValue: cardValue, discardIdx: discardIdx }; 
+                if(window.pendingDefense.info && Object.keys(window.pendingDefense.responses).length >= window.pendingDefense.info.targets.length) window.pendingDefense.timer = 0; 
+            }
+        } else {
+            if (window.socket) window.socket.emit('player_action', { action: 'defense_response', targetId: window.game.myId, cardValue: cardValue, discardIdx: discardIdx });
+        }
+        window.isDefending = false;
+    };
+
+    if (!modal || !list) { sendResponse(null, null); return; }
+    
     let attackName = '能力', attackDesc = ''; 
     if (window.AbilityDef && window.AbilityDef[attackCardValue]) { attackName = window.AbilityDef[attackCardValue].name; attackDesc = window.AbilityDef[attackCardValue].desc; } else if (attackCardValue === '+2' || attackCardValue === 'Wild+4') { attackName = attackCardValue; attackDesc = '引かされる枚数が増加します！(防御カードで防げます)'; }
     title.innerText = `攻撃を受けました！(${attackName})`; if (desc) { if (attackDesc) { desc.innerText = attackDesc; desc.classList.remove('hidden'); } else { desc.classList.add('hidden'); } }
@@ -332,14 +348,18 @@ window.showDefenseModal = function(attackCardValue) {
         defCards.forEach(item => {
             const btn = Renderer.createCardElement(item.card); btn.style.width = '50px'; btn.style.height = '75px'; btn.style.margin = '5px'; btn.style.cursor = 'pointer';
             btn.onclick = () => {
-                window.hasRespondedDefense = true; 
                 const def = window.AbilityDef[item.card.value]; if (typeof window.showAbilityCutin === 'function') { window.showAbilityCutin(item.card.value); }
-                if (def && (def.needsDiscard || def.needsAbilityDiscard)) { modal.classList.add('hidden'); window.openDiscardSelection(myHand, [item.idx], def, (discIdx) => { window.socket.emit('player_action', { action: 'defense_response', targetId: window.game.myId, cardValue: item.card.value, discardIdx: discIdx }); window.isDefending = false; }); } else { modal.classList.add('hidden'); window.socket.emit('player_action', { action: 'defense_response', targetId: window.game.myId, cardValue: item.card.value, discardIdx: null }); window.isDefending = false; }
+                if (def && (def.needsDiscard || def.needsAbilityDiscard)) { 
+                    modal.classList.add('hidden'); 
+                    window.openDiscardSelection(myHand, [item.idx], def, (discIdx) => { sendResponse(item.card.value, discIdx); }); 
+                } else { 
+                    sendResponse(item.card.value, null); 
+                }
             }; list.appendChild(btn);
         });
     };
     
-    btnNo.onclick = () => { window.hasRespondedDefense = true; modal.classList.add('hidden'); if(window.socket) window.socket.emit('player_action', { action: 'defense_response', targetId: window.game.myId, cardValue: null, discardIdx: null }); window.isDefending = false; };
+    btnNo.onclick = () => { sendResponse(null, null); };
     btnCancel.onclick = () => { window.hasRespondedDefense = false; qArea.classList.remove('hidden'); sArea.classList.add('hidden'); };
     modal.classList.remove('hidden');
 };
@@ -403,6 +423,7 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
     if (!window.isHost) return;
     const hand = window.game.hands[playerId]; if (!hand || !playedCardsData || playedCardsData.length === 0) return; 
     
+    const wasMyTurn = (playerId === window.game.currentPlayer.id);
     const cardValue = playedCardsData[0].value; const def = window.AbilityDef ? window.AbilityDef[cardValue] : null;
 
     if (!def) { window.executePlay(playerId, indices, false); return; }
@@ -443,7 +464,7 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
         } 
     });
 
-    if (cardValue === 'id_26') { setTimeout(() => { window.startJankenPhase(playerId, 0); }, 2500); return; }
+    if (cardValue === 'id_26') { setTimeout(() => { window.startJankenPhase(playerId, 0, null, wasMyTurn); }, 2500); return; }
 
     if (def.type === 'AT' || def.type === 'AT_BL' || def.type === 'HV') {
         let targets = [];
@@ -535,11 +556,11 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
     }
 };
 
-window.startJankenPhase = function(attackerId, loopCount, fixedTargetId = null) {
+window.startJankenPhase = function(attackerId, loopCount, fixedTargetId = null, wasMyTurn = true) {
     if (window.jankenInterval) clearInterval(window.jankenInterval);
     let targetId = fixedTargetId;
     if (!targetId) { const others = window.game.players.filter(p => p.id !== attackerId && p.connected); if (others.length === 0) { alert("じゃんけんの相手がいません！"); return; } targetId = others[Math.floor(Math.random() * others.length)].id; }
-    window.pendingJanken = { attackerId, targetId, loopCount, attackerHand: null, targetHand: null, timer: 10, result: null };
+    window.pendingJanken = { attackerId, targetId, loopCount, attackerHand: null, targetHand: null, timer: 10, result: null, wasMyTurn: wasMyTurn };
     window.broadcastGameState(); 
     window.jankenInterval = setInterval(() => {
         if (!window.pendingJanken || window.pendingJanken.result) { clearInterval(window.jankenInterval); return; }
@@ -569,16 +590,13 @@ window.resolveJanken = function() {
         let drawCount = 0; if (result === 'win') { drawCount = 2; } else if (result === 'lose' && pJ.loopCount === 0) { drawCount = 2; }
         if (drawCount > 0) { window.AbilityEngine.applyDraw(window.game, pJ.targetId, drawCount, false); const guides = [{ from: pJ.attackerId, to: pJ.targetId, text: 'じゃんけんドロー!', delay: 0 }]; window.broadcastGameState(false, guides); }
         let someoneWon = false; window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
-        
         if (!someoneWon) {
             const nextLoop = pJ.loopCount + 1; const aId = pJ.attackerId; const tId = pJ.targetId; const wasMyTurn = pJ.wasMyTurn;
             if (result === 'win' && nextLoop < 4) { window.pendingJanken.attackerHand = null; window.pendingJanken.targetHand = null; window.pendingJanken.result = null; window.pendingJanken.timer = 10; window.pendingJanken.loopCount = nextLoop; window.broadcastGameState(); window.startJankenPhase(aId, nextLoop, tId, wasMyTurn); } 
             else if (result === 'draw') { window.pendingJanken.attackerHand = null; window.pendingJanken.targetHand = null; window.pendingJanken.result = null; window.pendingJanken.timer = 10; window.broadcastGameState(); window.startJankenPhase(aId, pJ.loopCount, tId, wasMyTurn); } 
-            else { window.pendingJanken = null; if(wasMyTurn){ window.game.nextTurn(1); } window.broadcastGameState(); if(wasMyTurn){ setTimeout(() => window.checkTurn(), 1000); } }
+            else { window.pendingJanken = null; window.broadcastGameState(); }
         } else {
-            // ★修正: 誰かが上がった（手札0枚になった）場合はじゃんけんフェーズを終了してUIを閉じる
-            window.pendingJanken = null;
-            window.broadcastGameState();
+            window.pendingJanken = null; window.broadcastGameState();
         }
     }, 4500); 
 };
@@ -728,6 +746,7 @@ window.executeDraw = function(playerId, isBot = false) {
     for(let i=0; i<count; i++) { if(!window.game.drawCard(playerId)) { if(window.isGameOver) return; break; } }
     if (stack > 0) { window.game.drawStack = 0; window.game.nextTurn(1); window.checkTurn(); } 
     else { if (isBot) { window.game.nextTurn(1); window.checkTurn(); } else { window.game.hasDrawnThisTurn = true; window.broadcastGameState(); } }
+    window.waitingForServerResponse = false;
 };
 
 window.executeEndTurn = function(playerId) {
@@ -768,7 +787,7 @@ window.tryDrawWithAbility = function(callback) {
 window.handlePlayAction = function() {
     if (window.game.selectedIndices.length === 0 || window.isGameOver || window.isInitialDealing || window.isDrawing) return;
     
-    if (window.pendingJanken || window.pendingDefense || window.currentDefensePhaseId || window.isDefending || window.isProcessingPlay || window.waitingForServerResponse) {
+    if (window.waitingForServerResponse || window.pendingJanken || window.pendingDefense || window.currentDefensePhaseId || window.isDefending || window.isProcessingPlay) {
         alert("現在、通信または効果処理中です。解決するまでお待ちください。"); window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return;
     }
     
@@ -947,10 +966,9 @@ function initMainSocketEvents() {
     window.socket.on('sync_game_state', (state) => {
         if (!window.game) return;
         
-        // ★修正: サーバーから状態を受信した時点で必ず待機ロックを解除する
         window.waitingForServerResponse = false;
         
-        // サーバーが防御/じゃんけん中でなければ、ローカルのロック状態も初期化
+        // ★修正: サーバーが処理中でなければ、あらゆるローカルのロックフラグを強制解除する（フェイルセーフ）
         if (state.defensePhase === null && state.jankenPhase === null) {
             window.isServerProcessingAbility = false;
             window.isDefending = false;
@@ -962,7 +980,8 @@ function initMainSocketEvents() {
         
         if (typeof window.updatePhaseUI === 'function') { window.updatePhaseUI(state); }
         
-        const isChoosing = (!window.isHost && window.game.myId) && ((window.game.selectedIndices && window.game.selectedIndices.length > 0) || window.isProcessingPlay || window.isDrawing || document.querySelector('.action-popup:not(.hidden)'));        const currentFingerprint = JSON.stringify(state);
+        const isChoosing = (!window.isHost && window.game.myId) && ((window.game.selectedIndices && window.game.selectedIndices.length > 0) || window.isProcessingPlay || window.isDrawing || document.querySelector('.action-popup:not(.hidden)'));
+        const currentFingerprint = JSON.stringify(state);
         if (window.lastGameStateFingerprint === currentFingerprint && !window.isInitialDealing) return;
         window.lastGameStateFingerprint = currentFingerprint;
 
