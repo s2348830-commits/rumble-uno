@@ -1,12 +1,11 @@
 /**
- * main.js (全バグ修正・安定化・ID取得エラー対応版)
+ * main.js (ホスト側ドロー不可バグ＆UI消失バグ 徹底修正版)
  */
 
 if (window.AbilityDef && window.AbilityDef['id_33']) {
     window.AbilityDef['id_33'].desc = '【AT】自分以外のプレイヤーを一人指定し1枚ドローさせる。自分のターン中にこのカードを使用した場合、自分のターン終了後にこのカードを手札に戻してもよい。(各ターン1回のみ)';
 }
 
-// --- グローバル変数の初期化 ---
 window.game = new UNOGame(); window.playerAfkTimes = {}; window.turnTimer = null; window.isGameOver = false; window.isDrawing = false; window.isInitialDealing = false; window.isDefending = false; window.isDealAnimationRunning = false; window.isServerProcessingAbility = false;
 window.pendingDrawDefenseInfo = null; window.pendingJanken = null; window.isProcessingPlay = false; window.currentDefensePhaseId = null; window.hasRespondedDefense = false; window.currentJankenLoopId = null; 
 window.lastGameStateFingerprint = ""; window.hostSyncInterval = null; window.waitingForServerResponse = false; window.isAnimating = false; window.animatingTimeout = null;
@@ -14,7 +13,6 @@ window.lastGameStateFingerprint = ""; window.hostSyncInterval = null; window.wai
 window.resetDonePlayers = new Set();
 window.abilityResetSubmitted = false;
 
-// ★確実なID取得機能の導入
 window.getMyId = function() {
     return window.myId || (window.game ? window.game.myId : null);
 };
@@ -103,7 +101,31 @@ window.initVolumeControl = function() {
 
 const ColorUI = { callback: null, show: function(cb = null) { this.callback = cb; document.getElementById('color-selector').classList.remove('hidden'); }, hide: function() { document.getElementById('color-selector').classList.add('hidden'); } };
 
-window.updateUI = function() { if(window.game && window.game.players && window.game.players.length > 0) { Renderer.updateAll(window.game); window.checkFinalSprint(); } };
+// ★追加: ボタンの表示・非表示をシステム側で常に正しく保つための管理関数
+window.updateUI = function() { 
+    if(window.game && window.game.players && window.game.players.length > 0) { 
+        Renderer.updateAll(window.game); 
+        window.checkFinalSprint(); 
+        
+        const drawBtn = document.getElementById('draw-btn');
+        const endBtn = document.getElementById('end-turn-btn');
+        if (drawBtn && endBtn) {
+            // 自分のターンかつ、特殊な処理中でなければボタンを表示
+            if (window.game.currentPlayer && window.game.currentPlayer.id === window.getMyId() && !window.isGameOver && !window.isInitialDealing && !window.pendingJanken && !window.pendingDefense) {
+                endBtn.classList.remove('hidden');
+                // ドロー済みの場合は引くボタンを隠す
+                if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) {
+                    drawBtn.classList.add('hidden');
+                } else {
+                    drawBtn.classList.remove('hidden');
+                }
+            } else {
+                drawBtn.classList.add('hidden');
+                endBtn.classList.add('hidden');
+            }
+        }
+    } 
+};
 
 window.checkFinalSprint = function() {
     if (window.isGameOver || window.isInitialDealing) { window.SE.stopLoop('final_sprint'); return; }
@@ -809,12 +831,9 @@ window.declareUno = function() {
 window.tryDrawWithAbility = function(callback) {
     const currentId = window.getMyId();
     const me = window.game.players.find(p => p.id === currentId); 
-    
-    // ★修正: 手札データが存在しない場合のエラーを防ぐ
     const myHand = window.game.myHand || [];
     const renaIdx = myHand.findIndex(c => c && c.value === 'id_9');
     
-    // ★修正: me (プレイヤー情報) が正しく取得できているか必ずチェックする
     if (me && renaIdx > -1 && !me.frozen) { 
         window.showConfirm("【レナ】カードを引く代わりに「レナ」を場に出して効果を発動しますか？", (yes) => { 
             if (yes) { 
@@ -829,6 +848,7 @@ window.tryDrawWithAbility = function(callback) {
         callback(); 
     }
 };
+
 window.handlePlayAction = function() {
     if (window.game.selectedIndices.length === 0 || window.isGameOver || window.isInitialDealing || window.isDrawing) return;
         
@@ -911,6 +931,7 @@ window.handlePlayAction = function() {
                 if(window.socket) window.socket.emit('request_draw_animation', { playerId: currentId, count: penaltyCount }); 
                 for(let i=0; i<penaltyCount; i++) window.game.drawCard(currentId); 
                 if(wasMyTurnLocal) window.executeEndTurn(currentId); else window.broadcastGameState(true);
+                window.isDrawing = false; window.isProcessingPlay = false;
             } 
             else { 
                 window.waitingForServerResponse = true; 
@@ -919,11 +940,9 @@ window.handlePlayAction = function() {
 
             if (window.SE) window.SE.playMultiple('Distribute', penaltyCount, 500);
             if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
-                CardAnimation.animateMultiDraw(penaltyCount, 'player-hand', () => {
-                    window.isDrawing = false; window.isProcessingPlay = false; window.game.selectedIndices = [];
-                });
+                CardAnimation.animateMultiDraw(penaltyCount, 'player-hand', () => { window.isDrawing = false; window.isProcessingPlay = false; });
             } else {
-                window.isDrawing = false; window.isProcessingPlay = false; window.game.selectedIndices = [];
+                window.isDrawing = false; window.isProcessingPlay = false;
             }
         }); 
         return; 
@@ -1008,19 +1027,18 @@ document.getElementById('draw-btn').onclick = () => {
         if (window.isHost) {
             if (window.socket) window.socket.emit('request_draw_animation', { playerId: currentId, count: count });
             window.executeDraw(currentId);
-        } else if (window.socket) {
-            window.socket.emit('player_action', { action: 'draw', playerId: currentId, count: count });
+            window.isDrawing = false;
+            window.waitingForServerResponse = false;
+        } else {
+            if (window.socket) window.socket.emit('player_action', { action: 'draw', playerId: currentId, count: count });
+            setTimeout(() => { window.isDrawing = false; window.waitingForServerResponse = false; }, 1000);
         }
 
         if (window.SE) window.SE.playMultiple('Distribute', count, 500);
 
         if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
-            CardAnimation.animateMultiDraw(count, 'player-hand', () => { window.isDrawing = false; });
-        } else {
-            window.isDrawing = false;
+            CardAnimation.animateMultiDraw(count, 'player-hand', () => {});
         }
-        
-        setTimeout(() => { window.waitingForServerResponse = false; }, 2000);
     });
 };
 
@@ -1037,9 +1055,11 @@ document.getElementById('end-turn-btn').onclick = () => {
     const currentId = window.getMyId();
     if (window.isHost) {
         window.executeEndTurn(currentId);
-    } else if (window.socket) {
-        window.socket.emit('player_action', { action: 'end_turn', playerId: currentId });
-        setTimeout(() => { window.waitingForServerResponse = false; }, 2000);
+        window.waitingForServerResponse = false;
+        window.isProcessingPlay = false;
+    } else {
+        if (window.socket) window.socket.emit('player_action', { action: 'end_turn', playerId: currentId });
+        setTimeout(() => { window.waitingForServerResponse = false; window.isProcessingPlay = false; }, 1000);
     }
 };
 
@@ -1084,15 +1104,6 @@ function initMainSocketEvents() {
             window.isServerProcessingAbility = false;
         }
         
-        if (state.playersInfo && state.playersInfo[state.turnIndex]) {
-            if (state.playersInfo[state.turnIndex].id === window.getMyId()) {
-                const drawBtn = document.getElementById('draw-btn');
-                const endBtn = document.getElementById('end-turn-btn');
-                if (drawBtn) drawBtn.classList.remove('hidden');
-                if (endBtn) endBtn.classList.remove('hidden');
-            }
-        }
-
         if (typeof window.updatePhaseUI === 'function') { window.updatePhaseUI(state); }
         
         const isChoosing = (!window.isHost && window.getMyId()) && (document.querySelector('.action-popup:not(.hidden)'));
@@ -1144,7 +1155,7 @@ function initMainSocketEvents() {
     window.socket.on('receive_player_action', (data) => {
         if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
         const playerId = data.playerId;
-        if (!playerId) return; // IDがない通信は無視
+        if (!playerId) return; 
         
         if (data.action === 'play') {
             if (window.pendingDefense || window.pendingJanken) return;
