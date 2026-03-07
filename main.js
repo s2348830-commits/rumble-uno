@@ -2595,5 +2595,12 @@ function initMainSocketEvents() {
         }
     });
 }
+document.getElementById("btn-open-custom-cards").onclick = () => {
+    document.getElementById("custom-card-overlay").classList.remove("hidden");
+};
+
+document.getElementById("btn-close-custom-cards").onclick = () => {
+    document.getElementById("custom-card-overlay").classList.add("hidden");
+};
 
 initMainSocketEvents();
