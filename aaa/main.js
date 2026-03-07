@@ -101,32 +101,32 @@ window.initVolumeControl = function() {
 
 const ColorUI = { callback: null, show: function(cb = null) { this.callback = cb; document.getElementById('color-selector').classList.remove('hidden'); }, hide: function() { document.getElementById('color-selector').classList.add('hidden'); } };
 
+// ★修正: 重複ボタンが存在しても「最初の要素」だけを操作するようにし、UIのちらつきや二重送信を防ぐ
 window.updateUI = function() { 
     if(window.game && window.game.players && window.game.players.length > 0) { 
         Renderer.updateAll(window.game); 
         window.checkFinalSprint(); 
         
-        // ★修正: 常に「最初の要素だけ」を操作し、残りは無視することでUI重複バグを回避
-        const drawBtn = document.getElementById('draw-btn');
-        const endBtn = document.getElementById('end-turn-btn');
+        const drawBtns = document.querySelectorAll('#draw-btn');
+        const endBtns = document.querySelectorAll('#end-turn-btn');
         const isMyTurnAndCanAct = window.game.currentPlayer && window.game.currentPlayer.id === window.getMyId() && !window.isGameOver && !window.isInitialDealing && !window.pendingJanken && !window.pendingDefense;
 
-        if (endBtn) {
-            if (isMyTurnAndCanAct) endBtn.classList.remove('hidden');
-            else endBtn.classList.add('hidden');
-        }
+        endBtns.forEach(btn => {
+            if (isMyTurnAndCanAct) btn.classList.remove('hidden');
+            else btn.classList.add('hidden');
+        });
         
-        if (drawBtn) {
+        drawBtns.forEach(btn => {
             if (isMyTurnAndCanAct) {
                 if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) {
-                    drawBtn.classList.add('hidden');
+                    btn.classList.add('hidden');
                 } else {
-                    drawBtn.classList.remove('hidden');
+                    btn.classList.remove('hidden');
                 }
             } else {
-                drawBtn.classList.add('hidden');
+                btn.classList.add('hidden');
             }
-        }
+        });
     } 
 };
 
@@ -448,6 +448,7 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                     if (discCard && discCard.value && String(discCard.value).startsWith('id_')) { window.game.abilityGraveyard.push(discCard.value); } else if (discCard) { window.game.discardPile.push(discCard); window.game.discardRotations.push(0); }
                 }
                 const def = window.AbilityDef[defCardId];
+                // ★修正: 防御効果処理のエラーガード
                 try {
                     if (defCardId === 'id_2') { window.game.players.filter(px => px.id !== targetId).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); }); const targetP = window.game.players.find(p=>p.id===targetId); if(targetP) targetP.shield = { level: 1, turns: 1 }; if (Math.random() < 0.6) { window.game.players.filter(px => px.id !== targetId).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); }); } }
                     else if (defCardId === 'id_4') { if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) { window.AbilityEngine.triggerDiscardEffect(window.game, targetId, 'id_4', false, null); } }
@@ -552,6 +553,7 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
 
         if (cardValue === 'id_28' || !needsDefense) {
             let guides = []; 
+            // ★修正: 能力解決処理のエラーガード
             try {
                 if (window.AbilityEngine && window.AbilityEngine.resolve) { 
                     const resGuides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, responses, multiplier, selectedColor, multiCards, extraData); 
@@ -595,6 +597,7 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
                                 if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) { window.AbilityEngine.triggerDiscardEffect(window.game, tid, discCard.value, true, discCard); }
                                 if (discCard && discCard.value && String(discCard.value).startsWith('id_')) { window.game.abilityGraveyard.push(discCard.value); } else if (discCard) { window.game.discardPile.push(discCard); window.game.discardRotations.push(0); }
                             }
+                            // ★修正: 防御効果処理のエラーガード
                             try {
                                 if (defCardId === 'id_2') { window.game.players.filter(px => px.id !== tid).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); }); const targetP = window.game.players.find(p=>p.id===targetId); if(targetP) targetP.shield = { level: 1, turns: 1 }; if (Math.random() < 0.6) { window.game.players.filter(px => px.id !== tid).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); }); } }
                                 else if (defCardId === 'id_4') { if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) { window.AbilityEngine.triggerDiscardEffect(window.game, tid, 'id_4', false, null); } }
@@ -1141,8 +1144,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if(window.ensureModalsExist) window.ensureModalsExist(); 
     if(window.initVolumeControl) window.initVolumeControl(); 
 });
-
-document.getElementById('uno-btn').onclick = window.declareUno;
 
 (() => {
     const btnManual = document.getElementById('btn-manual'), manualOverlay = document.getElementById('manual-overlay'), manualImage = document.getElementById('manual-image'), manualPrev = document.getElementById('manual-prev'), manualNext = document.getElementById('manual-next'), manualClose = document.getElementById('manual-close'), manualIndicators = document.getElementById('manual-indicators');
