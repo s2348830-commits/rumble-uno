@@ -1221,6 +1221,8 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
     }, 1000);
 };
 
+// ...（後半へ続く）...
+
 window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, selectedColor = null, multiDiscardIndices = [], extraData = {}) {
     if (!window.isHost) return;
     
@@ -2338,7 +2340,9 @@ document.getElementById('draw-btn').onclick = function() {
         window.updateUI();                    
         
         const s = window.game.drawStack; 
-        const count = s > 0 ? s : 1;
+        let count = s > 0 ? s : 1;
+        const me = window.game.players.find(p=>p.id===window.game.myId);
+        if (me && me.laceration > 0) count += 1; // 裂傷の場合は+1枚
         
         if (window.isHost) {
             if (window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: count }); 
