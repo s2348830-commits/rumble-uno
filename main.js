@@ -161,6 +161,9 @@ window.broadcastGameState = function(skipUIUpdate = false, attackGuides = []) {
     if (!window.isHost) return;
     const playersInfo = window.game.players.map(p => ({ id: p.id, connected: p.connected, frozen: p.frozen, burnTurns: p.burnTurns, invincibleTurns: p.invincibleTurns, shield: p.shield, evasion: p.evasion, usedRaia: p.usedRaia }));
     const state = { deck: window.game.deck, turnIndex: window.game.turnIndex, direction: window.game.direction, hands: window.game.hands, discardPile: window.game.discardPile, discardRotations: window.game.discardRotations, drawStack: window.game.drawStack, currentColor: window.game.currentColor, playersInfo: playersInfo, hasDrawnThisTurn: window.game.hasDrawnThisTurn, defensePhase: window.pendingDefense ? window.pendingDefense.info : null, defenseTimer: window.pendingDefense ? window.pendingDefense.timer : 0, attackGuides: attackGuides, abilityGraveyard: window.game.abilityGraveyard, jankenPhase: window.pendingJanken, customDeck: window.game.customDeck };
+    
+    window.isServerProcessingAbility = (state.defensePhase !== null || state.jankenPhase !== null);
+
     if (window.socket) window.socket.emit('sync_game_state', state);
     if (!skipUIUpdate) { window.lastGameStateFingerprint = ""; window.updateUI(); }
     window.updatePhaseUI(state);
@@ -416,7 +419,7 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
             } 
         });
         let someoneWon = false; window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
-        if (!someoneWon) { window.game.nextTurn(1); window.broadcastGameState(false); setTimeout(() => window.checkTurn(), 500); }
+        if (!someoneWon) { window.broadcastGameState(false); setTimeout(() => window.checkTurn(), 500); }
         return;
     }
 
@@ -513,7 +516,7 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
                                 if (discCard.value && String(discCard.value).startsWith('id_')) { window.game.abilityGraveyard.push(discCard.value); } else { window.game.discardPile.push(discCard); window.game.discardRotations.push(0); }
                             }
                             const def = window.AbilityDef[defCardId];
-                            if (defCardId === 'id_2') { window.game.players.filter(px => px.id !== tid).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); }); const targetP = window.game.players.find(p=>p.id===tid); if(targetP) targetP.shield = { level: 1, turns: 1 }; if (Math.random() < 0.6) { window.game.players.filter(px => px.id !== tid).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); }); } }
+                            if (defCardId === 'id_2') { window.game.players.filter(px => px.id !== tid).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); }); const targetP = window.game.players.find(p=>p.id===targetId); if(targetP) targetP.shield = { level: 1, turns: 1 }; if (Math.random() < 0.6) { window.game.players.filter(px => px.id !== tid).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); }); } }
                             else if (defCardId === 'id_4') { if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) { window.AbilityEngine.triggerDiscardEffect(window.game, tid, 'id_4', false, null); } }
                             else if (defCardId === 'id_9') { window.game.players.filter(px => px.id !== tid).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 2); }); }
                             else if (defCardId === 'id_18') { window.game.players.filter(px => px.id !== tid).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); }); const targetP = window.game.players.find(p=>p.id===tid); if(targetP) targetP.shield = { level: 1, turns: 2 }; }
@@ -949,16 +952,13 @@ function initMainSocketEvents() {
     window.socket.on('sync_game_state', (state) => {
         if (!window.game) return;
         
-        if (window.game.currentPlayer && window.game.currentPlayer.id !== window.myId) {
-            window.waitingForServerResponse = false;
-        }
+        window.waitingForServerResponse = false;
+        window.isServerProcessingAbility = (state.defensePhase !== null || state.jankenPhase !== null);
         
         const isChoosing = (!window.isHost && window.game.myId) && ((window.game.selectedIndices && window.game.selectedIndices.length > 0) || window.isProcessingPlay || window.isDrawing || document.querySelector('.action-popup:not(.hidden)'));
         const currentFingerprint = JSON.stringify(state);
         if (window.lastGameStateFingerprint === currentFingerprint && !window.isInitialDealing) return;
         window.lastGameStateFingerprint = currentFingerprint;
-        
-        window.isServerProcessingAbility = (state.defensePhase !== null || state.jankenPhase !== null);
 
         window.game.deck = state.deck; window.game.turnIndex = state.turnIndex; window.game.direction = state.direction; window.game.discardPile = state.discardPile; window.game.discardRotations = state.discardRotations; window.game.drawStack = state.drawStack; window.game.currentColor = state.currentColor;
         if(state.hasDrawnThisTurn !== undefined) window.game.hasDrawnThisTurn = state.hasDrawnThisTurn; if(state.abilityGraveyard) window.game.abilityGraveyard = state.abilityGraveyard; if(state.customDeck) window.game.customDeck = state.customDeck;
