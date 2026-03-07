@@ -1,5 +1,5 @@
 /**
- * main.js (じゃんけんフリーズ・能力クラッシュ 完全修正版)
+ * main.js (UI重複・二重ドロー・能力クラッシュ 完全修正版)
  */
 
 if (window.AbilityDef && window.AbilityDef['id_33']) {
@@ -106,26 +106,27 @@ window.updateUI = function() {
         Renderer.updateAll(window.game); 
         window.checkFinalSprint(); 
         
-        const drawBtns = document.querySelectorAll('#draw-btn');
-        const endBtns = document.querySelectorAll('#end-turn-btn');
+        // ★修正: 常に「最初の要素だけ」を操作し、残りは無視することでUI重複バグを回避
+        const drawBtn = document.getElementById('draw-btn');
+        const endBtn = document.getElementById('end-turn-btn');
         const isMyTurnAndCanAct = window.game.currentPlayer && window.game.currentPlayer.id === window.getMyId() && !window.isGameOver && !window.isInitialDealing && !window.pendingJanken && !window.pendingDefense;
 
-        endBtns.forEach(btn => {
-            if (isMyTurnAndCanAct) btn.classList.remove('hidden');
-            else btn.classList.add('hidden');
-        });
+        if (endBtn) {
+            if (isMyTurnAndCanAct) endBtn.classList.remove('hidden');
+            else endBtn.classList.add('hidden');
+        }
         
-        drawBtns.forEach(btn => {
+        if (drawBtn) {
             if (isMyTurnAndCanAct) {
                 if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) {
-                    btn.classList.add('hidden');
+                    drawBtn.classList.add('hidden');
                 } else {
-                    btn.classList.remove('hidden');
+                    drawBtn.classList.remove('hidden');
                 }
             } else {
-                btn.classList.add('hidden');
+                drawBtn.classList.add('hidden');
             }
-        });
+        }
     } 
 };
 
@@ -256,7 +257,7 @@ window.showAbilityResetUI = function(maxCount) {
     
     window.abilityResetSubmitted = false; 
     let timeLeft = 10; maxSpan.innerText = maxCount; resetArea.innerHTML = ''; handArea.innerHTML = '';
-    let selectedCards = [], myAbilities = window.game.myHand.filter(c => c.value && String(c.value).startsWith('id_'));
+    let selectedCards = [], myAbilities = window.game.myHand.filter(c => c && c.value && String(c.value).startsWith('id_'));
     
     const renderCards = () => {
         resetArea.innerHTML = ''; selectedCards.forEach((c, idx) => { const el = Renderer.createCardElement(c); el.style.transform = 'none'; el.style.position = 'static'; el.style.margin = '0'; el.onclick = () => { selectedCards.splice(idx, 1); myAbilities.push(c); renderCards(); }; resetArea.appendChild(el); });
@@ -326,10 +327,10 @@ window.openTargetSelection = function(players, callback) {
 window.openDiscardSelection = function(hand, excludeIndices, def, callback) {
     window.ensureModalsExist(); const modal = document.getElementById('discard-modal'), list = document.getElementById('discard-modal-list');
     const isAbilityDiscard = def && def.needsAbilityDiscard;
-    if (!modal || !list) { const discardable = hand.findIndex((c, i) => { if (excludeIndices.includes(i)) return false; if (isAbilityDiscard) return (c.value && String(c.value).startsWith('id_')); return !(c.value && String(c.value).startsWith('id_')); }); callback(discardable > -1 ? discardable : 0); return; }
+    if (!modal || !list) { const discardable = hand.findIndex((c, i) => { if (excludeIndices.includes(i)) return false; if (isAbilityDiscard) return (c && c.value && String(c.value).startsWith('id_')); return !(c && c.value && String(c.value).startsWith('id_')); }); callback(discardable > -1 ? discardable : 0); return; }
     list.innerHTML = ''; let addedCount = 0;
     hand.forEach((card, idx) => {
-        if (excludeIndices.includes(idx)) return; const isAb = card.value && String(card.value).startsWith('id_');
+        if (!card || excludeIndices.includes(idx)) return; const isAb = card.value && String(card.value).startsWith('id_');
         if (isAbilityDiscard && !isAb) return; if (!isAbilityDiscard && def && def.needsDiscard && isAb) return;
         const btn = Renderer.createCardElement(card); btn.style.width = '50px'; btn.style.height = '75px'; btn.style.margin = '5px'; btn.style.cursor = 'pointer';
         btn.onclick = () => { modal.classList.add('hidden'); callback(idx); }; list.appendChild(btn); addedCount++;
@@ -342,7 +343,7 @@ window.openMultiDiscardSelection = function(hand, validIndices, callback) {
     if (!modal || !list) { callback([]); return; }
     list.innerHTML = ''; let selectedIndices = [];
     validIndices.forEach(idx => {
-        const card = hand[idx]; const btn = Renderer.createCardElement(card); btn.style.width = '50px'; btn.style.height = '75px'; btn.style.margin = '5px'; btn.style.cursor = 'pointer'; btn.style.transition = '0.2s';
+        const card = hand[idx]; if(!card) return; const btn = Renderer.createCardElement(card); btn.style.width = '50px'; btn.style.height = '75px'; btn.style.margin = '5px'; btn.style.cursor = 'pointer'; btn.style.transition = '0.2s';
         btn.onclick = () => { const pos = selectedIndices.indexOf(idx); if (pos > -1) { selectedIndices.splice(pos, 1); btn.style.transform = 'translateY(0)'; btn.style.border = '1.5px solid white'; } else { selectedIndices.push(idx); btn.style.transform = 'translateY(-10px)'; btn.style.border = '2px solid #f1c40f'; } };
         list.appendChild(btn);
     });
@@ -384,7 +385,7 @@ window.showDefenseModal = function(attackCardValue) {
     if (window.AbilityDef && window.AbilityDef[attackCardValue]) { attackName = window.AbilityDef[attackCardValue].name; attackDesc = window.AbilityDef[attackCardValue].desc; } else if (attackCardValue === '+2' || attackCardValue === 'Wild+4') { attackName = attackCardValue; attackDesc = '引かされる枚数が増加します！(防御カードで防げます)'; }
     title.innerText = `攻撃を受けました！(${attackName})`; if (desc) { if (attackDesc) { desc.innerText = attackDesc; desc.classList.remove('hidden'); } else { desc.classList.add('hidden'); } }
     qArea.classList.remove('hidden'); sArea.classList.add('hidden');
-    const myHand = window.game.myHand || []; const defCards = myHand.map((c, i) => ({card: c, idx: i})).filter(item => item.card.value && window.AbilityDef && window.AbilityDef[item.card.value] && window.AbilityDef[item.card.value].type.includes('BL'));
+    const myHand = window.game.myHand || []; const defCards = myHand.map((c, i) => ({card: c, idx: i})).filter(item => item.card && item.card.value && window.AbilityDef && window.AbilityDef[item.card.value] && window.AbilityDef[item.card.value].type.includes('BL'));
     
     btnYes.onclick = () => {
         if (defCards.length === 0) { alert('手札に防御カード(BL)がありません！'); return; }
@@ -413,10 +414,10 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
     if (p && p.type === 'bot') {
         const bHand = window.game.hands[targetId]; let hasDef = false;
         if(bHand) {
-            const blIdx = bHand.findIndex(c => c.value && window.AbilityDef && window.AbilityDef[c.value] && window.AbilityDef[c.value].type.includes('BL'));
+            const blIdx = bHand.findIndex(c => c && c.value && window.AbilityDef && window.AbilityDef[c.value] && window.AbilityDef[c.value].type.includes('BL'));
             if (blIdx > -1) {
                 const blCard = bHand[blIdx]; let bDiscard = null; const def = window.AbilityDef[blCard.value];
-                if(def && def.needsDiscard) { const nonAb = bHand.findIndex((c, i) => i !== blIdx && !(c.value && String(c.value).startsWith('id_'))); bDiscard = nonAb > -1 ? nonAb : (bHand.length > 1 ? bHand.findIndex((c, i) => i !== blIdx) : null); } else if (def && def.needsAbilityDiscard) { const ab = bHand.findIndex((c, i) => i !== blIdx && (c.value && String(c.value).startsWith('id_'))); bDiscard = ab > -1 ? ab : null; }
+                if(def && def.needsDiscard) { const nonAb = bHand.findIndex((c, i) => c && i !== blIdx && !(c.value && String(c.value).startsWith('id_'))); bDiscard = nonAb > -1 ? nonAb : (bHand.length > 1 ? bHand.findIndex((c, i) => c && i !== blIdx) : null); } else if (def && def.needsAbilityDiscard) { const ab = bHand.findIndex((c, i) => c && i !== blIdx && (c.value && String(c.value).startsWith('id_'))); bDiscard = ab > -1 ? ab : null; }
                 responses[targetId] = { cardValue: blCard.value, discardIdx: bDiscard }; hasDef = true;
             }
         }
@@ -432,7 +433,7 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
         if(window.pendingDefense.timer <= 0) {
             clearInterval(interval); const finalResponses = window.pendingDefense.responses; window.pendingDefense = null; let defenseGuides = []; let blocked = false;
             if (finalResponses && finalResponses[targetId] && finalResponses[targetId].cardValue) {
-                const resp = finalResponses[targetId]; const defCardId = resp.cardValue; const tHand = window.game.hands[targetId]; const cIdx = tHand.findIndex(c => c.value === defCardId); let actualDefDiscardIdx = resp.discardIdx;
+                const resp = finalResponses[targetId]; const defCardId = resp.cardValue; const tHand = window.game.hands[targetId]; const cIdx = tHand.findIndex(c => c && c.value === defCardId); let actualDefDiscardIdx = resp.discardIdx;
                 if (cIdx > -1) {
                     if (actualDefDiscardIdx !== null && cIdx < actualDefDiscardIdx) actualDefDiscardIdx--; const playedDefCard = tHand.splice(cIdx, 1)[0];
                     if(!window.game.abilityGraveyard) window.game.abilityGraveyard = []; window.game.abilityGraveyard.push(playedDefCard.value);
@@ -444,10 +445,9 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                     const discCard = tHand.splice(actualDefDiscardIdx, 1)[0];
                     if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: targetId, cards: [discCard] });
                     if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) { window.AbilityEngine.triggerDiscardEffect(window.game, targetId, discCard.value, true, discCard); }
-                    if (discCard.value && String(discCard.value).startsWith('id_')) { window.game.abilityGraveyard.push(discCard.value); } else { window.game.discardPile.push(discCard); window.game.discardRotations.push(0); }
+                    if (discCard && discCard.value && String(discCard.value).startsWith('id_')) { window.game.abilityGraveyard.push(discCard.value); } else if (discCard) { window.game.discardPile.push(discCard); window.game.discardRotations.push(0); }
                 }
                 const def = window.AbilityDef[defCardId];
-                // ★修正: クラッシュ防止の try-catch
                 try {
                     if (defCardId === 'id_2') { window.game.players.filter(px => px.id !== targetId).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); }); const targetP = window.game.players.find(p=>p.id===targetId); if(targetP) targetP.shield = { level: 1, turns: 1 }; if (Math.random() < 0.6) { window.game.players.filter(px => px.id !== targetId).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); }); } }
                     else if (defCardId === 'id_4') { if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) { window.AbilityEngine.triggerDiscardEffect(window.game, targetId, 'id_4', false, null); } }
@@ -473,15 +473,19 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
     if (!window.isHost) return;
     const hand = window.game.hands[playerId]; if (!hand || !playedCardsData || playedCardsData.length === 0) return; 
     
+    multiDiscardIndices = multiDiscardIndices || [];
+    extraData = extraData || {};
+    
     const wasMyTurn = (window.game.currentPlayer && playerId === window.game.currentPlayer.id);
     const cardValue = playedCardsData[0].value; const def = window.AbilityDef ? window.AbilityDef[cardValue] : null;
 
     if (!def) { window.executePlay(playerId, indices, false); return; }
 
-    if (extraData && extraData.isBlankPlay) {
+    if (extraData.isBlankPlay) {
+        if (!wasMyTurn) return;
         playedCardsData.forEach(pc => { 
             if(!pc) return;
-            const idx = hand.findIndex(c => c.value === pc.value && c.color === pc.color); 
+            const idx = hand.findIndex(c => c && c.value === pc.value && c.color === pc.color); 
             if(idx > -1) { 
                 const removed = hand.splice(idx, 1)[0]; 
                 if(!window.game.abilityGraveyard) window.game.abilityGraveyard = []; 
@@ -498,7 +502,7 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
     const originalHand = [...hand];
     const discCard = discardIdx !== null ? originalHand[discardIdx] : null;
     let safeMultiDiscardIndices = [];
-    if (multiDiscardIndices && multiDiscardIndices.length > 0) { safeMultiDiscardIndices = multiDiscardIndices.filter(i => { const c = originalHand[i]; return c && c.color === selectedColor && !(c.value && String(c.value).startsWith('id_')); }); }
+    if (multiDiscardIndices.length > 0) { safeMultiDiscardIndices = multiDiscardIndices.filter(i => { const c = originalHand[i]; return c && c.color === selectedColor && !(c.value && String(c.value).startsWith('id_')); }); }
     const multiCards = safeMultiDiscardIndices.map(i => originalHand[i]);
 
     let cardsToRemove = [...playedCardsData];
@@ -507,12 +511,12 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
 
     cardsToRemove.forEach(pc => { 
         if(!pc) return;
-        const idx = hand.findIndex(c => c.value === pc.value && c.color === pc.color); 
+        const idx = hand.findIndex(c => c && c.value === pc.value && c.color === pc.color); 
         if(idx > -1) { 
             const removed = hand.splice(idx, 1)[0]; 
-            const isAb = removed.value && String(removed.value).startsWith('id_'); 
+            const isAb = removed && removed.value && String(removed.value).startsWith('id_'); 
             if (isAb) { if(!window.game.abilityGraveyard) window.game.abilityGraveyard = []; window.game.abilityGraveyard.push(removed.value); } 
-            else { window.game.discardPile.push(removed); window.game.discardRotations.push(0); } 
+            else if (removed) { window.game.discardPile.push(removed); window.game.discardRotations.push(0); } 
         } 
     });
 
@@ -548,11 +552,10 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
 
         if (cardValue === 'id_28' || !needsDefense) {
             let guides = []; 
-            // ★修正: 配列結合のクラッシュ防止
             try {
                 if (window.AbilityEngine && window.AbilityEngine.resolve) { 
                     const resGuides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, responses, multiplier, selectedColor, multiCards, extraData); 
-                    if (resGuides) guides = guides.concat(resGuides);
+                    if (resGuides && Array.isArray(resGuides)) guides = guides.concat(resGuides);
                 }
             } catch(e) { console.error("Ability Resolve Error:", e); }
             guides.forEach(g => { if(g && g.delay === undefined) g.delay = 2500; }); 
@@ -560,7 +563,6 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
             let someoneWon = false; window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
             
             window.broadcastGameState(false, guides); 
-            // ★修正: wasMyTurnという制限を外し、常にゲームを再開させる
             if (!someoneWon) { setTimeout(() => window.checkTurn(), 500); } 
             return;
         }
@@ -593,7 +595,6 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
                                 if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) { window.AbilityEngine.triggerDiscardEffect(window.game, tid, discCard.value, true, discCard); }
                                 if (discCard && discCard.value && String(discCard.value).startsWith('id_')) { window.game.abilityGraveyard.push(discCard.value); } else if (discCard) { window.game.discardPile.push(discCard); window.game.discardRotations.push(0); }
                             }
-                            // ★修正: クラッシュ防止
                             try {
                                 if (defCardId === 'id_2') { window.game.players.filter(px => px.id !== tid).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); }); const targetP = window.game.players.find(p=>p.id===targetId); if(targetP) targetP.shield = { level: 1, turns: 1 }; if (Math.random() < 0.6) { window.game.players.filter(px => px.id !== tid).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); }); } }
                                 else if (defCardId === 'id_4') { if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) { window.AbilityEngine.triggerDiscardEffect(window.game, tid, 'id_4', false, null); } }
@@ -610,7 +611,7 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
                 try {
                     if (window.AbilityEngine && window.AbilityEngine.resolve) { 
                         const resGuides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, finalResponses, multiplier, selectedColor, multiCards, extraData); 
-                        if (resGuides) guides = guides.concat(resGuides); 
+                        if (resGuides && Array.isArray(resGuides)) guides = guides.concat(resGuides); 
                     }
                 } catch(e) { console.error("Ability Resolve Error:", e); }
                 
@@ -627,7 +628,7 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
         try {
             if (window.AbilityEngine && window.AbilityEngine.resolve) { 
                 const resGuides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, {}, multiplier, selectedColor, multiCards, extraData); 
-                if (resGuides) guides = guides.concat(resGuides); 
+                if (resGuides && Array.isArray(resGuides)) guides = guides.concat(resGuides); 
             }
         } catch(e) { console.error("Ability Resolve Error:", e); }
         
@@ -685,7 +686,6 @@ window.resolveJanken = function() {
             else { 
                 window.pendingJanken = null; 
                 window.broadcastGameState(); 
-                // ★修正: じゃんけんが完全に終わったら必ずゲームを再開する
                 setTimeout(() => window.checkTurn(), 500); 
             }
         } else {
@@ -737,9 +737,9 @@ window.checkTurn = function() {
                 let willDiscard = (isAbility && def && (def.needsDiscard || def.needsAbilityDiscard)) ? 1 : 0; let botSelectedColor = null, botMultiDiscardIndices = [], botDiscardIdx = null;
                 if (isAbility && def) {
                     if (def.needsColor) botSelectedColor = ['red', 'blue', 'green', 'yellow'][Math.floor(Math.random() * 4)];
-                    if (def.needsAbilityDiscard) { const bHand = window.game.hands[current.id]; const discIdx = bHand.findIndex((c, i) => !result.indices.includes(i) && (c.value && String(c.value).startsWith('id_'))); botDiscardIdx = discIdx > -1 ? discIdx : null; } 
-                    else if (def.needsDiscard) { const bHand = window.game.hands[current.id]; const discIdx = bHand.findIndex((c, i) => !result.indices.includes(i) && !(c.value && String(c.value).startsWith('id_'))); botDiscardIdx = discIdx > -1 ? discIdx : (bHand.length > result.indices.length ? bHand.findIndex((c,i)=>!result.indices.includes(i)) : null); }
-                    if (playedCards[0].value === 'id_20' && botSelectedColor) { const bHand = window.game.hands[current.id]; bHand.forEach((c, i) => { if (!result.indices.includes(i) && c.color === botSelectedColor && !(c.value && String(c.value).startsWith('id_'))) botMultiDiscardIndices.push(i); }); willDiscard += botMultiDiscardIndices.length; }
+                    if (def.needsAbilityDiscard) { const bHand = window.game.hands[current.id]; const discIdx = bHand.findIndex((c, i) => !result.indices.includes(i) && (c && c.value && String(c.value).startsWith('id_'))); botDiscardIdx = discIdx > -1 ? discIdx : null; } 
+                    else if (def.needsDiscard) { const bHand = window.game.hands[current.id]; const discIdx = bHand.findIndex((c, i) => !result.indices.includes(i) && !(c && c.value && String(c.value).startsWith('id_'))); botDiscardIdx = discIdx > -1 ? discIdx : (bHand.length > result.indices.length ? bHand.findIndex((c,i)=>!result.indices.includes(i)) : null); }
+                    if (playedCards[0].value === 'id_20' && botSelectedColor) { const bHand = window.game.hands[current.id]; bHand.forEach((c, i) => { if (!result.indices.includes(i) && c && c.color === botSelectedColor && !(c.value && String(c.value).startsWith('id_'))) botMultiDiscardIndices.push(i); }); willDiscard += botMultiDiscardIndices.length; }
                 }
                 const remainingCards = window.game.hands[current.id].length - playedCards.length - willDiscard;
                 if (remainingCards === 1 || remainingCards === 0) window.socket.emit('declare_uno', { id: current.id, name: current.name });
@@ -772,9 +772,9 @@ window.checkTurn = function() {
                         let willDiscard = (isAbility && def && (def.needsDiscard || def.needsAbilityDiscard)) ? 1 : 0; let botSelectedColor = null, botMultiDiscardIndices = [], botDiscardIdx = null;
                         if (isAbility && def) {
                             if (def.needsColor) botSelectedColor = ['red', 'blue', 'green', 'yellow'][Math.floor(Math.random() * 4)];
-                            if (def.needsAbilityDiscard) { const bHand = window.game.hands[current.id]; const discIdx = bHand.findIndex((c, i) => !result.indices.includes(i) && (c.value && String(c.value).startsWith('id_'))); botDiscardIdx = discIdx > -1 ? discIdx : null; } 
-                            else if (def.needsDiscard) { const bHand = window.game.hands[current.id]; const discIdx = bHand.findIndex((c, i) => !result.indices.includes(i) && !(c.value && String(c.value).startsWith('id_'))); botDiscardIdx = discIdx > -1 ? discIdx : (bHand.length > result.indices.length ? bHand.findIndex((c,i)=>!result.indices.includes(i)) : null); }
-                            if (playedCards[0].value === 'id_20' && botSelectedColor) { const bHand = window.game.hands[current.id]; bHand.forEach((c, i) => { if (!result.indices.includes(i) && c.color === botSelectedColor && !(c.value && String(c.value).startsWith('id_'))) botMultiDiscardIndices.push(i); }); willDiscard += botMultiDiscardIndices.length; } 
+                            if (def.needsAbilityDiscard) { const bHand = window.game.hands[current.id]; const discIdx = bHand.findIndex((c, i) => !result.indices.includes(i) && (c && c.value && String(c.value).startsWith('id_'))); botDiscardIdx = discIdx > -1 ? discIdx : null; } 
+                            else if (def.needsDiscard) { const bHand = window.game.hands[current.id]; const discIdx = bHand.findIndex((c, i) => !result.indices.includes(i) && !(c && c.value && String(c.value).startsWith('id_'))); botDiscardIdx = discIdx > -1 ? discIdx : (bHand.length > result.indices.length ? bHand.findIndex((c,i)=>!result.indices.includes(i)) : null); }
+                            if (playedCards[0].value === 'id_20' && botSelectedColor) { const bHand = window.game.hands[current.id]; bHand.forEach((c, i) => { if (!result.indices.includes(i) && c && c.color === botSelectedColor && !(c.value && String(c.value).startsWith('id_'))) botMultiDiscardIndices.push(i); }); willDiscard += botMultiDiscardIndices.length; } 
                         }
                         const remainingCards = window.game.hands[current.id].length - playedCards.length - willDiscard;
                         if (remainingCards === 1 || remainingCards === 0) window.socket.emit('declare_uno', { id: current.id, name: current.name });
@@ -1027,7 +1027,7 @@ window.handlePlayAction = function() {
         window.localRaiaReturnedTurn = window.localRaiaReturnedTurn || -1;
         const stepRaia = () => { if (cardValue === 'id_33' && window.game.isMyTurn && !me.usedRaia) { window.showConfirm("ライアの効果により、自分のターン終了時にこのカードを手札に戻しますか？\n(各ターン1回のみ)", (yes) => { if (yes) { extraData.returnRaia = true; me.usedRaia = true; } step6(); }); } else { step6(); } };
         const step5 = () => { if (def && def.needsDebuffSelect && me.frozen && me.burnTurns > 0) { window.openDebuffSelection((selected) => { debuffToClear = selected; stepRaia(); }); } else if (def && def.needsDebuffSelect) { if (me.frozen) debuffToClear = 'frozen'; else if (me.burnTurns > 0) debuffToClear = 'burn'; stepRaia(); } else { stepRaia(); } };
-        const step4 = () => { if (def && cardValue === 'id_20' && selColor) { const validIndices = []; window.game.myHand.forEach((c, i) => { if (!indices.includes(i) && i !== discardIdx && c.color === selColor && !(c.value && String(c.value).startsWith('id_'))) validIndices.push(i); }); if (validIndices.length > 0) { window.openMultiDiscardSelection(window.game.myHand, validIndices, (selectedMulti) => { multiDiscardIndices = selectedMulti; step5(); }); } else { step5(); } } else { step5(); } };
+        const step4 = () => { if (def && cardValue === 'id_20' && selColor) { const validIndices = []; window.game.myHand.forEach((c, i) => { if (!indices.includes(i) && i !== discardIdx && c && c.color === selColor && !(c.value && String(c.value).startsWith('id_'))) validIndices.push(i); }); if (validIndices.length > 0) { window.openMultiDiscardSelection(window.game.myHand, validIndices, (selectedMulti) => { multiDiscardIndices = selectedMulti; step5(); }); } else { step5(); } } else { step5(); } };
         const step3 = () => { if (def && def.needsColor) { ColorUI.show((color) => { selColor = color; step4(); }); } else { step4(); } };
         const step2 = () => { if (def && (def.needsDiscard || def.needsAbilityDiscard)) { window.openDiscardSelection(window.game.myHand, indices, def, (idx) => { discardIdx = idx; step3(); }); } else { step3(); } };
         if (def && def.needsTarget) { window.openTargetSelection(window.game.players, (tid) => { targetId = tid; step2(); }); } else { step2(); }
@@ -1056,13 +1056,26 @@ window.onColorChosen = function(color) {
     ColorUI.hide(); if (ColorUI.callback) { let cb = ColorUI.callback; ColorUI.callback = null; cb(color); } else { if (window.isHost) window.executeColor(window.getMyId(), color); else { window.waitingForServerResponse = true; if (window.socket) window.socket.emit('player_action', { action: 'color', playerId: window.getMyId(), color: color }); } }
 };
 
-// 連打防止フラグ（デバウンス処理）
+// ★連打・二重操作防止フラグ
 let isDrawClicked = false;
 let isEndClicked = false;
 
 document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('#draw-btn').forEach(btn => {
-        btn.onclick = (e) => {
+    
+    // ★HTML上の重複した不要なボタンを物理的に削除する（二重表示の根本対策）
+    const drawBtns = document.querySelectorAll('#draw-btn');
+    if (drawBtns.length > 1) {
+        for(let i = 1; i < drawBtns.length; i++) drawBtns[i].remove();
+    }
+    const endBtns = document.querySelectorAll('#end-turn-btn');
+    if (endBtns.length > 1) {
+        for(let i = 1; i < endBtns.length; i++) endBtns[i].remove();
+    }
+
+    // 残った正規のボタンにだけ、1度だけイベントを紐付ける
+    const drawBtn = document.getElementById('draw-btn');
+    if (drawBtn) {
+        drawBtn.onclick = (e) => {
             if (isDrawClicked) return;
             if (window.isAnimating || window.pendingJanken || window.isDrawing || window.isProcessingPlay || window.waitingForServerResponse || window.isServerProcessingAbility) return; 
             if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
@@ -1074,7 +1087,7 @@ document.addEventListener('DOMContentLoaded', () => {
             window.isDrawing = true; 
             window.waitingForServerResponse = true;
 
-            document.querySelectorAll('#draw-btn').forEach(b => b.classList.add('hidden'));
+            drawBtn.classList.add('hidden');
             
             window.tryDrawWithAbility(() => {
                 const s = window.game.drawStack; const count = s > 0 ? s : 1;
@@ -1097,10 +1110,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         };
-    });
+    }
 
-    document.querySelectorAll('#end-turn-btn').forEach(btn => {
-        btn.onclick = (e) => {
+    const endBtn = document.getElementById('end-turn-btn');
+    if (endBtn) {
+        endBtn.onclick = (e) => {
             if (isEndClicked) return;
             if (window.pendingJanken || window.waitingForServerResponse || window.isServerProcessingAbility) return; 
             if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
@@ -1109,8 +1123,8 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => { isEndClicked = false; }, 1000);
 
             window.waitingForServerResponse = true;
-            document.querySelectorAll('#draw-btn').forEach(b => b.classList.add('hidden'));
-            document.querySelectorAll('#end-turn-btn').forEach(b => b.classList.add('hidden'));
+            if (drawBtn) drawBtn.classList.add('hidden');
+            endBtn.classList.add('hidden');
             
             const currentId = window.getMyId();
             if (window.isHost) {
@@ -1122,11 +1136,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 setTimeout(() => { window.waitingForServerResponse = false; window.isProcessingPlay = false; }, 1000);
             }
         };
-    });
+    }
     
     if(window.ensureModalsExist) window.ensureModalsExist(); 
     if(window.initVolumeControl) window.initVolumeControl(); 
 });
+
+document.getElementById('uno-btn').onclick = window.declareUno;
 
 (() => {
     const btnManual = document.getElementById('btn-manual'), manualOverlay = document.getElementById('manual-overlay'), manualImage = document.getElementById('manual-image'), manualPrev = document.getElementById('manual-prev'), manualNext = document.getElementById('manual-next'), manualClose = document.getElementById('manual-close'), manualIndicators = document.getElementById('manual-indicators');
