@@ -807,10 +807,28 @@ window.declareUno = function() {
 };
 
 window.tryDrawWithAbility = function(callback) {
-    const me = window.game.players.find(p => p.id === window.getMyId()); const renaIdx = window.game.myHand.findIndex(c => c.value === 'id_9');
-    if (renaIdx > -1 && !me.frozen) { window.showConfirm("【レナ】カードを引く代わりに「レナ」を場に出して効果を発動しますか？", (yes) => { if (yes) { window.isDrawing = false; window.game.selectedIndices = [renaIdx]; window.handlePlayAction(); } else { callback(); } }); } else { callback(); }
+    const currentId = window.getMyId();
+    const me = window.game.players.find(p => p.id === currentId); 
+    
+    // ★修正: 手札データが存在しない場合のエラーを防ぐ
+    const myHand = window.game.myHand || [];
+    const renaIdx = myHand.findIndex(c => c && c.value === 'id_9');
+    
+    // ★修正: me (プレイヤー情報) が正しく取得できているか必ずチェックする
+    if (me && renaIdx > -1 && !me.frozen) { 
+        window.showConfirm("【レナ】カードを引く代わりに「レナ」を場に出して効果を発動しますか？", (yes) => { 
+            if (yes) { 
+                window.isDrawing = false; 
+                window.game.selectedIndices = [renaIdx]; 
+                window.handlePlayAction(); 
+            } else { 
+                callback(); 
+            } 
+        }); 
+    } else { 
+        callback(); 
+    }
 };
-
 window.handlePlayAction = function() {
     if (window.game.selectedIndices.length === 0 || window.isGameOver || window.isInitialDealing || window.isDrawing) return;
         
