@@ -569,11 +569,16 @@ window.resolveJanken = function() {
         let drawCount = 0; if (result === 'win') { drawCount = 2; } else if (result === 'lose' && pJ.loopCount === 0) { drawCount = 2; }
         if (drawCount > 0) { window.AbilityEngine.applyDraw(window.game, pJ.targetId, drawCount, false); const guides = [{ from: pJ.attackerId, to: pJ.targetId, text: 'じゃんけんドロー!', delay: 0 }]; window.broadcastGameState(false, guides); }
         let someoneWon = false; window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
+        
         if (!someoneWon) {
-            const nextLoop = pJ.loopCount + 1; const aId = pJ.attackerId; const tId = pJ.targetId;
-            if (result === 'win' && nextLoop < 4) { window.pendingJanken.attackerHand = null; window.pendingJanken.targetHand = null; window.pendingJanken.result = null; window.pendingJanken.timer = 10; window.pendingJanken.loopCount = nextLoop; window.broadcastGameState(); window.startJankenPhase(aId, nextLoop, tId); } 
-            else if (result === 'draw') { window.pendingJanken.attackerHand = null; window.pendingJanken.targetHand = null; window.pendingJanken.result = null; window.pendingJanken.timer = 10; window.broadcastGameState(); window.startJankenPhase(aId, pJ.loopCount, tId); } 
-            else { window.pendingJanken = null; window.broadcastGameState(); }
+            const nextLoop = pJ.loopCount + 1; const aId = pJ.attackerId; const tId = pJ.targetId; const wasMyTurn = pJ.wasMyTurn;
+            if (result === 'win' && nextLoop < 4) { window.pendingJanken.attackerHand = null; window.pendingJanken.targetHand = null; window.pendingJanken.result = null; window.pendingJanken.timer = 10; window.pendingJanken.loopCount = nextLoop; window.broadcastGameState(); window.startJankenPhase(aId, nextLoop, tId, wasMyTurn); } 
+            else if (result === 'draw') { window.pendingJanken.attackerHand = null; window.pendingJanken.targetHand = null; window.pendingJanken.result = null; window.pendingJanken.timer = 10; window.broadcastGameState(); window.startJankenPhase(aId, pJ.loopCount, tId, wasMyTurn); } 
+            else { window.pendingJanken = null; if(wasMyTurn){ window.game.nextTurn(1); } window.broadcastGameState(); if(wasMyTurn){ setTimeout(() => window.checkTurn(), 1000); } }
+        } else {
+            // ★修正: 誰かが上がった（手札0枚になった）場合はじゃんけんフェーズを終了してUIを閉じる
+            window.pendingJanken = null;
+            window.broadcastGameState();
         }
     }, 4500); 
 };
@@ -942,10 +947,12 @@ function initMainSocketEvents() {
     window.socket.on('sync_game_state', (state) => {
         if (!window.game) return;
         
-        // ★修正: サーバーが防御/じゃんけん中でなければ、強制的にローカルのロック状態を初期化してフリーズを防ぐ
+        // ★修正: サーバーから状態を受信した時点で必ず待機ロックを解除する
+        window.waitingForServerResponse = false;
+        
+        // サーバーが防御/じゃんけん中でなければ、ローカルのロック状態も初期化
         if (state.defensePhase === null && state.jankenPhase === null) {
             window.isServerProcessingAbility = false;
-            window.waitingForServerResponse = false;
             window.isDefending = false;
             window.currentDefensePhaseId = null;
             window.hasRespondedDefense = false;
@@ -955,8 +962,7 @@ function initMainSocketEvents() {
         
         if (typeof window.updatePhaseUI === 'function') { window.updatePhaseUI(state); }
         
-        const isChoosing = (!window.isHost && window.game.myId) && ((window.game.selectedIndices && window.game.selectedIndices.length > 0) || window.isProcessingPlay || window.isDrawing || document.querySelector('.action-popup:not(.hidden)'));
-        const currentFingerprint = JSON.stringify(state);
+        const isChoosing = (!window.isHost && window.game.myId) && ((window.game.selectedIndices && window.game.selectedIndices.length > 0) || window.isProcessingPlay || window.isDrawing || document.querySelector('.action-popup:not(.hidden)'));        const currentFingerprint = JSON.stringify(state);
         if (window.lastGameStateFingerprint === currentFingerprint && !window.isInitialDealing) return;
         window.lastGameStateFingerprint = currentFingerprint;
 
