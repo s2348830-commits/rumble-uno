@@ -1019,15 +1019,38 @@ document.getElementById('draw-btn').onclick = () => {
 };
 
 document.getElementById('end-turn-btn').onclick = () => {
-    if (window.isAnimating || window.pendingJanken || window.isDrawing || window.isProcessingPlay || window.isServerProcessingAbility || window.waitingForServerResponse) return; 
+    // 【改善1】画面にポップアップがないなら、すべてのロックフラグを強制的に叩き落とす（最強の自己修復）
+    if (!document.querySelector('.action-popup:not(.hidden)')) {
+        window.isProcessingPlay = false;
+        window.isDrawing = false;
+        window.waitingForServerResponse = false; // ★ここを追加
+    }
+
+    // 【改善2】致命的なロック（じゃんけん、他人の能力処理）以外は通すように判定を緩和
+    if (window.pendingJanken || window.waitingForServerResponse || window.isServerProcessingAbility) {
+        console.log("処理中のため終了できません");
+        return; 
+    }
+
+    // 自分のターンでなければ無視
     if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
     
-    window.isDrawing = true; window.waitingForServerResponse = true;
-    document.getElementById('draw-btn').classList.add('hidden');
-    document.getElementById('end-turn-btn').classList.add('hidden');
+    // 【改善3】即座にロックをかけ、ボタンを隠す（二重送信防止）
+    window.waitingForServerResponse = true;
+    const drawBtn = document.getElementById('draw-btn');
+    const endBtn = document.getElementById('end-turn-btn');
+    if (drawBtn) drawBtn.classList.add('hidden');
+    if (endBtn) endBtn.classList.add('hidden');
     
-    if (window.isHost) { window.executeEndTurn(window.game.myId); setTimeout(() => { window.isDrawing = false; window.waitingForServerResponse = false; }, 500); } 
-    else if (window.socket) { window.socket.emit('player_action', { action: 'end_turn' }); setTimeout(() => { window.isDrawing = false; window.waitingForServerResponse = false; }, 1500); }
+    if (window.isHost) {
+        window.executeEndTurn(window.game.myId);
+        // ホストはラグがないので短時間でロック解除
+        setTimeout(() => { window.waitingForServerResponse = false; }, 300);
+    } else if (window.socket) {
+        window.socket.emit('player_action', { action: 'end_turn' });
+        // 参加者はサーバーからの同期(sync)で解除されるが、保険として2秒後に強制解除
+        setTimeout(() => { window.waitingForServerResponse = false; }, 2000);
+    }
 };
 
 document.getElementById('uno-btn').onclick = window.declareUno;
@@ -1053,29 +1076,43 @@ function initMainSocketEvents() {
     if (typeof window.socket === 'undefined') { setTimeout(initMainSocketEvents, 100); return; }
 
     window.socket.on('sync_game_state', (state) => {
-    if (!window.game) return;
-    
-    // ★修正: 通信が届いた時点で、すべての待機ロックを強制解除する
-    window.waitingForServerResponse = false;
-    window.isDrawing = false; 
-    window.isProcessingPlay = false;
-
-    // サーバーが防御/じゃんけん中でなければフラグを掃除
-    if (state.defensePhase === null && state.jankenPhase === null) {
-        window.isServerProcessingAbility = false;
-        window.isDefending = false;
-        window.currentDefensePhaseId = null;
-        window.hasRespondedDefense = false;
-        window.isAnimating = false; 
-        window.pendingJanken = null;
-        window.pendingDefense = null;
-    } else {
-        window.isServerProcessingAbility = true;
-    }
-    
-    if (typeof window.updatePhaseUI === 'function') { window.updatePhaseUI(state); }
+        if (!window.game) return;
         
-        const isChoosing = (!window.isHost && window.game.myId) && (document.querySelector('.action-popup:not(.hidden)'));
+        // ★改善1: 通信が届いたので、サーバーとの通信待機ロックのみ即解除
+        window.waitingForServerResponse = false;
+
+        // サーバー側で防御/じゃんけんが動いていない平和な状態なら
+        if (state.defensePhase === null && state.jankenPhase === null) {
+            window.isServerProcessingAbility = false;
+            window.isDefending = false;
+            window.currentDefensePhaseId = null;
+            window.hasRespondedDefense = false;
+            window.isAnimating = false; 
+            window.pendingJanken = null;
+            window.pendingDefense = null;
+
+            // ★改善2: ダイアログが画面に無いなら、古い操作ロックを掃除する
+            if (!document.querySelector('.action-popup:not(.hidden)')) {
+                window.isProcessingPlay = false;
+                window.isDrawing = false;
+            }
+        } else {
+            window.isServerProcessingAbility = true;
+        }
+        
+        // ★改善3: 自分のターンなら、隠れていたボタンを必ず再表示
+        if (state.playersInfo && state.playersInfo[state.turnIndex]) {
+            if (state.playersInfo[state.turnIndex].id === window.myId) {
+                const drawBtn = document.getElementById('draw-btn');
+                const endBtn = document.getElementById('end-turn-btn');
+                if (drawBtn) drawBtn.classList.remove('hidden');
+                if (endBtn) endBtn.classList.remove('hidden');
+            }
+        }
+
+        if (typeof window.updatePhaseUI === 'function') { window.updatePhaseUI(state); }
+        
+        // (以下、Fingerprintチェック以降の既存処理を続ける)
         const currentFingerprint = JSON.stringify(state);
         if (window.lastGameStateFingerprint === currentFingerprint && !window.isInitialDealing) return;
         window.lastGameStateFingerprint = currentFingerprint;
