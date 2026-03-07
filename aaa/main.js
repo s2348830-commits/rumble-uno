@@ -785,28 +785,62 @@ window.tryDrawWithAbility = function(callback) {
 window.handlePlayAction = function() {
     if (window.game.selectedIndices.length === 0 || window.isGameOver || window.isInitialDealing || window.isDrawing) return;
     
-    if (window.waitingForServerResponse || window.pendingJanken || window.pendingDefense || window.currentDefensePhaseId || window.isDefending || window.isProcessingPlay) {
-        alert("現在、通信または効果処理中です。解決するまでお待ちください。"); window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return;
+    // 【改善案1】クリックした瞬間に、古いロックを強制掃除する。
+    // アクションポップアップ（対象選択など）が出ていなければ、処理中フラグを落とす
+    if (!document.querySelector('.action-popup:not(.hidden)')) {
+        window.isProcessingPlay = false;
     }
     
+    // 各種ロック判定
+    if (window.waitingForServerResponse) {
+        alert("サーバーと通信中です。少しお待ちください。"); window.game.selectedIndices = []; window.updateUI(); return;
+    }
+    if (window.pendingJanken || window.pendingDefense || window.currentDefensePhaseId || window.isDefending) {
+        alert("現在、効果処理または防御処理中です。解決するまでお待ちください。"); window.game.selectedIndices = []; window.updateUI(); return;
+    }
+    if (window.isProcessingPlay) {
+        alert("現在、カードの処理中です。"); window.game.selectedIndices = []; window.updateUI(); return;
+    }
+    
+    // 【改善案2】参加者側のブロック機能の二重チェック
     if (!window.game.isMyTurn && window.isServerProcessingAbility) {
-        alert("現在、他のプレイヤーの効果処理中です。解決するまでお待ちください。"); window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return;
+        // もしサーバー側で何も起きていないならロックを自動解除
+        if(window.pendingDefense === null && window.pendingJanken === null) {
+            window.isServerProcessingAbility = false;
+        } else {
+            alert("現在、他のプレイヤーの効果処理中です。解決するまでお待ちください。");
+            window.game.selectedIndices = []; window.updateUI(); return;
+        }
     }
     
     window.isProcessingPlay = true;
     
-    const me = window.game.players.find(p => p.id === window.game.myId); const selectedCards = window.game.selectedIndices.map(i => window.game.myHand[i]); const lastCard = selectedCards[selectedCards.length - 1]; const cardValue = lastCard.value;
+    const me = window.game.players.find(p => p.id === window.game.myId); 
+    const selectedCards = window.game.selectedIndices.map(i => window.game.myHand[i]); 
+    const lastCard = selectedCards[selectedCards.length - 1]; 
+    const cardValue = lastCard.value;
+    
     if (!lastCard) { window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; }
 
-    const isAbility = selectedCards[0] && selectedCards[0].value && String(selectedCards[0].value).startsWith('id_'); const isAction = !/^[0-9]$/.test(lastCard.value) && !isAbility; const def = isAbility && window.AbilityDef ? window.AbilityDef[selectedCards[0].value] : null;
+    const isAbility = selectedCards[0] && selectedCards[0].value && String(selectedCards[0].value).startsWith('id_'); 
+    const isAction = !/^[0-9]$/.test(lastCard.value) && !isAbility; 
+    const def = isAbility && window.AbilityDef ? window.AbilityDef[selectedCards[0].value] : null;
 
+    // 防御カード(BL)を直接出そうとした場合
     if (isAbility && def && def.type === 'BL') {
         window.showConfirm("攻撃を受けた時でないと効果は発動しませんがそれでも出しますか？", (yes) => {
             if (yes) {
-                const indicesToSend = [...window.game.selectedIndices]; const cardsToSend = [...selectedCards]; window.game.selectedIndices = []; window.updateUI();
+                const indicesToSend = [...window.game.selectedIndices]; 
+                const cardsToSend = [...selectedCards]; 
+                window.game.selectedIndices = []; window.updateUI();
                 window.animateSequentialPlay(indicesToSend, window.game, () => {
-                    if (window.isHost) { if (window.socket) window.socket.emit('request_play_animation', { playerId: window.game.myId, cards: cardsToSend }); window.executeAbilityPlay(window.game.myId, indicesToSend, cardsToSend, null, null, null, [], { isBlankPlay: true }); } 
-                    else { window.waitingForServerResponse = true; if (window.socket) { window.socket.emit('player_action', { action: 'play_ability', indices: indicesToSend, cards: cardsToSend, targetId: null, discardIdx: null, selectedColor: null, multiDiscardIndices: [], isHV: false, extraData: { isBlankPlay: true } }); } }
+                    if (window.isHost) { 
+                        if (window.socket) window.socket.emit('request_play_animation', { playerId: window.game.myId, cards: cardsToSend }); 
+                        window.executeAbilityPlay(window.game.myId, indicesToSend, cardsToSend, null, null, null, [], { isBlankPlay: true }); 
+                    } else { 
+                        window.waitingForServerResponse = true; 
+                        if (window.socket) window.socket.emit('player_action', { action: 'play_ability', indices: indicesToSend, cards: cardsToSend, targetId: null, discardIdx: null, selectedColor: null, multiDiscardIndices: [], isHV: false, extraData: { isBlankPlay: true } }); 
+                    }
                     window.isProcessingPlay = false; 
                 });
             } else {
@@ -817,91 +851,95 @@ window.handlePlayAction = function() {
     }
 
     if (!window.game.isMyTurn && !isAbility) { alert("今はあなたのターンではありません！"); window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; }
-    
     if (me.frozen && !isAbility) { alert("凍結中は能力カードしか使用できません！"); window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; }
     if (selectedCards.some(c => c.lockedTurns && c.lockedTurns > 0)) { alert("ロックされているカードは使用できません！"); window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; }
 
-    if (!isAbility) { const isLegalPlay = UNORules.canPlaySelected(selectedCards, window.game.topCard, window.game.currentColor, window.game.drawStack); if (!isLegalPlay) { if (window.SE) window.SE.play('Impossible'); window.isProcessingPlay = false; return; } }
+    if (!isAbility) { 
+        const isLegalPlay = UNORules.canPlaySelected(selectedCards, window.game.topCard, window.game.currentColor, window.game.drawStack); 
+        if (!isLegalPlay) { if (window.SE) window.SE.play('Impossible'); window.isProcessingPlay = false; return; } 
+    }
 
-    let willDiscard = (isAbility && def && (def.needsDiscard || def.needsAbilityDiscard)) ? 1 : 0; const finalHandCount = window.game.myHand.length - selectedCards.length - willDiscard;
+    let willDiscard = (isAbility && def && (def.needsDiscard || def.needsAbilityDiscard)) ? 1 : 0; 
+    const finalHandCount = window.game.myHand.length - selectedCards.length - willDiscard;
     const willBeActionFinishPenalty = (finalHandCount <= 0 && isAction && window.RuleSettings && !window.RuleSettings.allowActionFinish);
     const willBeAbilityFinishPenalty = (finalHandCount <= 0 && isAbility && window.RuleSettings && !window.RuleSettings.allowAbilityFinish);
     
     if (willBeActionFinishPenalty || willBeAbilityFinishPenalty || (finalHandCount <= 0 && !window.game.unoDeclared && window.RuleSettings && !window.RuleSettings.unoAuto)) {
-        let penaltyCount = window.RuleSettings.unoPenalty || 2; let penaltyMsg = "UNO宣言忘れ！";
+        let penaltyCount = window.RuleSettings.unoPenalty || 2; 
+        let penaltyMsg = "UNO宣言忘れ！";
         if (willBeActionFinishPenalty) { penaltyCount = window.RuleSettings.actionFinishPenalty || 3; penaltyMsg = "記号上がり禁止！"; } 
         else if (willBeAbilityFinishPenalty) { penaltyCount = window.RuleSettings.abilityFinishPenalty || 3; penaltyMsg = "能力上がり禁止！"; }
-        window.game.selectedIndices = []; window.updateUI(); alert(`${penaltyMsg} ペナルティとして ${penaltyCount}枚ドローします！`); window.isDrawing = true; 
-        
+        window.game.selectedIndices = []; window.updateUI(); alert(`${penaltyMsg} ペナルティとして ${penaltyCount}枚ドローします！`); 
+        window.isDrawing = true; 
         const wasMyTurnLocal = window.game.isMyTurn;
 
         window.tryDrawWithAbility(() => {
             if (window.SE) window.SE.playMultiple('Distribute', penaltyCount, 500);
-            if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
-                CardAnimation.animateMultiDraw(penaltyCount, 'player-hand', () => {
-                    window.isDrawing = false; window.isProcessingPlay = false; window.game.selectedIndices = []; window.updateUI();
-                    if (window.isHost) { 
-                        if(window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: penaltyCount }); 
-                        for(let i=0; i<penaltyCount; i++) window.game.drawCard(window.game.myId); 
-                        if(wasMyTurnLocal) window.executeEndTurn(window.game.myId); else window.broadcastGameState(true);
-                    } 
-                    else { window.waitingForServerResponse = true; if(window.socket) { window.socket.emit('player_action', { action: 'draw_penalty', count: penaltyCount, wasMyTurn: wasMyTurnLocal }); } }
-                });
-            } else {
+            const finishDraw = () => {
                 window.isDrawing = false; window.isProcessingPlay = false; window.game.selectedIndices = []; window.updateUI();
                 if (window.isHost) { 
                     if(window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: penaltyCount }); 
                     for(let i=0; i<penaltyCount; i++) window.game.drawCard(window.game.myId); 
                     if(wasMyTurnLocal) window.executeEndTurn(window.game.myId); else window.broadcastGameState(true);
-                } 
-                else { window.waitingForServerResponse = true; if(window.socket) { window.socket.emit('player_action', { action: 'draw_penalty', count: penaltyCount, wasMyTurn: wasMyTurnLocal }); } }
+                } else { 
+                    window.waitingForServerResponse = true; if(window.socket) window.socket.emit('player_action', { action: 'draw_penalty', count: penaltyCount, wasMyTurn: wasMyTurnLocal }); 
+                }
+            };
+            if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
+                CardAnimation.animateMultiDraw(penaltyCount, 'player-hand', finishDraw);
+            } else {
+                finishDraw();
             }
-        }); return; 
+        }); 
+        return; 
     }
 
-    const shouldAutoUno = window.RuleSettings && window.RuleSettings.unoAuto && (finalHandCount === 1 || finalHandCount === 0) && !window.game.unoDeclared;
-    if (shouldAutoUno) window.declareUno();
+    if (window.RuleSettings && window.RuleSettings.unoAuto && (finalHandCount === 1 || finalHandCount === 0) && !window.game.unoDeclared) window.declareUno();
 
-    const indices = [...window.game.selectedIndices]; const playedCards = indices.map(i => window.game.myHand[i]);
+    const indices = [...window.game.selectedIndices]; 
+    const playedCards = indices.map(i => window.game.myHand[i]);
 
     if (isAbility) {
         let targetId = null, discardIdx = null, selColor = null, multiDiscardIndices = [], debuffToClear = null, graveyardCardId = null, extraData = {};
         const finishAbilityPlay = () => {
             window.game.selectedIndices = []; window.updateUI();
-            const indicesToSend = [...indices]; const cardsToSend = [...playedCards];
-            if (debuffToClear) extraData.debuffToClear = debuffToClear; if (graveyardCardId) extraData.graveyardCardId = graveyardCardId;
+            const indicesToSend = [...indices], cardsToSend = [...playedCards];
+            if (debuffToClear) extraData.debuffToClear = debuffToClear; 
+            if (graveyardCardId) extraData.graveyardCardId = graveyardCardId;
             window.animateSequentialPlay(indices, window.game, () => {
-                const isHVActivated = (cardValue === 'id_20') || (def && def.needsAbilityDiscard && discardIdx !== null); window.showAbilityCutin(cardsToSend[0].value, isHVActivated);
-                if (window.isHost) { if (window.socket) window.socket.emit('request_play_animation', { playerId: window.game.myId, cards: cardsToSend, isHV: isHVActivated }); window.executeAbilityPlay(window.game.myId, indicesToSend, cardsToSend, targetId, discardIdx, selColor, multiDiscardIndices, extraData); } 
-                else { window.waitingForServerResponse = true; if (window.socket) { window.socket.emit('player_action', { action: 'play_ability', indices: indicesToSend, cards: cardsToSend, targetId: targetId, discardIdx: discardIdx, selectedColor: selColor, multiDiscardIndices: multiDiscardIndices, isHV: isHVActivated, extraData: extraData }); } }
+                const isHVActivated = (cardValue === 'id_20') || (def && def.needsAbilityDiscard && discardIdx !== null); 
+                window.showAbilityCutin(cardsToSend[0].value, isHVActivated);
+                if (window.isHost) { 
+                    if (window.socket) window.socket.emit('request_play_animation', { playerId: window.game.myId, cards: cardsToSend, isHV: isHVActivated }); 
+                    window.executeAbilityPlay(window.game.myId, indicesToSend, cardsToSend, targetId, discardIdx, selColor, multiDiscardIndices, extraData); 
+                } else { 
+                    window.waitingForServerResponse = true; 
+                    if (window.socket) window.socket.emit('player_action', { action: 'play_ability', indices: indicesToSend, cards: cardsToSend, targetId: targetId, discardIdx: discardIdx, selectedColor: selColor, multiDiscardIndices, isHV: isHVActivated, extraData }); 
+                }
                 window.isProcessingPlay = false; 
             });
         };
-        const step6 = () => { if (def && def.needsGraveyard) { window.openGraveyardSelection((selectedId) => { if (selectedId === false) { window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; } graveyardCardId = selectedId; finishAbilityPlay(); }); } else { finishAbilityPlay(); } }
-        
-        window.localRaiaReturnedTurn = window.localRaiaReturnedTurn || -1;
-        const stepRaia = () => { 
-            if (cardValue === 'id_33' && window.game.isMyTurn && !me.usedRaia) { 
-                window.showConfirm("ライアの効果により、自分のターン終了時にこのカードを手札に戻しますか？\n(各ターン1回のみ)", (yes) => { 
-                    if (yes) { extraData.returnRaia = true; me.usedRaia = true; } 
-                    step6(); 
-                }); 
-            } else { step6(); } 
-        }
 
-        const step5 = () => { if (def && def.needsDebuffSelect && me.frozen && me.burnTurns > 0) { window.openDebuffSelection((selected) => { debuffToClear = selected; stepRaia(); }); } else if (def && def.needsDebuffSelect) { if (me.frozen) debuffToClear = 'frozen'; else if (me.burnTurns > 0) debuffToClear = 'burn'; stepRaia(); } else { stepRaia(); } };
-        const step4 = () => { if (def && cardValue === 'id_20' && selColor) { const validIndices = []; window.game.myHand.forEach((c, i) => { if (!indices.includes(i) && i !== discardIdx && c.color === selColor && !(c.value && String(c.value).startsWith('id_'))) validIndices.push(i); }); if (validIndices.length > 0) { window.openMultiDiscardSelection(window.game.myHand, validIndices, (selectedMulti) => { multiDiscardIndices = selectedMulti; step5(); }); } else { step5(); } } else { step5(); } };
+        const step6 = () => { if (def && def.needsGraveyard) { window.openGraveyardSelection((id) => { if (id === false) { window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; } graveyardCardId = id; finishAbilityPlay(); }); } else { finishAbilityPlay(); } };
+        const stepRaia = () => { if (cardValue === 'id_33' && window.game.isMyTurn && !me.usedRaia) { window.showConfirm("ライアの効果により、ターン終了時にこのカードを手札に戻しますか？", (yes) => { if (yes) { extraData.returnRaia = true; me.usedRaia = true; } step6(); }); } else { step6(); } };
+        const step5 = () => { if (def && def.needsDebuffSelect && me.frozen && me.burnTurns > 0) { window.openDebuffSelection((sel) => { debuffToClear = sel; stepRaia(); }); } else if (def && def.needsDebuffSelect) { if (me.frozen) debuffToClear = 'frozen'; else if (me.burnTurns > 0) debuffToClear = 'burn'; stepRaia(); } else { stepRaia(); } };
+        const step4 = () => { if (def && cardValue === 'id_20' && selColor) { const valid = []; window.game.myHand.forEach((c, i) => { if (!indices.includes(i) && i !== discardIdx && c.color === selColor && !(c.value && String(c.value).startsWith('id_'))) valid.push(i); }); if (valid.length > 0) { window.openMultiDiscardSelection(window.game.myHand, valid, (selected) => { multiDiscardIndices = selected; step5(); }); } else { step5(); } } else { step5(); } };
         const step3 = () => { if (def && def.needsColor) { ColorUI.show((color) => { selColor = color; step4(); }); } else { step4(); } };
         const step2 = () => { if (def && (def.needsDiscard || def.needsAbilityDiscard)) { window.openDiscardSelection(window.game.myHand, indices, def, (idx) => { discardIdx = idx; step3(); }); } else { step3(); } };
         if (def && def.needsTarget) { window.openTargetSelection(window.game.players, (tid) => { targetId = tid; step2(); }); } else { step2(); }
         return; 
     }
 
+    // 通常カードのプレイ
     window.game.selectedIndices = []; window.updateUI();
-    const indicesToSend = [...indices]; const cardsToSend = [...playedCards];
+    const indicesToS = [...indices], cardsToS = [...playedCards];
     window.animateSequentialPlay(indices, window.game, () => {
-        if (window.isHost) { if (window.socket) window.socket.emit('request_play_animation', { playerId: window.game.myId, cards: cardsToSend }); window.executePlay(window.game.myId, indicesToSend); } 
-        else { window.waitingForServerResponse = true; if (window.socket) window.socket.emit('player_action', { action: 'play', indices: indicesToSend, cards: cardsToSend }); }
+        if (window.isHost) { 
+            if (window.socket) window.socket.emit('request_play_animation', { playerId: window.game.myId, cards: cardsToS }); 
+            window.executePlay(window.game.myId, indicesToS); 
+        } else { 
+            window.waitingForServerResponse = true; if (window.socket) window.socket.emit('player_action', { action: 'play', indices: indicesToS, cards: cardsToS }); 
+        }
         window.isProcessingPlay = false; 
     });
 };
