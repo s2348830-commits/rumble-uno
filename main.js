@@ -2197,13 +2197,16 @@ window.onColorChosen = function(color) {
 };
 
 // ★修正: 参加者側のボタン連打・重複送信防止
-document.getElementById('draw-btn').onclick = () => {
+document.getElementById('draw-btn').onclick = function() {
     if (window.pendingJanken || window.isDrawing || window.isProcessingPlay) return; 
     if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
     if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) return;
     
+    // ★ 物理的にボタンを無効化（disabled）して、2回目のクリックを絶対に防ぐ
     window.isDrawing = true; 
-    document.getElementById('draw-btn').style.pointerEvents = 'none'; // ロック
+    this.disabled = true;
+    this.style.pointerEvents = 'none'; // クリックロック
+    this.style.opacity = '0.5'; // 見た目もグレーアウトさせる
     
     window.tryDrawWithAbility(() => {
         window.game.hasDrawnThisTurn = true; 
@@ -2212,11 +2215,11 @@ document.getElementById('draw-btn').onclick = () => {
         const s = window.game.drawStack; 
         const count = s > 0 ? s : 1;
         
-        // ★ 即座に通信を送る！アニメーション待ちのラグによる多重送信を防止
         if (window.isHost) {
             if (window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: count }); 
             window.executeDraw(window.game.myId); 
         } else if (window.socket) {
+            // アニメーションを待たずに即座に送信！
             window.socket.emit('player_action', { action: 'draw', count: count });
         }
 
@@ -2225,7 +2228,11 @@ document.getElementById('draw-btn').onclick = () => {
         const finishDraw = () => {
             window.isDrawing = false; 
             const btn = document.getElementById('draw-btn');
-            if (btn) btn.style.pointerEvents = 'auto'; // ロック解除
+            if (btn) {
+                btn.style.pointerEvents = 'auto'; // ロック解除
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            }
         };
 
         if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
@@ -2460,16 +2467,23 @@ function initMainSocketEvents() {
                 }
             }
         } else if (data.action === 'draw') {
-            // 【重要追加ガード】 その人のターンじゃなければ無視！引いた後なら無視！
+            // 【完全ガード】 他の処理中、またはターンが違う場合は弾く
             if (!current || current.id !== playerId) return;
+            if (window.isProcessingPlay) return; // ★ 演出待ちの隙間を埋めるロック
             if (window.game.hasDrawnThisTurn && window.game.drawStack === 0) return;
 
-            // 1回目のリクエストを受信した瞬間にフラグを立てて、2回目の通信を弾く
+            // ★命令を受信した「瞬間」に処理中フラグを立てて、2回目の割り込みを100%防ぐ！
+            window.isProcessingPlay = true;
             if (window.game.drawStack === 0) window.game.hasDrawnThisTurn = true;
 
             window.socket.emit('request_draw_animation', { playerId: playerId, count: data.count });
             const delay = data.count * 100 + 400;
-            setTimeout(() => { if (typeof window.executeDraw === 'function') window.executeDraw(playerId); }, delay);
+            
+            setTimeout(() => { 
+                // アニメーション完了後にロックを解除して実際にカードを引かせる
+                window.isProcessingPlay = false;
+                if (typeof window.executeDraw === 'function') window.executeDraw(playerId); 
+            }, delay);
 
         } else if (data.action === 'end_turn') {
             // 【重要追加ガード】 その人のターンじゃなければ無視！
