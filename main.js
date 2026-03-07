@@ -1517,13 +1517,17 @@ window.resolveJanken = function() {
         if (!someoneWon) {
             const nextLoop = pJ.loopCount + 1;
             const aId = pJ.attackerId;
-            window.pendingJanken = null;
-            window.broadcastGameState();
 
-            // 勝つもしくはあいこだった場合、最大4回まで「新しいランダムな相手」と再戦可能
+            // ★修正: 勝つもしくはあいこだった場合、最大4回まで「UIを閉じずに」再戦へ移行する
             if ((result === 'win' || result === 'draw') && nextLoop < 4) {
-                setTimeout(() => window.startJankenPhase(aId, nextLoop), 1000);
+                setTimeout(() => {
+                    window.startJankenPhase(aId, nextLoop);
+                }, 1000);
             } else {
+                // ★修正: 負けた時、または上限(4回)に達した時のみデータを消してUIを閉じる
+                window.pendingJanken = null;
+                window.broadcastGameState();
+                
                 setTimeout(() => window.checkTurn(), 1000);
             }
         }
