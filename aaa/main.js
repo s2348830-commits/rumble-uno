@@ -16,6 +16,7 @@ window.showConfirm = function(message, callback) {
     window.ensureModalsExist();
     const modal = document.getElementById('custom-confirm-modal'), text = document.getElementById('custom-confirm-text'), btnYes = document.getElementById('btn-custom-confirm-yes'), btnNo = document.getElementById('btn-custom-confirm-no');
     text.innerText = message; modal.classList.remove('hidden');
+    window.resetDonePlayers = new Set();
     btnYes.onclick = () => { modal.classList.add('hidden'); callback(true); }; 
     btnNo.onclick = () => { modal.classList.add('hidden'); callback(false); };
 };
@@ -226,10 +227,9 @@ window.showAbilityResetUI = function(maxCount) {
           btnConfirm = document.getElementById('btn-reset-confirm'), 
           timerSpan = document.getElementById('reset-timer'), 
           maxSpan = document.getElementById('reset-max');
-          
     if(!overlay) return; 
-    
-    // ★追加: 送信済みロック用変数
+
+    // ★修正1: 送信済みロック用変数を追加
     let submitted = false; 
 
     let timeLeft = 10; 
@@ -237,25 +237,30 @@ window.showAbilityResetUI = function(maxCount) {
     resetArea.innerHTML = ''; 
     handArea.innerHTML = '';
     
-    let selectedCards = [], 
-        myAbilities = window.game.myHand.filter(c => c.value && String(c.value).startsWith('id_'));
-
+    let selectedCards = [], myAbilities = window.game.myHand.filter(c => c.value && String(c.value).startsWith('id_'));
     const renderCards = () => {
-        resetArea.innerHTML = ''; 
-        selectedCards.forEach((c, idx) => { 
-            const el = Renderer.createCardElement(c); 
-            el.style.transform = 'none'; el.style.position = 'static'; el.style.margin = '0'; 
-            el.onclick = () => { selectedCards.splice(idx, 1); myAbilities.push(c); renderCards(); }; 
-            resetArea.appendChild(el); 
-        });
-        handArea.innerHTML = ''; 
-        myAbilities.forEach((c, idx) => { 
-            const el = Renderer.createCardElement(c); 
-            el.style.transform = 'none'; el.style.position = 'static'; el.style.margin = '0'; 
-            el.onclick = () => { if (selectedCards.length < maxCount) { myAbilities.splice(idx, 1); selectedCards.push(c); renderCards(); } }; 
-            handArea.appendChild(el); 
-        });
+        resetArea.innerHTML = ''; selectedCards.forEach((c, idx) => { const el = Renderer.createCardElement(c); el.style.transform = 'none'; el.style.position = 'static'; el.style.margin = '0'; el.onclick = () => { selectedCards.splice(idx, 1); myAbilities.push(c); renderCards(); }; resetArea.appendChild(el); });
+        handArea.innerHTML = ''; myAbilities.forEach((c, idx) => { const el = Renderer.createCardElement(c); el.style.transform = 'none'; el.style.position = 'static'; el.style.margin = '0'; el.onclick = () => { if (selectedCards.length < maxCount) { myAbilities.splice(idx, 1); selectedCards.push(c); renderCards(); } }; handArea.appendChild(el); });
     };
+    renderCards(); overlay.classList.remove('hidden');
+
+    const finish = () => { 
+        // ★修正2: すでに送信済みなら何もしない（二重実行防止）
+        if (submitted) return; 
+        submitted = true;
+
+        clearInterval(timerInt); 
+        overlay.classList.add('hidden'); 
+        if (selectedCards.length > 0) { 
+            const vals = selectedCards.map(c => c.value); 
+            if (window.isHost) { window.game.replaceAbilityCards(window.game.myId, vals); window.updateUI(); } 
+            else { if(window.socket) window.socket.emit('player_action', { action: 'ability_reset', cards: vals }); } 
+        } 
+    };
+
+    btnConfirm.onclick = finish; 
+    const timerInt = setInterval(() => { timeLeft--; timerSpan.innerText = timeLeft; if (timeLeft <= 0) finish(); }, 1000);
+};
 
     renderCards(); 
     overlay.classList.remove('hidden');
@@ -285,7 +290,6 @@ window.showAbilityResetUI = function(maxCount) {
         timerSpan.innerText = timeLeft; 
         if (timeLeft <= 0) finish(); 
     }, 1000);
-};
 
 window.animateInitialDeal = function(targetHands, callback) {
     if (window.isDealAnimationRunning) return; window.isDealAnimationRunning = true;
@@ -1148,6 +1152,7 @@ function initMainSocketEvents() {
     });
 
     window.socket.on('back_to_lobby', (roomState) => {
+        window.resetDonePlayers.clear();
         window.currentRoomState = roomState; window.isGameOver = false; window.isInitialDealing = false;
         if (window.hostSyncInterval) { clearInterval(window.hostSyncInterval); window.hostSyncInterval = null; }
         document.getElementById('winner-banner').classList.remove('show'); document.getElementById('draw-curtain').classList.remove('show'); document.getElementById('game-container').classList.add('hidden'); document.getElementById('lobby-screen').classList.remove('hidden');
@@ -1187,12 +1192,15 @@ function initMainSocketEvents() {
             window.socket.emit('request_draw_animation', { playerId: playerId, count: data.count }); const delay = data.count * 100 + 400;
             setTimeout(() => { if (typeof window.game !== 'undefined' && typeof window.game.drawCard === 'function') { for(let i=0; i<data.count; i++) window.game.drawCard(playerId); if (data.wasMyTurn && typeof window.executeEndTurn === 'function') window.executeEndTurn(playerId); else window.broadcastGameState(true); } }, delay);
         } else if (data.action === 'ability_reset') {
-    // ★修正: ゲーム開始直後の初期交換時のみ許可する判定を追加
-    if (window.game && typeof window.game.replaceAbilityCards === 'function') {
-        window.game.replaceAbilityCards(playerId, data.cards);
-        // 交換後は必ず全体に最新状態を送り、手札枚数の不整合を正す
-        window.broadcastGameState(true);
-    }
+            // ★修正: すでにこのプレイヤーのリセットを処理済みなら、二重処理を防止してリターン
+            if (window.resetDonePlayers.has(playerId)) return;
+            window.resetDonePlayers.add(playerId);
+
+            if (window.game && typeof window.game.replaceAbilityCards === 'function') {
+                window.game.replaceAbilityCards(playerId, data.cards);
+                // 交換後は手札枚数が変わるため、即座に全体へ最新状態を同期する
+                window.broadcastGameState(true);
+            }
         } else if (data.action === 'janken_choice') {
             if (window.pendingJanken && !window.pendingJanken.result) { if (playerId === window.pendingJanken.attackerId) window.pendingJanken.attackerHand = data.choice; if (playerId === window.pendingJanken.targetId) window.pendingJanken.targetHand = data.choice; if (typeof window.checkJankenReady === 'function') window.checkJankenReady(); }
         }
