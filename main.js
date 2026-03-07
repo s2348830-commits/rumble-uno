@@ -1588,6 +1588,283 @@ window.playJankenResult = function(attackerId, targetId, aH, tH, result) {
     }
 };
 
+window.checkTurn = function() {
+    if (!window.isHost || window.isGameOver || window.isInitialDealing) return; 
+    clearInterval(window.turnTimer); 
+    const current = window.game.currentPlayer;
+    if (!current) return;
+    
+    let dispName = current.name;
+    if(current.type === 'bot' && window.RuleSettings && window.RuleSettings.showBotPersonality && current.personality) dispName += ` [${current.personality}]`;
+
+    if (current.type === 'bot') {
+        const roomStr = window.currentRoomState ? ` - 部屋ID:${window.currentRoomState.id}` : "";
+        document.getElementById('status-message').innerText = `${dispName} が考え中...${roomStr}`;
+        window.broadcastGameState();
+        setTimeout(() => {
+            if(window.isGameOver || window.isInitialDealing) return; 
+            const result = UNOBot.play(window.game, current.id);
+            if (result.action === 'play') {
+                const playedCards = result.indices.map(i => window.game.hands[current.id][i]);
+                const isAbility = playedCards[0] && playedCards[0].value && String(playedCards[0].value).startsWith('id_');
+                
+                const def = isAbility && window.AbilityDef ? window.AbilityDef[playedCards[0].value] : null;
+
+                if (isAbility && def && def.type === 'BL') {
+                    window.socket.emit('request_play_animation', { playerId: current.id, cards: playedCards });
+                    setTimeout(() => {
+                        window.executeAbilityPlay(current.id, result.indices, null, null, null, [], {});
+                    }, playedCards.length * 100 + 400);
+                    return;
+                }
+
+                let willDiscard = (isAbility && def && (def.needsDiscard || def.needsAbilityDiscard)) ? 1 : 0;
+                
+                let botSelectedColor = null;
+                let botMultiDiscardIndices = [];
+                let botDiscardIdx = null;
+
+                if (isAbility && def) {
+                    if (def.needsColor) botSelectedColor = ['red', 'blue', 'green', 'yellow'][Math.floor(Math.random() * 4)];
+                    if (def.needsAbilityDiscard) {
+                        const bHand = window.game.hands[current.id];
+                        const discIdx = bHand.findIndex((c, i) => !result.indices.includes(i) && (c.value && String(c.value).startsWith('id_')));
+                        botDiscardIdx = discIdx > -1 ? discIdx : null;
+                    } else if (def.needsDiscard) {
+                        const bHand = window.game.hands[current.id];
+                        const discIdx = bHand.findIndex((c, i) => !result.indices.includes(i) && !(c.value && String(c.value).startsWith('id_')));
+                        botDiscardIdx = discIdx > -1 ? discIdx : (bHand.length > result.indices.length ? bHand.findIndex((c,i)=>!result.indices.includes(i)) : null);
+                    }
+                    if (playedCards[0].value === 'id_20' && botSelectedColor) {
+                        const bHand = window.game.hands[current.id];
+                        bHand.forEach((c, i) => {
+                            if (!result.indices.includes(i) && c.color === botSelectedColor) botMultiDiscardIndices.push(i);
+                        });
+                        willDiscard += botMultiDiscardIndices.length;
+                    }
+                }
+
+                const remainingCards = window.game.hands[current.id].length - playedCards.length - willDiscard;
+                
+                if (remainingCards === 1 || remainingCards === 0) window.socket.emit('declare_uno', { id: current.id, name: current.name });
+                
+                window.socket.emit('request_play_animation', { playerId: current.id, cards: playedCards });
+                const delay = playedCards.length * 100 + 400;
+                
+                setTimeout(() => {
+                    if (isAbility) {
+                        let botTargetId = null;
+                        if (def && def.needsTarget) {
+                            const others = window.game.players.filter(p=>p.id!==current.id);
+                            if(others.length>0) botTargetId = others[Math.floor(Math.random()*others.length)].id;
+                        }
+                        
+                        let extraData = {};
+                        if (def && def.needsGraveyard) {
+                            const gyList = window.game.abilityGraveyard.filter(id => window.AbilityDef[id] && window.AbilityDef[id].rarity !== 'UR');
+                            if (gyList.length > 0) extraData.graveyardCardId = gyList[Math.floor(Math.random() * gyList.length)];
+                        }
+                        if (def && def.needsDebuffSelect) {
+                            const p = window.game.players.find(x=>x.id===current.id);
+                            if (p && p.frozen) extraData.debuffToClear = 'frozen';
+                            else if (p && p.burnTurns > 0) extraData.debuffToClear = 'burn';
+                        }
+
+                        window.executeAbilityPlay(current.id, result.indices, botTargetId, botDiscardIdx, botSelectedColor, botMultiDiscardIndices, extraData);
+                    } else {
+                        window.executePlay(current.id, result.indices, true);
+                    }
+                }, delay);
+            } else {
+                const drawCount = result.count || 1;
+                window.socket.emit('request_draw_animation', { playerId: current.id, count: drawCount });
+                setTimeout(() => window.executeDraw(current.id, true), drawCount * 100 + 400);
+            }
+        }, 1500);
+    } else {
+        const roomStr = window.currentRoomState ? ` - 部屋ID:${window.currentRoomState.id}` : "";
+        document.getElementById('status-message').innerText = current.id === window.game.myId ? `あなたの番です${roomStr}` : `${dispName} のターン${roomStr}`;
+        window.broadcastGameState();
+        window.turnTimer = setInterval(() => {
+            if (!window.playerAfkTimes[current.id]) window.playerAfkTimes[current.id] = 0;
+            window.playerAfkTimes[current.id]++;
+            if (window.playerAfkTimes[current.id] >= 180) {
+                clearInterval(window.turnTimer);
+                if(window.isGameOver || window.isInitialDealing) return;
+                window.playerAfkTimes[current.id] = 0; 
+                setTimeout(() => {
+                    const result = UNOBot.play(window.game, current.id);
+                    if (result.action === 'play') {
+                        const playedCards = result.indices.map(i => window.game.hands[current.id][i]);
+                        const isAbility = playedCards[0] && playedCards[0].value && String(playedCards[0].value).startsWith('id_');
+                        
+                        const def = isAbility && window.AbilityDef ? window.AbilityDef[playedCards[0].value] : null;
+
+                        if (isAbility && def && def.type === 'BL') {
+                            window.socket.emit('request_play_animation', { playerId: current.id, cards: playedCards });
+                            setTimeout(() => {
+                                window.executeAbilityPlay(current.id, result.indices, null, null, null, [], {});
+                            }, playedCards.length * 100 + 400);
+                            return;
+                        }
+
+                        let willDiscard = (isAbility && def && (def.needsDiscard || def.needsAbilityDiscard)) ? 1 : 0;
+                        let botSelectedColor = null;
+                        let botMultiDiscardIndices = [];
+                        let botDiscardIdx = null;
+
+                        if (isAbility && def) {
+                            if (def.needsColor) botSelectedColor = ['red', 'blue', 'green', 'yellow'][Math.floor(Math.random() * 4)];
+                            if (def.needsAbilityDiscard) {
+                                const bHand = window.game.hands[current.id];
+                                const discIdx = bHand.findIndex((c, i) => !result.indices.includes(i) && (c.value && String(c.value).startsWith('id_')));
+                                botDiscardIdx = discIdx > -1 ? discIdx : null;
+                            } else if (def.needsDiscard) {
+                                const bHand = window.game.hands[current.id];
+                                const discIdx = bHand.findIndex((c, i) => !result.indices.includes(i) && !(c.value && String(c.value).startsWith('id_')));
+                                botDiscardIdx = discIdx > -1 ? discIdx : (bHand.length > result.indices.length ? bHand.findIndex((c,i)=>!result.indices.includes(i)) : null);
+                            }
+                            if (playedCards[0].value === 'id_20' && botSelectedColor) {
+                                const bHand = window.game.hands[current.id];
+                                bHand.forEach((c, i) => {
+                                    if (!result.indices.includes(i) && c.color === botSelectedColor) botMultiDiscardIndices.push(i);
+                                });
+                                willDiscard += botMultiDiscardIndices.length;
+                            }
+                        }
+
+                        const remainingCards = window.game.hands[current.id].length - playedCards.length - willDiscard;
+                        
+                        if (remainingCards === 1 || remainingCards === 0) window.socket.emit('declare_uno', { id: current.id, name: current.name });
+                        
+                        window.socket.emit('request_play_animation', { playerId: current.id, cards: playedCards });
+                        setTimeout(() => {
+                            if (isAbility) {
+                                let botTargetId = null;
+                                if (def && def.needsTarget) {
+                                    const others = window.game.players.filter(p=>p.id!==current.id);
+                                    if(others.length>0) botTargetId = others[Math.floor(Math.random()*others.length)].id;
+                                }
+
+                                let extraData = {};
+                                if (def && def.needsGraveyard) {
+                                    const gyList = window.game.abilityGraveyard.filter(id => window.AbilityDef[id] && window.AbilityDef[id].rarity !== 'UR');
+                                    if (gyList.length > 0) extraData.graveyardCardId = gyList[Math.floor(Math.random() * gyList.length)];
+                                }
+                                if (def && def.needsDebuffSelect) {
+                                    const p = window.game.players.find(x=>x.id===current.id);
+                                    if (p && p.frozen) extraData.debuffToClear = 'frozen';
+                                    else if (p && p.burnTurns > 0) extraData.debuffToClear = 'burn';
+                                }
+
+                                window.executeAbilityPlay(current.id, result.indices, botTargetId, botDiscardIdx, botSelectedColor, botMultiDiscardIndices, extraData);
+                            } else window.executePlay(current.id, result.indices, true);
+                        }, playedCards.length * 100 + 400);
+                    } else {
+                        const drawCount = result.count || 1;
+                        window.socket.emit('request_draw_animation', { playerId: current.id, count: drawCount });
+                        setTimeout(() => window.executeDraw(current.id, true), drawCount * 100 + 400);
+                    }
+                }, 1000);
+            }
+        }, 1000);
+    }
+};
+
+window.executePlay = function(playerId, indices, isBot = false) {
+    if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
+    
+    clearInterval(window.turnTimer); 
+    if(window.playerAfkTimes) window.playerAfkTimes[playerId] = 0; 
+    
+    const result = window.game.playCards(playerId, indices);
+    
+    if (result.penalty) { 
+        document.getElementById('status-message').innerText = `${result.penaltyReason}上がり禁止ペナルティ！`; 
+        window.broadcastGameState(); setTimeout(window.checkTurn, 1000); return; 
+    }
+    
+    if (result.success) {
+        let guides = [];
+        let isDrawAttack = false;
+        let attackCardVal = null;
+        let targetId = null;
+
+        if (result.lastCard && (result.lastCard.value === '+2' || result.lastCard.value === 'Wild+4')) {
+            attackCardVal = result.lastCard.value;
+            isDrawAttack = true;
+        }
+
+        if (window.checkWin(playerId)) return;
+        if (result.isAbility) { window.broadcastGameState(false, guides); setTimeout(() => { window.checkTurn(); }, 500); return; }
+
+        if (result.needsColor) {
+            if (isDrawAttack) {
+                if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length === 0) {
+                    // 何もしない
+                } else {
+                    window.pendingDrawDefenseInfo = { attackerId: playerId, cardValue: attackCardVal };
+                }
+            }
+            if (isBot) { 
+                window.game.currentColor = ['red', 'blue', 'green', 'yellow'][Math.floor(Math.random() * 4)]; 
+                window.executeColor(playerId, window.game.currentColor); 
+            } 
+            else if (playerId === window.game.myId) { 
+                const roomStr = window.currentRoomState ? ` - 部屋ID:${window.currentRoomState.id}` : "";
+                document.getElementById('status-message').innerText = `色を選択してください${roomStr}`; 
+                ColorUI.show(); window.broadcastGameState(false, guides); 
+            } 
+            else { 
+                const roomStr = window.currentRoomState ? ` - 部屋ID:${window.currentRoomState.id}` : "";
+                document.getElementById('status-message').innerText = `色選択中...${roomStr}`; 
+                window.socket.emit('request_color_select', playerId); window.broadcastGameState(false, guides); 
+            }
+        } else { 
+            if (isDrawAttack) {
+                targetId = window.game.currentPlayer.id;
+                guides.push({ from: playerId, to: targetId, text: attackCardVal, delay: 0 }); 
+                if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length > 0) {
+                    window.startDrawDefensePhase(playerId, targetId, attackCardVal, guides);
+                } else {
+                    window.broadcastGameState(false, guides);
+                    window.checkTurn(); 
+                }
+            } else {
+                window.broadcastGameState(false, guides);
+                window.checkTurn(); 
+            }
+        }
+    } else {
+        if (isBot) window.executeDraw(playerId, true); else window.checkTurn(); 
+    }
+};
+
+window.executeColor = function(playerId, color) {
+    if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
+    
+    if(window.playerAfkTimes) window.playerAfkTimes[playerId] = 0; 
+    window.game.currentColor = color; 
+    
+    const info = window.pendingDrawDefenseInfo;
+    window.pendingDrawDefenseInfo = null;
+
+    window.game.nextTurn(1); 
+    
+    if (info) {
+        const targetId = window.game.currentPlayer.id;
+        const guides = [{ from: info.attackerId, to: targetId, text: info.cardValue, delay: 0 }];
+        if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length > 0) {
+            window.startDrawDefensePhase(info.attackerId, targetId, info.cardValue, guides);
+        } else {
+            window.broadcastGameState(false, guides);
+            window.checkTurn();
+        }
+    } else {
+        window.checkTurn();
+    }
+};
+
 // ★修正: ホスト側の処理を厳格化（「現在ターンか？」をチェック）
 window.executeDraw = function(playerId, isBot = false) {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
