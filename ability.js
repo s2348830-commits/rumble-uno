@@ -62,8 +62,8 @@ window.AbilityEngine = {
         }
         
         for (let i = 0; i < actualDrawn; i++) {
-            // 第3引数に forced=true を渡して蘇生チェックを発動させる
-            game.drawCard(targetId, false, isForcedByAbility); 
+            // ★修正: blockable が false(貫通) ならシールド無視(!blockable) を適用
+            game.drawCard(targetId, !blockable, isForcedByAbility); 
         }
         if (actualDrawn > 0 && window.isHost && window.socket) {
             window.socket.emit('request_draw_animation', { playerId: targetId, count: actualDrawn });
@@ -298,6 +298,66 @@ window.AbilityEngine = {
                 } else if (abilityId === 'id_11') {
                     if (game.lockRandomCard) game.lockRandomCard(attackerId, selectedTargetId, 'symbol', 2, 2);
                     guides.push({ from: attackerId, to: selectedTargetId, text: '記号2枚ロック', se: 'rock' });
+                } 
+                // ★復活: 消えてしまっていた id_13, id_16, id_22, id_23 の処理を追加
+                else if (abilityId === 'id_13') {
+                    const othersList = game.players.filter(p=>p.id!==attackerId && p.connected);
+                    if (othersList.length > 0) {
+                        const tid = othersList[Math.floor(Math.random() * othersList.length)].id;
+                        this.applyDraw(game, tid, 1, true, true);
+                        const tHand = game.hands[tid];
+                        let symbolIndices = [];
+                        if (tHand) {
+                            for (let i = 0; i < tHand.length; i++) {
+                                const c = tHand[i];
+                                if (!(c.value && String(c.value).startsWith('id_')) && !/^[0-9]$/.test(c.value)) symbolIndices.push(i);
+                            }
+                        }
+                        if (symbolIndices.length > 0) {
+                            const rIdx = symbolIndices[Math.floor(Math.random() * symbolIndices.length)];
+                            const returnedCard = tHand.splice(rIdx, 1)[0];
+                            if (game.deck) {
+                                const insertPos = Math.floor(Math.random() * (game.deck.length + 1));
+                                game.deck.splice(insertPos, 0, returnedCard);
+                            }
+                            guides.push({ from: attackerId, to: tid, text: '記号戻し' });
+                        } else {
+                            this.applyDraw(game, tid, 1, true, true);
+                            guides.push({ from: attackerId, to: tid, text: '追加1ドロー' });
+                        }
+                    }
+                } else if (abilityId === 'id_16') {
+                    if(self) { 
+                        self.frozen = false; self.burnTurns = 0; 
+                        self.evasion = { level: 2, turns: 1 };
+                        guides.push({ from: attackerId, to: attackerId, text: '✨解除＆💨回避II(1T)' }); 
+                    }
+                } else if (abilityId === 'id_22') {
+                    if (self) {
+                        if (extraData.debuffToClear === 'frozen') self.frozen = false;
+                        else if (extraData.debuffToClear === 'burn') self.burnTurns = 0;
+                    }
+                    game.players.forEach(p => {
+                        if(p.connected && p.id !== attackerId) {
+                            const res = this.applyDraw(game, p.id, 1, true, true);
+                            if (res === -1) guides.push({ from: attackerId, to: p.id, text: '💨回避!' });
+                            else guides.push({ from: attackerId, to: p.id, text: '1枚' });
+                        }
+                    });
+                    guides.push({ from: attackerId, to: attackerId, text: 'デバフ解除' });
+                } else if (abilityId === 'id_23') {
+                    if(self) {
+                        self.invincibleTurns = 1;
+                        let dbfs = [];
+                        if (self.frozen) dbfs.push('frozen');
+                        if (self.burnTurns > 0) dbfs.push('burn');
+                        if (dbfs.length > 0) {
+                            const r = dbfs[Math.floor(Math.random()*dbfs.length)];
+                            if (r === 'frozen') self.frozen = false;
+                            else self.burnTurns = 0;
+                        }
+                    }
+                    guides.push({ from: attackerId, to: attackerId, text: '無敵化＆デバフ解除' });
                 } else if (abilityId === 'id_34') {
                     if(self) self.evasion = { level: 1, turns: 1 };
                     guides.push({ from: attackerId, to: attackerId, text: '💨回避I(1T)' });
