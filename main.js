@@ -237,7 +237,7 @@ window.SE = {
 const unlockAudioContext = () => {
     if (window.SE.unlocked) return; window.SE.unlocked = true; window.SE.initContext();
     if (window.SE.audioCtx.state === 'suspended') window.SE.audioCtx.resume();
-    ['win', 'win2', 'setting', 'draw', 'uno_message', 'buttonclick', 'uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6', 'frieze', 'rock', 'Distribute', 'mvp_1', 'mvp_2', 'hv/id_20(1)', 'hv/id_20(2)', 'hv/id_25', 'hv/id_26', 'hv/id_35'].forEach(name => window.SE.loadSound(name, 'mp3'));
+    ['win', 'win2', 'setting', 'draw', 'uno_message', 'buttonclick', 'uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6', 'frieze', 'rock', 'Distribute', 'mvp_1', 'mvp_2', 'hv/id_20(1)', 'hv/id_20(2)', 'hv/id_25', 'hv/id_26'].forEach(name => window.SE.loadSound(name, 'mp3'));
     ['fire', 'page'].forEach(name => window.SE.loadSound(name, 'wav'));
     document.removeEventListener('click', unlockAudioContext);
     document.removeEventListener('touchstart', unlockAudioContext);
@@ -688,16 +688,13 @@ window.showAbilityCutin = function(cardValue, isHVActivated = false) {
     void cutinEl.offsetWidth; 
     cutinEl.classList.add('show-cutin');
     
-   if (cardValue === 'id_20') {
+    if (cardValue === 'id_20') {
         const rand = Math.random() < 0.5 ? 1 : 2;
         if (window.SE) window.SE.play(`hv/id_20(${rand})`);
     } else if (cardValue === 'id_25') {
         if (window.SE) window.SE.play(`hv/id_26`);
     } else if (cardValue === 'id_26') {
         if (window.SE) window.SE.play(`hv/id_25`);
-    } else if (cardValue === 'id_35') {
-        // ★追加: イヴ(id_35)の専用SEを再生
-        if (window.SE) window.SE.play(`hv/id_35`);
     } else {
         const randMvp = Math.random() < 0.5 ? 1 : 2;
         if (window.SE) window.SE.play(`mvp_${randMvp}`);
@@ -1487,22 +1484,15 @@ window.resolveJanken = function() {
         if (!someoneWon) {
             const nextLoop = pJ.loopCount + 1;
             const aId = pJ.attackerId;
-            
-            // ★修正: 引き分けの時も「別の相手」を探す。もし他に相手がいなければ再戦を終了し、フリーズを防止する
-            if ((result === 'win' || result === 'draw') && nextLoop < 4) {
-                const others = window.game.players.filter(p => p.id !== aId && p.connected && p.id !== pJ.targetId);
-                if (others.length > 0) {
-                    const nextTargetId = others[Math.floor(Math.random() * others.length)].id;
-                    window.startJankenPhase(aId, nextLoop, nextTargetId);
-                } else {
-                    // 他に相手がいない場合は終了してターンを再開
-                    window.pendingJanken = null;
-                    window.broadcastGameState();
-                    setTimeout(() => window.checkTurn(), 1000);
-                }
+            const tId = pJ.targetId; 
+            window.pendingJanken = null;
+            window.broadcastGameState();
+
+            if (result === 'win' && nextLoop < 4) {
+                setTimeout(() => window.startJankenPhase(aId, nextLoop), 1000);
+            } else if (result === 'draw') {
+                setTimeout(() => window.startJankenPhase(aId, pJ.loopCount, tId), 1000);
             } else {
-                window.pendingJanken = null;
-                window.broadcastGameState();
                 setTimeout(() => window.checkTurn(), 1000);
             }
         }
@@ -1884,6 +1874,7 @@ window.executeColor = function(playerId, color) {
 window.executeDraw = function(playerId, isBot = false) {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
     
+    // 【重要】現在のターンのプレイヤーかチェック
     const current = window.game.currentPlayer;
     if (!current || current.id !== playerId) return;
 
@@ -1891,34 +1882,10 @@ window.executeDraw = function(playerId, isBot = false) {
     if(window.playerAfkTimes) window.playerAfkTimes[playerId] = 0;
     
     const stack = window.game.drawStack; 
-    let count = stack > 0 ? stack : 1;
-    let isForced = stack > 0; // ★追加: +2や+4の強制ドローかどうかの判定
-    
-    // ★追加: 裂傷状態なら引く枚数を+1
-    if (current.laceration && current.laceration > 0) count += 1;
+    const count = stack > 0 ? stack : 1;
     
     for(let i=0; i<count; i++) { 
         if(!window.game.drawCard(playerId)) { if(window.isGameOver) return; break; } 
-    }
-
-    // ★追加: 強制ドローだった場合、蘇生システムを発動する
-    if (isForced && window.game.triggerRevive) {
-        window.game.triggerRevive(playerId);
-    }
-    
-    let revGuides = [];
-    if (window.game.pendingReviveGuides && window.game.pendingReviveGuides.length > 0) {
-        revGuides = window.game.pendingReviveGuides;
-        window.game.pendingReviveGuides = [];
-    }
-
-    // ★追加: 裂傷や蘇生のガイド表示
-    if (revGuides.length > 0 || (current.laceration && current.laceration > 0)) {
-        let guides = [...revGuides];
-        if (current.laceration && current.laceration > 0) {
-            guides.push({ from: playerId, to: playerId, text: '🩸裂傷(+1枚)' });
-        }
-        window.broadcastGameState(false, guides);
     }
     
     if (stack > 0) { 
@@ -1929,6 +1896,7 @@ window.executeDraw = function(playerId, isBot = false) {
         if (isBot) { 
             window.game.nextTurn(1); window.checkTurn(); 
         } else { 
+            // ドロー後に自動でターンを終了させず、引いた状態（hasDrawnThisTurn）にする
             window.game.hasDrawnThisTurn = true; 
             window.broadcastGameState(); 
         } 
@@ -2597,32 +2565,6 @@ function initMainSocketEvents() {
             }
         }
     });
-}
-
-const btnOpenCustomCards = document.getElementById("btn-open-custom-cards");
-    if (btnOpenCustomCards) {
-        btnOpenCustomCards.onclick = () => {
-            const overlay = document.getElementById("custom-card-overlay");
-            if (overlay) {
-                overlay.classList.remove("hidden");
-                if (window.SE) window.SE.play('touch_to_start'); // お好みで開く時の音
-            }
-        };
-    }
-
-    const btnCloseCustomCards = document.getElementById("btn-close-custom-cards");
-    if (btnCloseCustomCards) {
-        btnCloseCustomCards.onclick = () => {
-    const overlay = document.getElementById("custom-card-overlay");
-    if (overlay) {
-        overlay.classList.add("hidden");
-        if (window.SE) window.SE.play('page');
-        
-        // ★ここを追加：詳細パネルも一緒に消す
-        const infoPanel = document.getElementById('ability-info');
-        if (infoPanel) infoPanel.style.opacity = 0;
-    }
-};
 }
 
 initMainSocketEvents();

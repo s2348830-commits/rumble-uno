@@ -370,18 +370,6 @@ button.disabled-btn { opacity: 0.5; cursor: not-allowed; }
     box-shadow: 0 0 20px #4caf50;
     animation: pulseDiscard 1.5s infinite;
 }
-.wild-color-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    border-radius: var(--font-corner, 10px);
-    pointer-events: none;
-    box-sizing: border-box;
-    z-index: 50; /* ★カード内の文字やアイコン（通常z-index:1〜10）の上に確実に色を被せるため高めに設定 */
-}
-
 @keyframes pulseDiscard {
     0% { box-shadow: 0 0 10px #4caf50; }
     50% { box-shadow: 0 0 25px #4caf50; }

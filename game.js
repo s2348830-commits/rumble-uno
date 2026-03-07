@@ -18,7 +18,6 @@ class UNOGame {
         this.hasDrawnThisTurn = false;
         this.abilityGraveyard = []; 
         this.customDeck = []; 
-        this.pendingReviveGuides = [];
     }
 
     get isMyTurn() { return this.currentPlayer && this.currentPlayer.id === this.myId; }
@@ -32,18 +31,14 @@ class UNOGame {
             p.frozen = false; p.burnTurns = 0; p.invincibleTurns = 0; 
             p.shield = { level: 0, turns: 0 }; p.evasion = { level: 0, turns: 0 }; 
             p.frozenBurnImmune = false; p.usedRaia = false; p.raiaReturnPending = false;
-            // ★追加: 裂傷と蘇生のステータス
-            p.laceration = 0; p.usedReviveMisa = 0; p.hasReviveMisa = false; p.usedReviveEve = 0; p.hasReviveEve = false;
         });
         this.myId = myId;
-        this.pendingReviveGuides = [];
     }
 
     start() {
         this.deck = UNORules.createDeck();
         this.abilityGraveyard = [];
         this.customDeck = [];
-        this.pendingReviveGuides = [];
         
         if (window.RuleSettings && window.RuleSettings.randomTurnOrder) {
             for (let i = this.players.length - 1; i > 0; i--) {
@@ -110,7 +105,6 @@ class UNOGame {
             if (this.hands[this.currentPlayer.id]) {
                 this.hands[this.currentPlayer.id].forEach(c => { if (c.lockedTurns && c.lockedTurns > 0) c.lockedTurns--; });
             }
-            if (this.currentPlayer.laceration > 0) this.currentPlayer.laceration--;
         }
 
         this.turnIndex = (this.turnIndex + (this.direction * skipCount) + this.players.length * 10) % this.players.length;
@@ -161,6 +155,7 @@ class UNOGame {
             const isAbility = lastCard.value && String(lastCard.value).startsWith('id_');
             const isAction = !/^[0-9]$/.test(lastCard.value) && !isAbility;
             
+            // ★修正4: ペナルティ判定のズレ（能力で捨てるカードも考慮）
             const def = (isAbility && typeof window !== 'undefined' && window.AbilityDef) ? window.AbilityDef[lastCard.value] : null;
             const willDiscard = (isAbility && def && (def.needsDiscard || def.needsAbilityDiscard)) ? 1 : 0;
             const finalHandCount = hand.length - selectedCards.length - willDiscard;
@@ -235,6 +230,7 @@ class UNOGame {
                 } else { newDeck.push(c); }
             }
 
+            // ★修正4: 無限ループ回避（新しく補充できるカードが1枚もない場合はドロー不可とする）
             if (newDeck.length === 0) {
                 this.discardPile.push(top); this.discardRotations.push(topRot);
                 return false;
@@ -271,34 +267,6 @@ class UNOGame {
                 const targetCard = candidates.splice(r, 1)[0];
                 targetCard.lockedTurns = (attackerId === targetId) ? turns + 1 : turns; 
                 targetCard.lockedType = type; 
-            }
-        }
-    }
-
-    triggerRevive(playerId) {
-        const p = this.players.find(x => x.id === playerId);
-        if (!p) return;
-        
-        if (p.hasReviveMisa && p.usedReviveMisa === 0) {
-            const gIdx = this.abilityGraveyard.indexOf('id_25');
-            if (gIdx > -1) {
-                this.abilityGraveyard.splice(gIdx, 1);
-                if (this.hands[playerId]) this.hands[playerId].push({ color: 'black', value: 'id_25' });
-                p.usedReviveMisa = 1;
-                p.hasReviveMisa = false;
-                if (!this.pendingReviveGuides) this.pendingReviveGuides = [];
-                this.pendingReviveGuides.push({ from: playerId, to: playerId, text: '蘇生・ミサ発動!' });
-            }
-        }
-        if (p.hasReviveEve && p.usedReviveEve === 0) {
-            const gIdx = this.abilityGraveyard.indexOf('id_35');
-            if (gIdx > -1) {
-                this.abilityGraveyard.splice(gIdx, 1);
-                if (this.hands[playerId]) this.hands[playerId].push({ color: 'black', value: 'id_35' });
-                p.usedReviveEve = 1;
-                p.hasReviveEve = false;
-                if (!this.pendingReviveGuides) this.pendingReviveGuides = [];
-                this.pendingReviveGuides.push({ from: playerId, to: playerId, text: '蘇生・イヴ発動!' });
             }
         }
     }
