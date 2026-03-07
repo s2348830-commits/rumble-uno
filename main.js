@@ -14,6 +14,7 @@ window.isProcessingPlay = false;
 window.currentDefensePhaseId = null;
 window.hasRespondedDefense = false;
 window.currentJankenLoopId = null; 
+window.currentJankenPhaseId = null;
 
 window.JANKEN_BACK_IMG = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 60'%3E%3Crect width='40' height='60' rx='6' fill='%23222' stroke='%23444' stroke-width='2'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23fff' font-size='24' font-family='sans-serif' font-weight='bold'%3E?%3C/text%3E%3C/svg%3E";
 
@@ -213,6 +214,38 @@ window.hideProcessingOverlay = function() {
     }
 };
 
+// ★追加: ワイルドカードの色の視覚的フィードバック処理
+window.applyWildColorOverlay = function() {
+    const discardPileEl = document.getElementById('discard-pile');
+    if (!discardPileEl) return;
+
+    const topCard = window.game.topCard;
+    if (topCard && topCard.color === 'black' && window.game.currentColor && window.game.currentColor !== 'black') {
+        const cards = discardPileEl.getElementsByClassName('card');
+        if (cards.length > 0) {
+            const topCardEl = cards[cards.length - 1];
+            if (!topCardEl.querySelector('.wild-color-overlay')) {
+                const overlay = document.createElement('div');
+                overlay.className = 'wild-color-overlay';
+                
+                let baseColor = 'rgba(255, 255, 255, 0.5)';
+                let borderColor = 'white';
+                if (window.game.currentColor === 'red') { baseColor = 'rgba(211, 47, 47, 0.6)'; borderColor = '#ff5252'; }
+                else if (window.game.currentColor === 'blue') { baseColor = 'rgba(25, 118, 210, 0.6)'; borderColor = '#448aff'; }
+                else if (window.game.currentColor === 'green') { baseColor = 'rgba(56, 142, 60, 0.6)'; borderColor = '#69f0ae'; }
+                else if (window.game.currentColor === 'yellow') { baseColor = 'rgba(251, 192, 45, 0.6)'; borderColor = '#ffff00'; }
+                
+                overlay.style.backgroundColor = baseColor;
+                overlay.style.boxShadow = `0 0 15px ${borderColor}`;
+                overlay.style.border = `3px solid ${borderColor}`;
+                
+                topCardEl.style.position = 'relative';
+                topCardEl.appendChild(overlay);
+            }
+        }
+    }
+};
+
 window.SE = {
     audioCtx: null, masterGain: null, buffers: {}, activeLoopSources: {}, intendedLoops: {}, volume: 0.5, unlocked: false, lastPlayed: {}, 
     initContext: function() {
@@ -310,7 +343,13 @@ const ColorUI = {
 };
 
 window.updateUI = function() { 
-    if(window.game && window.game.players && window.game.players.length > 0) { Renderer.updateAll(window.game); window.checkFinalSprint(); } 
+    if(window.game && window.game.players && window.game.players.length > 0) { 
+        Renderer.updateAll(window.game); 
+        window.checkFinalSprint(); 
+        
+        // ★追加: 描画後にワイルドカードの指定色フィードバックを反映
+        if (typeof window.applyWildColorOverlay === 'function') window.applyWildColorOverlay();
+    } 
 };
 
 window.checkFinalSprint = function() {
@@ -359,9 +398,11 @@ window.updatePhaseUI = function(state) {
     }
 
     if (state.jankenPhase) {
-        if (!window.isJankenShowing) {
+        if (window.currentJankenPhaseId !== state.jankenPhase.phaseId) {
+            window.currentJankenPhaseId = state.jankenPhase.phaseId;
             if (typeof window.showJankenUI === 'function') window.showJankenUI(state.jankenPhase.attackerId, state.jankenPhase.targetId, state.jankenPhase.loopCount);
             window.isJankenShowing = true;
+            window.jankenResultPlayed = false;
         }
         const jTimer = document.getElementById('janken-timer');
         if (jTimer) jTimer.innerText = state.jankenPhase.timer;
@@ -389,8 +430,8 @@ window.updatePhaseUI = function(state) {
         window.currentJankenLoopId = null; 
         const jOverlay = document.getElementById('janken-overlay');
         if (jOverlay) {
-            jOverlay.classList.remove('result-showing'); // ★追加: 結果表示状態を解除
-            jOverlay.classList.add('hidden'); // ★追加: 確実に非表示にする
+            jOverlay.classList.remove('result-showing');
+            jOverlay.classList.add('hidden');
         }
     }
 };
@@ -988,13 +1029,13 @@ window.showDefenseModal = function(attackCardValue) {
                 if (def && (def.needsDiscard || def.needsAbilityDiscard)) {
                     modal.classList.add('hidden'); 
                     window.openDiscardSelection(myHand, [item.idx], def, (discIdx) => {
-                        window.hasRespondedDefense = true; // ✅ カード確定時にフラグを立てる
+                        window.hasRespondedDefense = true; 
                         window.socket.emit('player_action', { action: 'defense_response', targetId: window.game.myId, cardValue: item.card.value, discardIdx: discIdx });
                         window.isDefending = false;
                     });
                 } else {
                     modal.classList.add('hidden'); 
-                    window.hasRespondedDefense = true; // ✅ カード確定時にフラグを立てる
+                    window.hasRespondedDefense = true; 
                     window.socket.emit('player_action', { action: 'defense_response', targetId: window.game.myId, cardValue: item.card.value, discardIdx: null });
                     window.isDefending = false;
                 }
@@ -1460,7 +1501,8 @@ window.startJankenPhase = function(attackerId, loopCount, fixedTargetId = null) 
         attackerId, targetId, loopCount,
         attackerHand: null, targetHand: null,
         timer: 10,
-        result: null
+        result: null,
+        phaseId: Date.now() // ★追加：じゃんけんフェーズの更新管理用
     };
 
     window.broadcastGameState(); 
@@ -1539,14 +1581,16 @@ window.resolveJanken = function() {
             const nextLoop = pJ.loopCount + 1;
             const aId = pJ.attackerId;
             const tId = pJ.targetId; 
-            window.pendingJanken = null;
-            window.broadcastGameState();
-
+            
+            // ★修正：勝った時・あいこの時はUIを閉じずに次のループへ
             if (result === 'win' && nextLoop < 4) {
-                setTimeout(() => window.startJankenPhase(aId, nextLoop), 1000);
+                window.startJankenPhase(aId, nextLoop);
             } else if (result === 'draw') {
-                setTimeout(() => window.startJankenPhase(aId, pJ.loopCount, tId), 1000);
+                window.startJankenPhase(aId, pJ.loopCount, tId);
             } else {
+                window.pendingJanken = null;
+                window.broadcastGameState();
+                window.game.nextTurn(1);
                 setTimeout(() => window.checkTurn(), 1000);
             }
         }
@@ -1558,12 +1602,7 @@ window.showJankenUI = function(attackerId, targetId, loopCount) {
     let overlay = document.getElementById('janken-overlay');
     if (!overlay) return;
 
-    const jankenLoopId = `${attackerId}-${targetId}-${loopCount}`;
-    if (window.currentJankenLoopId !== jankenLoopId) {
-        window.currentJankenLoopId = jankenLoopId;
-        if (window.SE) window.SE.play('hv/id_26');
-    }
-
+    // ★修正：初期表示時の音を削除し、結果表示のリセット処理を追加
     overlay.classList.remove('result-showing');
     overlay.classList.remove('hidden');
     
@@ -1603,6 +1642,13 @@ window.showJankenUI = function(attackerId, targetId, loopCount) {
 window.playJankenResult = function(attackerId, targetId, aH, tH, result) {
     const overlay = document.getElementById('janken-overlay');
     if (overlay) overlay.classList.add('result-showing'); 
+
+    // ★追加: 能力カード使用者が勝つまたはあいこになった時に0.5秒待って音を流す
+    if (result === 'win' || result === 'draw') {
+        setTimeout(() => {
+            if (window.SE) window.SE.play('hv/id_26');
+        }, 500);
+    }
 
     const p1Card = document.getElementById('janken-p1-card');
     const p2Card = document.getElementById('janken-p2-card');
@@ -1922,7 +1968,6 @@ window.executeColor = function(playerId, color) {
     }
 };
 
-// ★修正: ホスト側の処理を厳格化（「現在ターンか？」をチェック）
 window.executeDraw = function(playerId, isBot = false) {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
     
@@ -1953,7 +1998,6 @@ window.executeDraw = function(playerId, isBot = false) {
     }
 };
 
-// ★修正: 終了時も厳格化
 window.executeEndTurn = function(playerId) {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
     
@@ -2250,7 +2294,6 @@ window.onColorChosen = function(color) {
     }
 };
 
-// ★修正: 参加者側のボタン連打・重複送信の完全防止
 document.getElementById('draw-btn').onclick = function() {
     if (window.pendingJanken || window.isDrawing || window.isProcessingPlay) return; 
     if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
