@@ -2407,8 +2407,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-document.getElementById('uno-btn').onclick = window.declareUno;
-
 (() => {
     const btnManual = document.getElementById('btn-manual');
     const manualOverlay = document.getElementById('manual-overlay');
