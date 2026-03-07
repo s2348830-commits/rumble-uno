@@ -820,12 +820,7 @@ window.tryDrawWithAbility = function(callback) {
 
 window.handlePlayAction = function() {
     if (window.game.selectedIndices.length === 0 || window.isGameOver || window.isInitialDealing || window.isDrawing) return;
-    
-    if (!document.querySelector('.action-popup:not(.hidden)')) {
-        window.isProcessingPlay = false;
-        window.waitingForServerResponse = false;
-    }
-    
+        
     if (window.waitingForServerResponse) { alert("サーバーと通信中です。少しお待ちください。"); window.game.selectedIndices = []; window.updateUI(); return; }
     if (window.pendingJanken || window.pendingDefense || window.currentDefensePhaseId || window.isDefending) { alert("現在、効果処理または防御処理中です。解決するまでお待ちください。"); window.game.selectedIndices = []; window.updateUI(); return; }
     if (window.isProcessingPlay) { alert("現在、カードの処理中です。"); window.game.selectedIndices = []; window.updateUI(); return; }
@@ -950,23 +945,22 @@ window.onColorChosen = function(color) {
 };
 
 document.getElementById('draw-btn').onclick = () => {
-    // 致命的なロックがかかっている場合は無視
+    // ロックがかかっている場合は無視
     if (window.isAnimating || window.pendingJanken || window.isDrawing || window.isProcessingPlay || window.waitingForServerResponse || window.isServerProcessingAbility) return; 
     if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
-    
-    // すでに引いている場合はルールに従ってブロック
     if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) return;
     
     window.isDrawing = true; 
     window.waitingForServerResponse = true;
-    
-    // ★修正1: クリックした瞬間に物理的にボタンを隠し、二重クリックを防止
-    document.getElementById('draw-btn').classList.add('hidden');
+
+    // ★修正: クリックした瞬間に物理的にボタンを隠し、二重クリックを防止
+    const drawBtn = document.getElementById('draw-btn');
+    if (drawBtn) drawBtn.classList.add('hidden');
     
     window.tryDrawWithAbility(() => {
         const s = window.game.drawStack; const count = s > 0 ? s : 1;
         
-        // ★通信を即座に行う
+        // ★修正: アニメーションを待たずに、即座にサーバーに「引く」通信を送る
         if (window.isHost) {
             if (window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: count });
             window.executeDraw(window.game.myId);
@@ -989,11 +983,6 @@ document.getElementById('draw-btn').onclick = () => {
 };
 
 document.getElementById('end-turn-btn').onclick = () => {
-    if (!document.querySelector('.action-popup:not(.hidden)')) {
-        window.isProcessingPlay = false;
-        window.isDrawing = false;
-        window.waitingForServerResponse = false; 
-    }
 
     if (window.pendingJanken || window.waitingForServerResponse || window.isServerProcessingAbility) {
         console.log("処理中のため終了できません");
