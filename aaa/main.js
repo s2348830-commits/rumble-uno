@@ -1001,46 +1001,107 @@ function initMainSocketEvents() {
 
     window.socket.on('sync_game_state', (state) => {
         if (!window.game) return;
-        
+
+        // --- 【最優先】サーバーから通信が届いた時点で、未完了の待機ロックをすべて解除する ---
         window.waitingForServerResponse = false;
-        
-        // ★フェイルセーフ: サーバーが防御やじゃんけんの処理中でないなら、クライアント側の全てのロックを強制リセット
+
+        // サーバー側で防御フェーズもじゃんけんフェーズも動いていないなら
         if (state.defensePhase === null && state.jankenPhase === null) {
             window.isServerProcessingAbility = false;
             window.isDefending = false;
             window.currentDefensePhaseId = null;
             window.hasRespondedDefense = false;
-            window.isAnimating = false; 
+            window.isAnimating = false; // アニメーションのスタックも強制リセット
             window.pendingJanken = null;
             window.pendingDefense = null;
             
-            // ダイアログが開いていないなら isProcessingPlay も強制解除
-            const isChoosing = document.querySelector('.action-popup:not(.hidden)');
-            if (!isChoosing) {
+            // 画面上に選択ダイアログが出ていないなら、カードプレイ中のロックも解除
+            if (!document.querySelector('.action-popup:not(.hidden)')) {
                 window.isProcessingPlay = false;
             }
         } else {
+            // 何か処理中ならフラグを立てる
             window.isServerProcessingAbility = true;
         }
-        
+
+        // フェイズ演出用のUI更新（じゃんけん表示など）を呼び出す
         if (typeof window.updatePhaseUI === 'function') { window.updatePhaseUI(state); }
-        
-        const isChoosing = (!window.isHost && window.game.myId) && ((window.game.selectedIndices && window.game.selectedIndices.length > 0) || window.isProcessingPlay || window.isDrawing || document.querySelector('.action-popup:not(.hidden)'));
+
+        // --- ここから画面描画のチェック ---
+        const isChoosing = (!window.isHost && window.game.myId) && (document.querySelector('.action-popup:not(.hidden)'));
         const currentFingerprint = JSON.stringify(state);
+
+        // 前回の状態と全く同じなら、これ以降の重い描画処理（DOM操作）をスキップする
+        // ★重要: ロック解除処理の「後」にこれを置くことで、描画はスキップしても操作不能は防げる
         if (window.lastGameStateFingerprint === currentFingerprint && !window.isInitialDealing) return;
         window.lastGameStateFingerprint = currentFingerprint;
 
-        window.game.deck = state.deck; window.game.turnIndex = state.turnIndex; window.game.direction = state.direction; window.game.discardPile = state.discardPile; window.game.discardRotations = state.discardRotations; window.game.drawStack = state.drawStack; window.game.currentColor = state.currentColor;
-        if(state.hasDrawnThisTurn !== undefined) window.game.hasDrawnThisTurn = state.hasDrawnThisTurn; if(state.abilityGraveyard) window.game.abilityGraveyard = state.abilityGraveyard; if(state.customDeck) window.game.customDeck = state.customDeck;
-        if (state.playersInfo) { let newPlayers = []; state.playersInfo.forEach(info => { let p = window.game.players.find(x => x.id === info.id); if (p) { p.frozen = info.frozen; p.burnTurns = info.burnTurns; p.connected = info.connected; p.invincibleTurns = info.invincibleTurns || 0; p.shield = info.shield || { level: 0, turns: 0 }; p.evasion = info.evasion || { level: 0, turns: 0 }; p.usedRaia = info.usedRaia || false; newPlayers.push(p); } }); if (newPlayers.length === window.game.players.length) window.game.players = newPlayers; }
+        // ゲームデータの同期
+        window.game.deck = state.deck; 
+        window.game.turnIndex = state.turnIndex; 
+        window.game.direction = state.direction; 
+        window.game.discardPile = state.discardPile; 
+        window.game.discardRotations = state.discardRotations; 
+        window.game.drawStack = state.drawStack; 
+        window.game.currentColor = state.currentColor;
         
-        if (window.isInitialDealing && !window.isHost) { if (typeof window.animateInitialDeal === 'function') { window.animateInitialDeal(state.hands, () => {}); } else { window.isInitialDealing = false; window.game.hands = state.hands; if (typeof window.updateUI === 'function') window.updateUI(); } } 
-        else if (!window.isInitialDealing) { if (!isChoosing) { window.game.hands = state.hands; if (typeof window.updateUI === 'function') window.updateUI(); } }
+        if(state.hasDrawnThisTurn !== undefined) window.game.hasDrawnThisTurn = state.hasDrawnThisTurn; 
+        if(state.abilityGraveyard) window.game.abilityGraveyard = state.abilityGraveyard; 
+        if(state.customDeck) window.game.customDeck = state.customDeck;
+
+        // プレイヤー情報の同期
+        if (state.playersInfo) { 
+            let newPlayers = []; 
+            state.playersInfo.forEach(info => { 
+                let p = window.game.players.find(x => x.id === info.id); 
+                if (p) { 
+                    p.frozen = info.frozen; 
+                    p.burnTurns = info.burnTurns; 
+                    p.connected = info.connected; 
+                    p.invincibleTurns = info.invincibleTurns || 0; 
+                    p.shield = info.shield || { level: 0, turns: 0 }; 
+                    p.evasion = info.evasion || { level: 0, turns: 0 }; 
+                    p.usedRaia = info.usedRaia || false; 
+                    newPlayers.push(p); 
+                } 
+            }); 
+            if (newPlayers.length === window.game.players.length) window.game.players = newPlayers; 
+        }
+
+        // 手札の同期（アニメーション中や選択中以外のみ）
+        if (window.isInitialDealing && !window.isHost) { 
+            if (typeof window.animateInitialDeal === 'function') { 
+                window.animateInitialDeal(state.hands, () => {}); 
+            } else { 
+                window.isInitialDealing = false; 
+                window.game.hands = state.hands; 
+                window.updateUI(); 
+            } 
+        } else if (!window.isInitialDealing) { 
+            if (!isChoosing) { 
+                window.game.hands = state.hands; 
+                if (typeof window.updateUI === 'function') window.updateUI(); 
+            } 
+        }
+
+        // メッセージとガイドの表示
+        const current = window.game.currentPlayer; 
+        const msgEl = document.getElementById('status-message');
+        if (window.isInitialDealing) { 
+            msgEl.innerText = "カードを配っています..."; 
+        } else if (current) { 
+            const roomStr = window.currentRoomState ? ` - 部屋ID:${window.currentRoomState.id}` : ""; 
+            msgEl.innerText = current.id === window.myId ? `あなたの番です${roomStr}` : `${current.name} のターン${roomStr}`; 
+        }
         
-        const current = window.game.currentPlayer; const msgEl = document.getElementById('status-message');
-        if (window.isInitialDealing) { msgEl.innerText = "カードを配っています..."; } 
-        else if (current) { const roomStr = window.currentRoomState ? ` - 部屋ID:${window.currentRoomState.id}` : ""; msgEl.innerText = current.id === window.myId ? `あなたの番です${roomStr}` : `${current.name} のターン${roomStr}`; }
-        if (state.attackGuides && state.attackGuides.length > 0) { state.attackGuides.forEach(g => { const delay = g.delay || 0; setTimeout(() => { if (typeof window.showAttackGuide === 'function') window.showAttackGuide(g.from, g.to, g.text, g.se); }, delay); }); }
+        if (state.attackGuides && state.attackGuides.length > 0) { 
+            state.attackGuides.forEach(g => { 
+                const delay = g.delay || 0; 
+                setTimeout(() => { 
+                    if (typeof window.showAttackGuide === 'function') window.showAttackGuide(g.from, g.to, g.text, g.se); 
+                }, delay); 
+            }); 
+        }
     });
 
     window.socket.on('broadcast_uno', (data) => {
