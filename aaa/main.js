@@ -325,17 +325,23 @@ window.showDefenseModal = function(attackCardValue) {
     title.innerText = `攻撃を受けました！(${attackName})`; if (desc) { if (attackDesc) { desc.innerText = attackDesc; desc.classList.remove('hidden'); } else { desc.classList.add('hidden'); } }
     qArea.classList.remove('hidden'); sArea.classList.add('hidden');
     const myHand = window.game.myHand || []; const defCards = myHand.map((c, i) => ({card: c, idx: i})).filter(item => item.card.value && window.AbilityDef && window.AbilityDef[item.card.value] && window.AbilityDef[item.card.value].type.includes('BL'));
+    
     btnYes.onclick = () => {
         if (defCards.length === 0) { alert('手札に防御カード(BL)がありません！'); return; }
-        window.hasRespondedDefense = true; qArea.classList.add('hidden'); sArea.classList.remove('hidden'); list.innerHTML = '';
+        // ★修正: ここにあった window.hasRespondedDefense = true; を削除しました
+        qArea.classList.add('hidden'); sArea.classList.remove('hidden'); list.innerHTML = '';
         defCards.forEach(item => {
             const btn = Renderer.createCardElement(item.card); btn.style.width = '50px'; btn.style.height = '75px'; btn.style.margin = '5px'; btn.style.cursor = 'pointer';
             btn.onclick = () => {
+                // ★修正: 実際にカードを選んで決定した瞬間にフラグを立てるように移動
+                window.hasRespondedDefense = true; 
+
                 const def = window.AbilityDef[item.card.value]; if (typeof window.showAbilityCutin === 'function') { window.showAbilityCutin(item.card.value); }
                 if (def && (def.needsDiscard || def.needsAbilityDiscard)) { modal.classList.add('hidden'); window.openDiscardSelection(myHand, [item.idx], def, (discIdx) => { window.socket.emit('player_action', { action: 'defense_response', targetId: window.game.myId, cardValue: item.card.value, discardIdx: discIdx }); window.isDefending = false; }); } else { modal.classList.add('hidden'); window.socket.emit('player_action', { action: 'defense_response', targetId: window.game.myId, cardValue: item.card.value, discardIdx: null }); window.isDefending = false; }
             }; list.appendChild(btn);
         });
     };
+    
     btnNo.onclick = () => { window.hasRespondedDefense = true; modal.classList.add('hidden'); if(window.socket) window.socket.emit('player_action', { action: 'defense_response', targetId: window.game.myId, cardValue: null, discardIdx: null }); window.isDefending = false; };
     btnCancel.onclick = () => { window.hasRespondedDefense = false; qArea.classList.remove('hidden'); sArea.classList.add('hidden'); };
     modal.classList.remove('hidden');
