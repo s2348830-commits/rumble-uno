@@ -387,40 +387,50 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
     }, 1000);
 };
 
-window.executeAbilityPlay = function(playerId, playedCardsData, targetId, discardIdx, selectedColor = null, multiDiscardIndices = [], extraData = {}) {
+window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetId, discardIdx, selectedColor = null, multiDiscardIndices = [], extraData = {}) {
     if (!window.isHost) return;
-    const hand = window.game.hands[playerId]; if (!hand) return; 
+    const hand = window.game.hands[playerId]; if (!hand || playedCardsData.length === 0) return; 
     
     const wasMyTurn = (playerId === window.game.currentPlayer.id);
     const cardValue = playedCardsData[0].value; const def = window.AbilityDef ? window.AbilityDef[cardValue] : null;
 
+    if (!def) { window.executePlay(playerId, indices, false); return; }
+
     if (extraData && extraData.isBlankPlay) {
         if (!wasMyTurn) return;
-        playedCardsData.forEach(pc => { const idx = hand.findIndex(c => c.value === pc.value && c.color === pc.color); if(idx > -1) { const removed = hand.splice(idx, 1)[0]; if(!window.game.abilityGraveyard) window.game.abilityGraveyard = []; window.game.abilityGraveyard.push(removed.value); } });
+        playedCardsData.forEach(pc => { 
+            const idx = hand.findIndex(c => c.value === pc.value && c.color === pc.color); 
+            if(idx > -1) { 
+                const removed = hand.splice(idx, 1)[0]; 
+                if(!window.game.abilityGraveyard) window.game.abilityGraveyard = []; 
+                window.game.abilityGraveyard.push(removed.value); 
+            } 
+        });
         let someoneWon = false; window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
         if (!someoneWon) { window.broadcastGameState(false); }
         return;
     }
 
     const multiplier = playedCardsData.length; 
-    const discCard = discardIdx !== null ? hand[discardIdx] : null;
+    const originalHand = [...hand];
+    const discCard = discardIdx !== null ? originalHand[discardIdx] : null;
     let safeMultiDiscardIndices = [];
-    if (multiDiscardIndices && multiDiscardIndices.length > 0) { safeMultiDiscardIndices = multiDiscardIndices.filter(i => { const c = hand[i]; return c && c.color === selectedColor && !(c.value && String(c.value).startsWith('id_')); }); }
-    const multiCards = safeMultiDiscardIndices.map(i => hand[i]);
+    if (multiDiscardIndices && multiDiscardIndices.length > 0) { safeMultiDiscardIndices = multiDiscardIndices.filter(i => { const c = originalHand[i]; return c && c.color === selectedColor && !(c.value && String(c.value).startsWith('id_')); }); }
+    const multiCards = safeMultiDiscardIndices.map(i => originalHand[i]);
 
-    let allRemoveIndices = [];
-    if (discardIdx !== null) allRemoveIndices.push(discardIdx);
-    if (safeMultiDiscardIndices.length > 0) allRemoveIndices.push(...safeMultiDiscardIndices);
-    allRemoveIndices = [...new Set(allRemoveIndices)].sort((a,b) => b - a); allRemoveIndices.forEach(i => hand.splice(i, 1));
+    let cardsToRemove = [...playedCardsData];
+    if (discCard) cardsToRemove.push(discCard);
+    multiCards.forEach(c => cardsToRemove.push(c));
 
-    playedCardsData.forEach(pc => {
-        const idx = hand.findIndex(c => c.value === pc.value && c.color === pc.color);
-        if(idx > -1) {
-            const removed = hand.splice(idx, 1)[0];
+    cardsToRemove.forEach(pc => { 
+        if(!pc) return;
+        const idx = hand.findIndex(c => c.value === pc.value && c.color === pc.color); 
+        if(idx > -1) { 
+            const removed = hand.splice(idx, 1)[0]; 
             const isAb = removed.value && String(removed.value).startsWith('id_'); 
             if (isAb) { if(!window.game.abilityGraveyard) window.game.abilityGraveyard = []; window.game.abilityGraveyard.push(removed.value); } 
-            else { window.game.discardPile.push(removed); window.game.discardRotations.push(0); }
-        }
+            else { window.game.discardPile.push(removed); window.game.discardRotations.push(0); } 
+        } 
     });
 
     if (cardValue === 'id_26') { setTimeout(() => { window.startJankenPhase(playerId, 0, null, wasMyTurn); }, 2500); return; }
@@ -457,7 +467,11 @@ window.executeAbilityPlay = function(playerId, playedCardsData, targetId, discar
             let guides = []; if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, responses, multiplier, selectedColor, multiCards, extraData);
             guides.forEach(g => { if(g.delay === undefined) g.delay = 2500; }); 
             let someoneWon = false; window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
-            if (!someoneWon) { if(wasMyTurn) { window.game.nextTurn(1); } window.broadcastGameState(false, guides); if(wasMyTurn) { setTimeout(() => window.checkTurn(), 500); } } else { window.broadcastGameState(false, guides); }
+            if (!someoneWon) { 
+                if(wasMyTurn) { window.game.nextTurn(1); } 
+                window.broadcastGameState(false, guides); 
+                if(wasMyTurn) { setTimeout(() => window.checkTurn(), 500); } 
+            } else { window.broadcastGameState(false, guides); }
             return;
         }
 
@@ -504,14 +518,22 @@ window.executeAbilityPlay = function(playerId, playedCardsData, targetId, discar
                 guides.forEach(g => { if(g.delay === undefined) g.delay = 2500; }); 
                 
                 let someoneWon = false; window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
-                if (!someoneWon) { if(wasMyTurn) { window.game.nextTurn(1); } window.broadcastGameState(false, guides); if(wasMyTurn) { setTimeout(() => window.checkTurn(), 500); } } else { window.broadcastGameState(false, guides); }
+                if (!someoneWon) { 
+                    if(wasMyTurn) { window.game.nextTurn(1); } 
+                    window.broadcastGameState(false, guides); 
+                    if(wasMyTurn) { setTimeout(() => window.checkTurn(), 500); } 
+                } else { window.broadcastGameState(false, guides); }
             } else { window.pendingDefense.timer--; window.broadcastGameState(true); }
         }, 1000);
     } else {
         let guides = []; if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, {}, multiplier, selectedColor, multiCards, extraData);
         guides.forEach(g => { if(g.delay === undefined) g.delay = 2500; }); 
         let someoneWon = false; window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
-        if (!someoneWon) { if(wasMyTurn) { window.game.nextTurn(1); } window.broadcastGameState(false, guides); if(wasMyTurn){ setTimeout(() => window.checkTurn(), 500); } } else { window.broadcastGameState(false, guides); }
+        if (!someoneWon) { 
+            if(wasMyTurn) { window.game.nextTurn(1); } 
+            window.broadcastGameState(false, guides); 
+            if(wasMyTurn) { setTimeout(() => window.checkTurn(), 500); } 
+        } else { window.broadcastGameState(false, guides); }
     }
 };
 
@@ -596,7 +618,7 @@ window.checkTurn = function() {
             const result = UNOBot.play(window.game, current.id);
             if (result.action === 'play') {
                 const playedCards = result.indices.map(i => window.game.hands[current.id][i]); const isAbility = playedCards[0] && playedCards[0].value && String(playedCards[0].value).startsWith('id_'); const def = isAbility && window.AbilityDef ? window.AbilityDef[playedCards[0].value] : null;
-                if (isAbility && def && def.type === 'BL') { window.socket.emit('request_play_animation', { playerId: current.id, cards: playedCards }); setTimeout(() => { window.executeAbilityPlay(current.id, result.indices, null, null, null, [], { isBlankPlay: true }); }, playedCards.length * 100 + 400); return; }
+                if (isAbility && def && def.type === 'BL') { window.socket.emit('request_play_animation', { playerId: current.id, cards: playedCards }); setTimeout(() => { window.executeAbilityPlay(current.id, result.indices, playedCards, null, null, null, [], { isBlankPlay: true }); }, playedCards.length * 100 + 400); return; }
                 
                 let willDiscard = (isAbility && def && (def.needsDiscard || def.needsAbilityDiscard)) ? 1 : 0; let botSelectedColor = null, botMultiDiscardIndices = [], botDiscardIdx = null;
                 if (isAbility && def) {
@@ -614,7 +636,7 @@ window.checkTurn = function() {
                         let botTargetId = null; if (def && def.needsTarget) { const others = window.game.players.filter(p=>p.id!==current.id); if(others.length>0) botTargetId = others[Math.floor(Math.random()*others.length)].id; }
                         let extraData = {}; if (def && def.needsGraveyard) { const gyList = window.game.abilityGraveyard.filter(id => window.AbilityDef[id] && window.AbilityDef[id].rarity !== 'UR'); if (gyList.length > 0) extraData.graveyardCardId = gyList[Math.floor(Math.random() * gyList.length)]; } if (def && def.needsDebuffSelect) { const p = window.game.players.find(x=>x.id===current.id); if (p && p.frozen) extraData.debuffToClear = 'frozen'; else if (p && p.burnTurns > 0) extraData.debuffToClear = 'burn'; }
                         if (playedCards[0].value === 'id_33') { if (Math.random() < 0.5) extraData.returnRaia = true; }
-                        window.executeAbilityPlay(current.id, result.indices, botTargetId, botDiscardIdx, botSelectedColor, botMultiDiscardIndices, extraData);
+                        window.executeAbilityPlay(current.id, result.indices, playedCards, botTargetId, botDiscardIdx, botSelectedColor, botMultiDiscardIndices, extraData);
                     } else { window.executePlay(current.id, result.indices, true); }
                 }, delay);
             } else { const drawCount = result.count || 1; window.socket.emit('request_draw_animation', { playerId: current.id, count: drawCount }); setTimeout(() => window.executeDraw(current.id, true), drawCount * 100 + 400); }
@@ -631,7 +653,7 @@ window.checkTurn = function() {
                     const result = UNOBot.play(window.game, current.id);
                     if (result.action === 'play') {
                         const playedCards = result.indices.map(i => window.game.hands[current.id][i]); const isAbility = playedCards[0] && playedCards[0].value && String(playedCards[0].value).startsWith('id_'); const def = isAbility && window.AbilityDef ? window.AbilityDef[playedCards[0].value] : null;
-                        if (isAbility && def && def.type === 'BL') { window.socket.emit('request_play_animation', { playerId: current.id, cards: playedCards }); setTimeout(() => { window.executeAbilityPlay(current.id, result.indices, null, null, null, [], { isBlankPlay: true }); }, playedCards.length * 100 + 400); return; }
+                        if (isAbility && def && def.type === 'BL') { window.socket.emit('request_play_animation', { playerId: current.id, cards: playedCards }); setTimeout(() => { window.executeAbilityPlay(current.id, result.indices, playedCards, null, null, null, [], { isBlankPlay: true }); }, playedCards.length * 100 + 400); return; }
                         
                         let willDiscard = (isAbility && def && (def.needsDiscard || def.needsAbilityDiscard)) ? 1 : 0; let botSelectedColor = null, botMultiDiscardIndices = [], botDiscardIdx = null;
                         if (isAbility && def) {
@@ -649,7 +671,7 @@ window.checkTurn = function() {
                                 let botTargetId = null; if (def && def.needsTarget) { const others = window.game.players.filter(p=>p.id!==current.id); if(others.length>0) botTargetId = others[Math.floor(Math.random()*others.length)].id; }
                                 let extraData = {}; if (def && def.needsGraveyard) { const gyList = window.game.abilityGraveyard.filter(id => window.AbilityDef[id] && window.AbilityDef[id].rarity !== 'UR'); if (gyList.length > 0) extraData.graveyardCardId = gyList[Math.floor(Math.random() * gyList.length)]; } if (def && def.needsDebuffSelect) { const p = window.game.players.find(x=>x.id===current.id); if (p && p.frozen) extraData.debuffToClear = 'frozen'; else if (p && p.burnTurns > 0) extraData.debuffToClear = 'burn'; }
                                 if (playedCards[0].value === 'id_33') { if (Math.random() < 0.5) extraData.returnRaia = true; } 
-                                window.executeAbilityPlay(current.id, result.indices, botTargetId, botDiscardIdx, botSelectedColor, botMultiDiscardIndices, extraData);
+                                window.executeAbilityPlay(current.id, result.indices, playedCards, botTargetId, botDiscardIdx, botSelectedColor, botMultiDiscardIndices, extraData);
                             } else window.executePlay(current.id, result.indices, true);
                         }, playedCards.length * 100 + 400);
                     } else { const drawCount = result.count || 1; window.socket.emit('request_draw_animation', { playerId: current.id, count: drawCount }); setTimeout(() => window.executeDraw(current.id, true), drawCount * 100 + 400); }
@@ -757,7 +779,7 @@ window.handlePlayAction = function() {
             if (yes) {
                 const indicesToSend = [...window.game.selectedIndices]; const cardsToSend = [...selectedCards]; window.game.selectedIndices = []; window.updateUI();
                 window.animateSequentialPlay(indicesToSend, window.game, () => {
-                    if (window.isHost) { if (window.socket) window.socket.emit('request_play_animation', { playerId: window.game.myId, cards: cardsToSend }); window.executeAbilityPlay(window.game.myId, indicesToSend, null, null, null, [], { isBlankPlay: true }); } 
+                    if (window.isHost) { if (window.socket) window.socket.emit('request_play_animation', { playerId: window.game.myId, cards: cardsToSend }); window.executeAbilityPlay(window.game.myId, indicesToSend, cardsToSend, null, null, null, [], { isBlankPlay: true }); } 
                     else if (window.socket) { window.socket.emit('player_action', { action: 'play_ability', indices: indicesToSend, cards: cardsToSend, targetId: null, discardIdx: null, selectedColor: null, multiDiscardIndices: [], isHV: false, extraData: { isBlankPlay: true } }); }
                     window.isProcessingPlay = false; 
                 });
@@ -824,7 +846,7 @@ window.handlePlayAction = function() {
             if (debuffToClear) extraData.debuffToClear = debuffToClear; if (graveyardCardId) extraData.graveyardCardId = graveyardCardId;
             window.animateSequentialPlay(indices, window.game, () => {
                 const isHVActivated = (cardValue === 'id_20') || (def && def.needsAbilityDiscard && discardIdx !== null); window.showAbilityCutin(cardsToSend[0].value, isHVActivated);
-                if (window.isHost) { if (window.socket) window.socket.emit('request_play_animation', { playerId: window.game.myId, cards: cardsToSend, isHV: isHVActivated }); window.executeAbilityPlay(window.game.myId, indicesToSend, targetId, discardIdx, selColor, multiDiscardIndices, extraData); } 
+                if (window.isHost) { if (window.socket) window.socket.emit('request_play_animation', { playerId: window.game.myId, cards: cardsToSend, isHV: isHVActivated }); window.executeAbilityPlay(window.game.myId, indicesToSend, cardsToSend, targetId, discardIdx, selColor, multiDiscardIndices, extraData); } 
                 else if (window.socket) { window.socket.emit('player_action', { action: 'play_ability', indices: indicesToSend, cards: cardsToSend, targetId: targetId, discardIdx: discardIdx, selectedColor: selColor, multiDiscardIndices: multiDiscardIndices, isHV: isHVActivated, extraData: extraData }); }
                 window.isProcessingPlay = false; 
             });
@@ -863,10 +885,10 @@ window.onColorChosen = function(color) {
 };
 
 document.getElementById('draw-btn').onclick = () => {
-    if (window.pendingJanken || window.isDrawing || window.isProcessingPlay || window.waitingForServerResponse) return; 
+    if (window.pendingJanken || window.isDrawing || window.isProcessingPlay || window.waitingForServerResponse || window.isServerProcessingAbility) return; 
     if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
     if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) return;
-    window.isDrawing = true; window.waitingForServerResponse = true;
+    window.isDrawing = true; window.waitingForServerResponse = true; 
     window.tryDrawWithAbility(() => {
         window.game.hasDrawnThisTurn = true; window.updateUI(); setTimeout(() => { window.isDrawing = false; window.waitingForServerResponse = false; }, 3000);
         const s = window.game.drawStack; const count = s > 0 ? s : 1;
@@ -877,7 +899,7 @@ document.getElementById('draw-btn').onclick = () => {
 };
 
 document.getElementById('end-turn-btn').onclick = () => {
-    if (window.pendingJanken || window.isDrawing || window.isProcessingPlay) return; 
+    if (window.pendingJanken || window.isDrawing || window.isProcessingPlay || window.isServerProcessingAbility) return; 
     if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
     window.isDrawing = true; 
     if (window.isHost) { window.executeEndTurn(window.game.myId); setTimeout(() => { window.isDrawing = false; }, 500); } 
@@ -966,7 +988,7 @@ function initMainSocketEvents() {
             window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards }); const delay = data.cards.length * 100 + 400; setTimeout(() => { if (typeof window.executePlay === 'function') window.executePlay(playerId, data.indices); }, delay);
         } else if (data.action === 'play_ability') {
             if (window.pendingDefense || window.pendingJanken) return;
-            window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards, isHV: data.isHV }); const delay = data.cards.length * 100 + 400; setTimeout(() => { if (typeof window.executeAbilityPlay === 'function') window.executeAbilityPlay(playerId, data.indices, data.targetId, data.discardIdx, data.selectedColor, data.multiDiscardIndices, data.extraData); }, delay);
+            window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards, isHV: data.isHV }); const delay = data.cards.length * 100 + 400; setTimeout(() => { if (typeof window.executeAbilityPlay === 'function') window.executeAbilityPlay(playerId, data.indices, data.cards, data.targetId, data.discardIdx, data.selectedColor, data.multiDiscardIndices, data.extraData); }, delay);
         } else if (data.action === 'defense_response') {
             if (window.pendingDefense && window.pendingDefense.responses) {
                 window.pendingDefense.responses[data.targetId] = { cardValue: data.cardValue || null, discardIdx: data.discardIdx !== undefined ? data.discardIdx : null };
