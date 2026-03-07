@@ -11,17 +11,15 @@ const mimeTypes = {
     '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpg', '.gif': 'image/gif',
     '.mp3': 'audio/mpeg', 
     '.wav': 'audio/wav',
-    '.mov': 'video/quicktime', // ★ 追加: movファイルを許可
+    '.mov': 'video/quicktime',
     '.mp4': 'video/mp4'
 };
 
 const server = http.createServer((req, res) => {
-    // ★ 追加: ngrokのヘッダー通信を許可するCORS設定（403エラー対策）
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'ngrok-skip-browser-warning, Content-Type');
     
-    // ブラウザからの事前確認(OPTIONS)にはOK(204)を返す
     if (req.method === 'OPTIONS') {
         res.writeHead(204);
         res.end();
@@ -29,7 +27,6 @@ const server = http.createServer((req, res) => {
     }
 
     let filePath = '.' + req.url.split('?')[0];
-    
     if (filePath === './') filePath = './index.html';
     const extname = String(path.extname(filePath)).toLowerCase();
     const contentType = mimeTypes[extname] || 'application/octet-stream';
@@ -39,8 +36,7 @@ const server = http.createServer((req, res) => {
             if (error.code === 'ENOENT') { 
                 res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' }); 
                 res.end('<h1>404 Not Found</h1>', 'utf-8'); 
-            } 
-            else { 
+            } else { 
                 res.writeHead(500); 
                 res.end('Server Error: ' + error.code + ' ..\n'); 
             }
@@ -51,10 +47,7 @@ const server = http.createServer((req, res) => {
     });
 });
 
-const io = new Server(server, {
-    cors: { origin: "*", methods: ["GET", "POST"] }
-});
-
+const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } });
 let rooms = {};
 
 io.on('connection', (socket) => {
@@ -65,8 +58,7 @@ io.on('connection', (socket) => {
             slots: [{ id: socket.id, userId: userData.userId, type: 'host', name: userData.name, icon: userData.icon, ready: true, connected: true }],
             settings: null 
         };
-        socket.join(roomId);
-        socket.roomId = roomId; socket.userId = userData.userId;
+        socket.join(roomId); socket.roomId = roomId; socket.userId = userData.userId;
         socket.emit('room_joined', { roomId, isHost: true, myId: socket.id, state: rooms[roomId] });
     });
 
@@ -131,16 +123,12 @@ io.on('connection', (socket) => {
             const personalities = ['破天荒', '慎重', '攻撃的', '統制'];
 
             if (slot.type === 'empty') {
-                const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
                 room.slots[index] = { 
                     id: 'bot_' + Math.random().toString(36).substring(2), 
                     userId: 'bot_user_' + Math.random(), 
-                    type: 'bot', 
-                    name: botNames[Math.floor(Math.random() * botNames.length)], 
-                    icon: botIcons[0], 
-                    ready: true, 
-                    connected: true,
-                    personality: randomPersonality,
+                    type: 'bot', name: botNames[Math.floor(Math.random() * botNames.length)], 
+                    icon: botIcons[0], ready: true, connected: true,
+                    personality: personalities[Math.floor(Math.random() * personalities.length)],
                     difficulty: '普通' 
                 };
             } else if (slot.type === 'bot') {
@@ -154,10 +142,7 @@ io.on('connection', (socket) => {
         const room = rooms[socket.roomId];
         if (room && room.host === socket.id && data.index > 0 && data.index < room.slots.length) {
             const slot = room.slots[data.index];
-            if (slot && slot.type === 'bot') {
-                slot.difficulty = data.difficulty;
-                io.to(socket.roomId).emit('room_state_update', room);
-            }
+            if (slot && slot.type === 'bot') { slot.difficulty = data.difficulty; io.to(socket.roomId).emit('room_state_update', room); }
         }
     });
 
@@ -165,40 +150,27 @@ io.on('connection', (socket) => {
         const rId = (data && data.roomId) ? data.roomId : socket.roomId;
         const uId = (data && data.userId) ? data.userId : socket.userId;
         const room = rooms[rId];
-        
         if (room && !room.gameStarted) {
             const slot = room.slots.find(s => s.userId === uId || s.id === socket.id);
-            if (slot && slot.type === 'player') {
-                slot.ready = !slot.ready;
-                io.to(rId).emit('room_state_update', room);
-            }
+            if (slot && slot.type === 'player') { slot.ready = !slot.ready; io.to(rId).emit('room_state_update', room); }
         }
     });
 
     socket.on('update_settings', (newSettings) => {
         const room = rooms[socket.roomId];
-        if (room && room.host === socket.id) {
-            room.settings = newSettings;
-            socket.to(socket.roomId).emit('settings_updated', newSettings);
-        }
+        if (room && room.host === socket.id) { room.settings = newSettings; socket.to(socket.roomId).emit('settings_updated', newSettings); }
     });
 
     socket.on('disband_room', () => {
         const room = rooms[socket.roomId];
-        if (room && room.host === socket.id) {
-            io.to(socket.roomId).emit('room_disbanded');
-            delete rooms[socket.roomId];
-        }
+        if (room && room.host === socket.id) { io.to(socket.roomId).emit('room_disbanded'); delete rooms[socket.roomId]; }
     });
 
     socket.on('start_game', () => {
         const room = rooms[socket.roomId];
         if (room && room.host === socket.id && !room.gameStarted) {
             const allReady = room.slots.filter(s => s.type === 'player').every(s => s.ready);
-            if (allReady) {
-                room.gameStarted = true;
-                io.to(socket.roomId).emit('game_started', room);
-            }
+            if (allReady) { room.gameStarted = true; io.to(socket.roomId).emit('game_started', room); }
         }
     });
 
@@ -219,42 +191,46 @@ io.on('connection', (socket) => {
 
     socket.on('player_action', (data) => {
         const room = rooms[socket.roomId];
-        if (room && room.host) {
-            data.playerId = socket.id;
-            io.to(room.host).emit('receive_player_action', data);
-        }
+        if (room && room.host) { data.playerId = socket.id; io.to(room.host).emit('receive_player_action', data); }
     });
 
     socket.on('declare_uno', (data) => io.to(socket.roomId).emit('broadcast_uno', data));
     socket.on('request_play_animation', (data) => io.to(socket.roomId).emit('play_animation', data));
     socket.on('request_draw_animation', (data) => io.to(socket.roomId).emit('draw_animation', data));
     socket.on('request_color_select', (targetId) => io.to(targetId).emit('show_color_selector'));
-    
-    socket.on('send_chat', (data) => {
-        io.to(data.roomId).emit('receive_chat', data);
-    });
-
+    socket.on('send_chat', (data) => io.to(data.roomId).emit('receive_chat', data));
     socket.on('announce_win', (data) => io.to(socket.roomId).emit('game_over', data));
     socket.on('announce_draw', () => io.to(socket.roomId).emit('game_over', { isDraw: true }));
 
+    // ★修正5: 道連れ終了バグ（ホストマイグレーションの追加）
     socket.on('disconnect', () => {
         const roomId = socket.roomId;
         if (roomId && rooms[roomId]) {
             const room = rooms[roomId];
-            if (room.host === socket.id) {
-                io.to(roomId).emit('error_message', 'ホストが退出しました'); delete rooms[roomId];
-            } else {
-                const slot = room.slots.find(s => s.id === socket.id);
-                if (slot) {
-                    if (room.gameStarted) {
-                        slot.connected = false;
-                        io.to(roomId).emit('room_state_update', room);
-                    } else {
-                        const slotIndex = room.slots.indexOf(slot);
-                        room.slots[slotIndex] = { id: null, userId: null, type: 'empty', name: '空き枠', icon: null, ready: false, connected: false };
-                        io.to(roomId).emit('room_state_update', room);
-                    }
+            const slotIndex = room.slots.findIndex(s => s.id === socket.id);
+            
+            if (slotIndex !== -1) {
+                const slot = room.slots[slotIndex];
+                if (room.gameStarted) {
+                    slot.connected = false;
+                } else {
+                    room.slots[slotIndex] = { id: null, userId: null, type: 'empty', name: '空き枠', icon: null, ready: false, connected: false };
                 }
+            }
+
+            if (room.host === socket.id) {
+                // 新しいホスト（ボット以外の接続中プレイヤー）を探す
+                const newHostSlot = room.slots.find(s => s.type === 'player' && s.connected && s.id !== socket.id);
+                if (newHostSlot) {
+                    newHostSlot.type = 'host';
+                    room.host = newHostSlot.id;
+                    io.to(roomId).emit('room_state_update', room);
+                } else {
+                    io.to(roomId).emit('error_message', 'ホストが退出したため、部屋が解散されました');
+                    delete rooms[roomId];
+                }
+            } else {
+                io.to(roomId).emit('room_state_update', room);
             }
         }
     });
@@ -262,7 +238,6 @@ io.on('connection', (socket) => {
 
 server.listen(PORT, '0.0.0.0', () => {
     console.log('===================================================');
-    console.log(`✅ サーバー起動！`);
-    console.log(`http://localhost:3000`);
+    console.log(`✅ サーバー起動！ http://localhost:${PORT}`);
     console.log('===================================================');
 });

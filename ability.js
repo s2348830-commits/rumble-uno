@@ -123,6 +123,7 @@ window.AbilityEngine = {
             
             if (abilityId === 'id_32') {
                 for (let i = 0; i < 3; i++) {
+                    // ★修正2: 対象が0人の場合のクラッシュ対策
                     if (others.length > 0) {
                         const tid = others[Math.floor(Math.random() * others.length)].id;
                         const res = this.applyBurn(game, tid, 2);
@@ -142,7 +143,7 @@ window.AbilityEngine = {
 
                 actualTargets.forEach(t => {
                     let targetId = t;
-                    const resp = defenseResponses[targetId];
+                    const resp = defenseResponses ? defenseResponses[targetId] : null;
                     if (resp && resp.cardValue) return;
 
                     let reduceDraw = false;
@@ -209,7 +210,7 @@ window.AbilityEngine = {
                             const attacker = game.players.find(p => p.id === attackerId);
                             if (attacker) {
                                 attacker.usedRaia = true;
-                                attacker.raiaReturnPending = true; // ★ 次のターンに戻るフラグ
+                                attacker.raiaReturnPending = true;
                             }
                             guides.push({ from: attackerId, to: attackerId, text: '回収待機' });
                         }

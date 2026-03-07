@@ -8,12 +8,9 @@ window.isGameOver = false;
 window.isDrawing = false; 
 window.isInitialDealing = false; 
 window.isDefending = false; 
-
 window.pendingDrawDefenseInfo = null; 
 window.pendingJanken = null;
-
 window.isProcessingPlay = false;
-
 window.currentDefensePhaseId = null;
 window.hasRespondedDefense = false;
 window.currentJankenLoopId = null; 
@@ -201,10 +198,8 @@ window.SE = {
         const now = Date.now();
         if (this.lastPlayed[name] && (now - this.lastPlayed[name] < 100)) return;
         this.lastPlayed[name] = now;
-        
         let ext = 'mp3';
         if (name === 'fire' || name === 'page') ext = 'wav';
-
         if (!this.audioCtx) this.initContext();
         if (!this.buffers[name]) {
             this.loadSound(name, ext).then(() => this.playSoundBuffer(name, false));
@@ -339,7 +334,11 @@ window.updatePhaseUI = function(state) {
         window.jankenResultPlayed = false;
         window.currentJankenLoopId = null; 
         const jOverlay = document.getElementById('janken-overlay');
-        if (jOverlay && !jOverlay.classList.contains('result-showing')) jOverlay.classList.add('hidden');
+        // ★修正3: デッドロック回避のため、必ず非表示クラスを付与する
+        if (jOverlay) {
+            jOverlay.classList.remove('result-showing');
+            jOverlay.classList.add('hidden');
+        }
     }
 };
 
@@ -363,7 +362,6 @@ window.broadcastGameState = function(skipUIUpdate = false, attackGuides = []) {
     };
     if (window.socket) window.socket.emit('sync_game_state', state);
     if (!skipUIUpdate) window.updateUI();
-
     window.updatePhaseUI(state);
 
     if (attackGuides && attackGuides.length > 0) {
@@ -410,85 +408,56 @@ window.drawOpponentAnimation = function(playerId, count, callback) {
 
 window.showAttackGuide = function(fromId, toId, labelText, seName) {
     if (seName && window.SE) window.SE.play(seName);
-
     let fromEl = document.querySelector(`.circle-player-badge[data-id="${fromId}"]`);
     let toEl = document.querySelector(`.circle-player-badge[data-id="${toId}"]`);
-    
     if (!fromEl && fromId === window.game.myId) fromEl = document.getElementById('my-player-info');
     if (!toEl && toId === window.game.myId) toEl = document.getElementById('my-player-info');
-    
     if (!fromEl || !toEl) return;
 
     const fromRect = fromEl.getBoundingClientRect();
     const toRect = toEl.getBoundingClientRect();
-    
     const startX = fromRect.left + fromRect.width / 2;
     const startY = fromRect.top + fromRect.height / 2;
     const endX = toRect.left + toRect.width / 2;
     const endY = toRect.top + toRect.height / 2;
-    
-    const dx = endX - startX;
-    const dy = endY - startY;
+    const dx = endX - startX; const dy = endY - startY;
     const dist = Math.sqrt(dx*dx + dy*dy);
     if (dist < 10) return;
 
-    const midX = (startX + endX) / 2 - dy * 0.3;
-    const midY = (startY + endY) / 2 + dx * 0.3;
-
+    const midX = (startX + endX) / 2 - dy * 0.3; const midY = (startY + endY) / 2 + dx * 0.3;
     const svgNS = "http://www.w3.org/2000/svg";
     const svg = document.createElementNS(svgNS, "svg");
-    svg.style.position = 'fixed';
-    svg.style.top = '0';
-    svg.style.left = '0';
-    svg.style.width = '100vw';
-    svg.style.height = '100vh';
-    svg.style.pointerEvents = 'none';
-    svg.style.zIndex = '900000'; 
+    svg.style.position = 'fixed'; svg.style.top = '0'; svg.style.left = '0';
+    svg.style.width = '100vw'; svg.style.height = '100vh';
+    svg.style.pointerEvents = 'none'; svg.style.zIndex = '900000'; 
 
     const defs = document.createElementNS(svgNS, "defs");
     const markerId = 'arrow-attack-' + fromId + toId + Date.now();
     const marker = document.createElementNS(svgNS, "marker");
-    marker.setAttribute('id', markerId); 
-    marker.setAttribute('viewBox', '0 0 10 10');
-    marker.setAttribute('refX', '8');
-    marker.setAttribute('refY', '5');
-    marker.setAttribute('markerWidth', '6');
-    marker.setAttribute('markerHeight', '6');
+    marker.setAttribute('id', markerId); marker.setAttribute('viewBox', '0 0 10 10');
+    marker.setAttribute('refX', '8'); marker.setAttribute('refY', '5');
+    marker.setAttribute('markerWidth', '6'); marker.setAttribute('markerHeight', '6');
     marker.setAttribute('orient', 'auto-start-reverse');
     const markerPath = document.createElementNS(svgNS, "path");
-    markerPath.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z');
-    markerPath.setAttribute('fill', '#ff5252');
-    marker.appendChild(markerPath);
-    defs.appendChild(marker);
-    svg.appendChild(defs);
+    markerPath.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z'); markerPath.setAttribute('fill', '#ff5252');
+    marker.appendChild(markerPath); defs.appendChild(marker); svg.appendChild(defs);
 
     const path = document.createElementNS(svgNS, "path");
     const d = `M ${startX},${startY} Q ${midX},${midY} ${endX},${endY}`;
-    path.setAttribute('d', d);
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', '#ff5252');
-    path.setAttribute('stroke-width', '3');
-    path.setAttribute('stroke-dasharray', '8 8');
-    path.setAttribute('marker-end', `url(#${markerId})`);
+    path.setAttribute('d', d); path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', '#ff5252'); path.setAttribute('stroke-width', '3');
+    path.setAttribute('stroke-dasharray', '8 8'); path.setAttribute('marker-end', `url(#${markerId})`);
     
-    const length = dist * 1.5; 
-    path.style.strokeDasharray = length;
-    path.style.strokeDashoffset = length;
+    const length = dist * 1.5; path.style.strokeDasharray = length; path.style.strokeDashoffset = length;
 
     const text = document.createElementNS(svgNS, "text");
-    text.setAttribute('x', midX);
-    text.setAttribute('y', midY - 10);
-    text.setAttribute('fill', '#fbc02d');
-    text.setAttribute('font-size', '16px');
-    text.setAttribute('font-weight', 'bold');
-    text.setAttribute('text-anchor', 'middle');
-    text.setAttribute('stroke', '#000');
-    text.setAttribute('stroke-width', '1');
+    text.setAttribute('x', midX); text.setAttribute('y', midY - 10);
+    text.setAttribute('fill', '#fbc02d'); text.setAttribute('font-size', '16px');
+    text.setAttribute('font-weight', 'bold'); text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('stroke', '#000'); text.setAttribute('stroke-width', '1');
     text.textContent = labelText;
 
-    svg.appendChild(path);
-    svg.appendChild(text);
-    document.body.appendChild(svg);
+    svg.appendChild(path); svg.appendChild(text); document.body.appendChild(svg);
 
     path.animate([
         { strokeDashoffset: length, opacity: 1 },
@@ -513,72 +482,48 @@ window.showAbilityResetUI = function(maxCount) {
     const btnConfirm = document.getElementById('btn-reset-confirm');
     const timerSpan = document.getElementById('reset-timer');
     const maxSpan = document.getElementById('reset-max');
-    
     if(!overlay) return;
     
-    let timeLeft = 10;
-    maxSpan.innerText = maxCount;
-    resetArea.innerHTML = '';
-    handArea.innerHTML = '';
-    let selectedCards = [];
-    let myAbilities = window.game.myHand.filter(c => c.value && String(c.value).startsWith('id_'));
+    let timeLeft = 10; maxSpan.innerText = maxCount;
+    resetArea.innerHTML = ''; handArea.innerHTML = '';
+    let selectedCards = []; let myAbilities = window.game.myHand.filter(c => c.value && String(c.value).startsWith('id_'));
     
     const renderCards = () => {
         resetArea.innerHTML = '';
         selectedCards.forEach((c, idx) => {
             const el = Renderer.createCardElement(c);
             el.style.transform = 'none'; el.style.position = 'static'; el.style.margin = '0';
-            el.onclick = () => {
-                selectedCards.splice(idx, 1);
-                myAbilities.push(c);
-                renderCards();
-            };
+            el.onclick = () => { selectedCards.splice(idx, 1); myAbilities.push(c); renderCards(); };
             resetArea.appendChild(el);
         });
-        
         handArea.innerHTML = '';
         myAbilities.forEach((c, idx) => {
             const el = Renderer.createCardElement(c);
             el.style.transform = 'none'; el.style.position = 'static'; el.style.margin = '0';
             el.onclick = () => {
-                if (selectedCards.length < maxCount) {
-                    myAbilities.splice(idx, 1);
-                    selectedCards.push(c);
-                    renderCards();
-                }
+                if (selectedCards.length < maxCount) { myAbilities.splice(idx, 1); selectedCards.push(c); renderCards(); }
             };
             handArea.appendChild(el);
         });
     };
-    renderCards();
-    overlay.classList.remove('hidden');
+    renderCards(); overlay.classList.remove('hidden');
     
     const finish = () => {
-        clearInterval(timerInt);
-        overlay.classList.add('hidden');
+        clearInterval(timerInt); overlay.classList.add('hidden');
         if (selectedCards.length > 0) {
             const vals = selectedCards.map(c => c.value);
-            if (window.isHost) {
-                window.game.replaceAbilityCards(window.game.myId, vals);
-                window.updateUI();
-            } else {
-                if(window.socket) window.socket.emit('player_action', { action: 'ability_reset', cards: vals });
-            }
+            if (window.isHost) { window.game.replaceAbilityCards(window.game.myId, vals); window.updateUI(); } 
+            else { if(window.socket) window.socket.emit('player_action', { action: 'ability_reset', cards: vals }); }
         }
     };
     
     btnConfirm.onclick = finish;
-    const timerInt = setInterval(() => {
-        timeLeft--;
-        timerSpan.innerText = timeLeft;
-        if (timeLeft <= 0) finish();
-    }, 1000);
+    const timerInt = setInterval(() => { timeLeft--; timerSpan.innerText = timeLeft; if (timeLeft <= 0) finish(); }, 1000);
 };
 
 window.animateInitialDeal = function(targetHands, callback) {
     const playerIds = window.game.players.map(p => p.id);
-    window.game.hands = {};
-    playerIds.forEach(id => { window.game.hands[id] = []; });
+    window.game.hands = {}; playerIds.forEach(id => { window.game.hands[id] = []; });
     window.updateUI(); 
 
     const deckEl = document.getElementById('deck-visual');
@@ -590,27 +535,17 @@ window.animateInitialDeal = function(targetHands, callback) {
     const startRect = deckEl.getBoundingClientRect();
     const handSize = targetHands[playerIds[0]] ? targetHands[playerIds[0]].length : 0;
     const totalDeals = handSize * playerIds.length;
-    
-    let dealIndex = 0;
-    let completedDeals = 0; 
+    let dealIndex = 0; let completedDeals = 0; 
 
     function checkComplete() {
         completedDeals++;
         if (completedDeals >= totalDeals) {
-            window.game.hands = JSON.parse(JSON.stringify(targetHands));
-            window.updateUI();
+            window.game.hands = JSON.parse(JSON.stringify(targetHands)); window.updateUI();
             window.isInitialDealing = false;
             
             if (window.RuleSettings && window.RuleSettings.abilityResetCount > 0) {
-                if (typeof window.showAbilityResetUI === 'function') {
-                    window.showAbilityResetUI(window.RuleSettings.abilityResetCount);
-                }
-                if (window.isHost) {
-                    setTimeout(() => {
-                        window.broadcastGameState();
-                        window.checkTurn();
-                    }, 13000);
-                }
+                if (typeof window.showAbilityResetUI === 'function') window.showAbilityResetUI(window.RuleSettings.abilityResetCount);
+                if (window.isHost) { setTimeout(() => { window.broadcastGameState(); window.checkTurn(); }, 13000); }
             } else {
                 window.updateUI();
                 if (window.isHost) setTimeout(() => window.checkTurn(), 500);
@@ -621,56 +556,41 @@ window.animateInitialDeal = function(targetHands, callback) {
 
     function dealNext() {
         if (dealIndex >= totalDeals) return;
-
-        const pIdx = dealIndex % playerIds.length;
-        const round = Math.floor(dealIndex / playerIds.length);
+        const pIdx = dealIndex % playerIds.length; const round = Math.floor(dealIndex / playerIds.length);
         const pId = playerIds[pIdx];
 
         if (window.SE) window.SE.play('Distribute'); 
 
         const dummyCard = document.createElement('div');
-        dummyCard.className = 'card back';
-        dummyCard.style.width = '40px'; 
-        dummyCard.style.height = '60px';
+        dummyCard.className = 'card back'; dummyCard.style.width = '40px'; dummyCard.style.height = '60px';
 
         let endX, endY;
         if (pId === window.game.myId) {
-            const handEl = document.getElementById('player-hand');
-            const rect = handEl.getBoundingClientRect();
-            endX = rect.left + rect.width / 2;
-            endY = rect.top + rect.height / 2;
+            const handEl = document.getElementById('player-hand'); const rect = handEl.getBoundingClientRect();
+            endX = rect.left + rect.width / 2; endY = rect.top + rect.height / 2;
         } else {
             const badge = document.querySelector(`.other-player-badge[data-id="${pId}"]`);
             if (badge) {
-                const rect = badge.getBoundingClientRect();
-                endX = rect.left + rect.width / 2;
-                endY = rect.top + rect.height / 2;
-            } else {
-                endX = window.innerWidth / 2;
-                endY = window.innerHeight / 2;
-            }
+                const rect = badge.getBoundingClientRect(); endX = rect.left + rect.width / 2; endY = rect.top + rect.height / 2;
+            } else { endX = window.innerWidth / 2; endY = window.innerHeight / 2; }
         }
 
         if (typeof CardAnimation !== 'undefined' && CardAnimation.moveCard) {
             CardAnimation.moveCard(dummyCard, startRect, endX, endY, 0, () => {
                 if (targetHands[pId] && targetHands[pId][round]) {
-                    window.game.hands[pId].push(targetHands[pId][round]);
-                    window.updateUI();
+                    window.game.hands[pId].push(targetHands[pId][round]); window.updateUI();
                 }
                 checkComplete();
             });
         } else {
             if (targetHands[pId] && targetHands[pId][round]) {
-                window.game.hands[pId].push(targetHands[pId][round]);
-                window.updateUI();
+                window.game.hands[pId].push(targetHands[pId][round]); window.updateUI();
             }
             checkComplete();
         }
-
         dealIndex++;
         if (dealIndex < totalDeals) setTimeout(dealNext, 120); 
     }
-
     dealNext();
 };
 
@@ -689,34 +609,23 @@ window.showAbilityCutin = function(cardValue, isHVActivated = false) {
         if (cutinText) cutinText.innerText = window.AbilityDef[cardValue].desc;
     }
 
-    cutinEl.classList.remove('hidden', 'fade-out');
-    void cutinEl.offsetWidth; 
+    cutinEl.classList.remove('hidden', 'fade-out'); void cutinEl.offsetWidth; 
     cutinEl.classList.add('show-cutin');
     
-    if (cardValue === 'id_20') {
-        const rand = Math.random() < 0.5 ? 1 : 2;
-        if (window.SE) window.SE.play(`hv/id_20(${rand})`);
-    } else if (cardValue === 'id_25') {
-        if (window.SE) window.SE.play(`hv/id_26`);
-    } else if (cardValue === 'id_26') {
-        if (window.SE) window.SE.play(`hv/id_25`);
-    } else {
-        const randMvp = Math.random() < 0.5 ? 1 : 2;
-        if (window.SE) window.SE.play(`mvp_${randMvp}`);
-    }
+    if (cardValue === 'id_20') { if (window.SE) window.SE.play(`hv/id_20(${Math.random() < 0.5 ? 1 : 2})`); } 
+    else if (cardValue === 'id_25') { if (window.SE) window.SE.play(`hv/id_26`); } 
+    else if (cardValue === 'id_26') { if (window.SE) window.SE.play(`hv/id_25`); } 
+    else { if (window.SE) window.SE.play(`mvp_${Math.random() < 0.5 ? 1 : 2}`); }
 
     setTimeout(() => {
-        cutinEl.classList.remove('show-cutin'); 
-        cutinEl.classList.add('fade-out');
+        cutinEl.classList.remove('show-cutin'); cutinEl.classList.add('fade-out');
         setTimeout(() => cutinEl.classList.add('hidden'), 400); 
     }, 2000); 
 };
 
 window.openTargetSelection = function(players, callback) {
     window.ensureModalsExist();
-    const modal = document.getElementById('target-modal');
-    const list = document.getElementById('target-modal-list');
-    
+    const modal = document.getElementById('target-modal'); const list = document.getElementById('target-modal-list');
     const validPlayers = players || (window.game && window.game.players) || [];
     const targets = validPlayers.filter(p => p.id !== window.game.myId);
 
@@ -727,8 +636,7 @@ window.openTargetSelection = function(players, callback) {
     const defaultIcon = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ccc'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
 
     targets.forEach(p => {
-        const btn = document.createElement('div');
-        btn.className = 'target-icon-btn';
+        const btn = document.createElement('div'); btn.className = 'target-icon-btn';
         btn.innerHTML = `<img src="${p.icon || defaultIcon}"><span style="font-size:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:60px;">${p.name}</span>`;
         btn.onclick = () => { modal.classList.add('hidden'); callback(p.id); };
         list.appendChild(btn);
@@ -738,9 +646,7 @@ window.openTargetSelection = function(players, callback) {
 
 window.openDiscardSelection = function(hand, excludeIndices, def, callback) {
     window.ensureModalsExist();
-    const modal = document.getElementById('discard-modal');
-    const list = document.getElementById('discard-modal-list');
-
+    const modal = document.getElementById('discard-modal'); const list = document.getElementById('discard-modal-list');
     const isAbilityDiscard = def && def.needsAbilityDiscard;
 
     if (!modal || !list) {
@@ -749,12 +655,10 @@ window.openDiscardSelection = function(hand, excludeIndices, def, callback) {
             if (isAbilityDiscard) return (c.value && String(c.value).startsWith('id_'));
             return !(c.value && String(c.value).startsWith('id_'));
         });
-        callback(discardable > -1 ? discardable : 0);
-        return;
+        callback(discardable > -1 ? discardable : 0); return;
     }
 
-    list.innerHTML = '';
-    let addedCount = 0;
+    list.innerHTML = ''; let addedCount = 0;
     hand.forEach((card, idx) => {
         if (excludeIndices.includes(idx)) return;
         const isAb = card.value && String(card.value).startsWith('id_');
@@ -764,175 +668,115 @@ window.openDiscardSelection = function(hand, excludeIndices, def, callback) {
         const btn = Renderer.createCardElement(card);
         btn.style.width = '50px'; btn.style.height = '75px'; btn.style.margin = '5px'; btn.style.cursor = 'pointer';
         btn.onclick = () => { modal.classList.add('hidden'); callback(idx); };
-        list.appendChild(btn);
-        addedCount++;
+        list.appendChild(btn); addedCount++;
     });
     
-    if(addedCount === 0) {
-        modal.classList.add('hidden'); callback(null);
-    } else {
-        modal.classList.remove('hidden');
-    }
+    if(addedCount === 0) { modal.classList.add('hidden'); callback(null); } 
+    else { modal.classList.remove('hidden'); }
 };
 
 window.openMultiDiscardSelection = function(hand, validIndices, callback) {
     window.ensureModalsExist();
-    const modal = document.getElementById('multi-discard-modal');
-    const list = document.getElementById('multi-discard-modal-list');
+    const modal = document.getElementById('multi-discard-modal'); const list = document.getElementById('multi-discard-modal-list');
     const btnConfirm = document.getElementById('btn-multi-discard-confirm');
 
     if (!modal || !list) { callback([]); return; }
-
-    list.innerHTML = '';
-    let selectedIndices = [];
+    list.innerHTML = ''; let selectedIndices = [];
 
     validIndices.forEach(idx => {
         const card = hand[idx];
         const btn = Renderer.createCardElement(card);
-        btn.style.width = '50px'; btn.style.height = '75px'; btn.style.margin = '5px'; btn.style.cursor = 'pointer';
-        btn.style.transition = '0.2s';
+        btn.style.width = '50px'; btn.style.height = '75px'; btn.style.margin = '5px'; btn.style.cursor = 'pointer'; btn.style.transition = '0.2s';
         
         btn.onclick = () => {
             const pos = selectedIndices.indexOf(idx);
             if (pos > -1) {
                 selectedIndices.splice(pos, 1);
-                btn.style.transform = 'translateY(0)';
-                btn.style.border = '1.5px solid white';
+                btn.style.transform = 'translateY(0)'; btn.style.border = '1.5px solid white';
             } else {
                 selectedIndices.push(idx);
-                btn.style.transform = 'translateY(-10px)';
-                btn.style.border = '2px solid #f1c40f';
+                btn.style.transform = 'translateY(-10px)'; btn.style.border = '2px solid #f1c40f';
             }
         };
         list.appendChild(btn);
     });
 
-    btnConfirm.onclick = () => {
-        modal.classList.add('hidden');
-        callback(selectedIndices);
-    };
-
+    btnConfirm.onclick = () => { modal.classList.add('hidden'); callback(selectedIndices); };
     modal.classList.remove('hidden');
 };
 
 window.openGraveyardSelection = function(callback) {
     window.ensureModalsExist();
     const list = window.game.abilityGraveyard.filter(id => {
-        const def = window.AbilityDef[id];
-        return def && def.rarity !== 'UR';
+        const def = window.AbilityDef[id]; return def && def.rarity !== 'UR';
     });
     
     if (list.length === 0) {
-        if(confirm("対象となるSSR以下のカードが墓地にありません。\n適用されない効果がありますが、それでも実行しますか？")) {
-            callback(null);
-        } else {
-            callback(false); 
-        }
+        if(confirm("対象となるSSR以下のカードが墓地にありません。\n適用されない効果がありますが、それでも実行しますか？")) callback(null);
+        else callback(false); 
         return;
     }
     
-    const modal = document.getElementById('graveyard-modal');
-    const container = document.getElementById('graveyard-list');
+    const modal = document.getElementById('graveyard-modal'); const container = document.getElementById('graveyard-list');
     container.innerHTML = '';
     
     list.forEach(id => {
-        const btn = document.createElement('img');
-        btn.src = `card/custom/${id}.png`;
-        btn.style.width = '60px'; btn.style.cursor = 'pointer';
-        btn.onclick = () => {
-            modal.classList.add('hidden');
-            callback(id);
-        };
+        const btn = document.createElement('img'); btn.src = `card/custom/${id}.png`; btn.style.width = '60px'; btn.style.cursor = 'pointer';
+        btn.onclick = () => { modal.classList.add('hidden'); callback(id); };
         container.appendChild(btn);
     });
 
-    document.getElementById('btn-cancel-graveyard').onclick = () => {
-        modal.classList.add('hidden');
-        callback(false); 
-    };
-
+    document.getElementById('btn-cancel-graveyard').onclick = () => { modal.classList.add('hidden'); callback(false); };
     modal.classList.remove('hidden');
 };
 
 window.openDebuffSelection = function(callback) {
     window.ensureModalsExist();
     const modal = document.getElementById('debuff-modal');
-    const btnFreeze = document.getElementById('btn-debuff-freeze');
-    const btnBurn = document.getElementById('btn-debuff-burn');
-    
-    btnFreeze.onclick = () => { modal.classList.add('hidden'); callback('frozen'); };
-    btnBurn.onclick = () => { modal.classList.add('hidden'); callback('burn'); };
-    
+    document.getElementById('btn-debuff-freeze').onclick = () => { modal.classList.add('hidden'); callback('frozen'); };
+    document.getElementById('btn-debuff-burn').onclick = () => { modal.classList.add('hidden'); callback('burn'); };
     modal.classList.remove('hidden');
 };
 
 window.showDefenseModal = function(attackCardValue) {
     window.ensureModalsExist();
-    const modal = document.getElementById('defense-modal');
-    const list = document.getElementById('defense-modal-list');
-    const title = document.getElementById('defense-title');
-    const desc = document.getElementById('defense-desc');
-    const qArea = document.getElementById('defense-question-area');
-    const sArea = document.getElementById('defense-select-area');
-    const btnYes = document.getElementById('btn-defense-yes');
-    const btnNo = document.getElementById('btn-defense-no');
-    const btnCancel = document.getElementById('btn-cancel-defense');
+    const modal = document.getElementById('defense-modal'); const list = document.getElementById('defense-modal-list');
+    const title = document.getElementById('defense-title'); const desc = document.getElementById('defense-desc');
+    const qArea = document.getElementById('defense-question-area'); const sArea = document.getElementById('defense-select-area');
     
     if (!modal || !list) {
         if (window.socket) window.socket.emit('player_action', { action: 'defense_response', targetId: window.myId, cardValue: null, discardIdx: null });
-        window.isDefending = false;
-        return;
+        window.isDefending = false; return;
     }
     
-    let attackName = '能力';
-    let attackDesc = ''; 
-    
+    let attackName = '能力'; let attackDesc = ''; 
     if (window.AbilityDef && window.AbilityDef[attackCardValue]) {
-        attackName = window.AbilityDef[attackCardValue].name;
-        attackDesc = window.AbilityDef[attackCardValue].desc; 
+        attackName = window.AbilityDef[attackCardValue].name; attackDesc = window.AbilityDef[attackCardValue].desc; 
     } else if (attackCardValue === '+2' || attackCardValue === 'Wild+4') {
-        attackName = attackCardValue;
-        attackDesc = '引かされる枚数が増加します！(防御カードで防げます)'; 
+        attackName = attackCardValue; attackDesc = '引かされる枚数が増加します！(防御カードで防げます)'; 
     }
     
     title.innerText = `攻撃を受けました！(${attackName})`;
-    
     if (desc) {
-        if (attackDesc) {
-            desc.innerText = attackDesc;
-            desc.classList.remove('hidden');
-        } else {
-            desc.classList.add('hidden');
-        }
+        if (attackDesc) { desc.innerText = attackDesc; desc.classList.remove('hidden'); } 
+        else { desc.classList.add('hidden'); }
     }
     
-    qArea.classList.remove('hidden');
-    sArea.classList.add('hidden');
+    qArea.classList.remove('hidden'); sArea.classList.add('hidden');
     
     const myHand = window.game.myHand || [];
-    const defCards = myHand.map((c, i) => ({card: c, idx: i}))
-                           .filter(item => item.card.value && window.AbilityDef && window.AbilityDef[item.card.value] && window.AbilityDef[item.card.value].type.includes('BL'));
+    const defCards = myHand.map((c, i) => ({card: c, idx: i})).filter(item => item.card.value && window.AbilityDef && window.AbilityDef[item.card.value] && window.AbilityDef[item.card.value].type.includes('BL'));
     
-    btnYes.onclick = () => {
-        if (defCards.length === 0) {
-            alert('手札に防御カード(BL)がありません！');
-            return;
-        }
-        window.hasRespondedDefense = true; 
-        qArea.classList.add('hidden');
-        sArea.classList.remove('hidden');
-        
+    document.getElementById('btn-defense-yes').onclick = () => {
+        if (defCards.length === 0) { alert('手札に防御カード(BL)がありません！'); return; }
+        window.hasRespondedDefense = true; qArea.classList.add('hidden'); sArea.classList.remove('hidden');
         list.innerHTML = '';
         defCards.forEach(item => {
             const btn = Renderer.createCardElement(item.card);
             btn.style.width = '50px'; btn.style.height = '75px'; btn.style.margin = '5px'; btn.style.cursor = 'pointer';
             btn.onclick = () => {
                 const def = window.AbilityDef[item.card.value];
-                
-                if (typeof window.showAbilityCutin === 'function') {
-                    window.showAbilityCutin(item.card.value);
-                }
-
+                if (typeof window.showAbilityCutin === 'function') window.showAbilityCutin(item.card.value);
                 if (def && (def.needsDiscard || def.needsAbilityDiscard)) {
                     modal.classList.add('hidden'); 
                     window.openDiscardSelection(myHand, [item.idx], def, (discIdx) => {
@@ -949,34 +793,27 @@ window.showDefenseModal = function(attackCardValue) {
         });
     };
 
-    btnNo.onclick = () => {
-        window.hasRespondedDefense = true; 
-        modal.classList.add('hidden'); 
+    document.getElementById('btn-defense-no').onclick = () => {
+        window.hasRespondedDefense = true; modal.classList.add('hidden'); 
         if(window.socket) window.socket.emit('player_action', { action: 'defense_response', targetId: window.game.myId, cardValue: null, discardIdx: null });
         window.isDefending = false;
     };
 
-    btnCancel.onclick = () => {
-        window.hasRespondedDefense = false;
-        qArea.classList.remove('hidden');
-        sArea.classList.add('hidden');
+    document.getElementById('btn-cancel-defense').onclick = () => {
+        window.hasRespondedDefense = false; qArea.classList.remove('hidden'); sArea.classList.add('hidden');
     };
-
     modal.classList.remove('hidden');
 };
 
 window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides) {
-    let responses = {};
-    const p = window.game.players.find(px => px.id === targetId);
+    let responses = {}; const p = window.game.players.find(px => px.id === targetId);
     
     if (p && p.type === 'bot') {
-        const bHand = window.game.hands[targetId];
-        let hasDef = false;
+        const bHand = window.game.hands[targetId]; let hasDef = false;
         if(bHand) {
             const blIdx = bHand.findIndex(c => c.value && window.AbilityDef && window.AbilityDef[c.value] && window.AbilityDef[c.value].type.includes('BL'));
             if (blIdx > -1) {
-                const blCard = bHand[blIdx];
-                let bDiscard = null;
+                const blCard = bHand[blIdx]; let bDiscard = null;
                 const def = window.AbilityDef[blCard.value];
                 if(def && def.needsDiscard) {
                     const nonAb = bHand.findIndex((c, i) => i !== blIdx && !(c.value && String(c.value).startsWith('id_')));
@@ -985,8 +822,7 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                     const ab = bHand.findIndex((c, i) => i !== blIdx && (c.value && String(c.value).startsWith('id_')));
                     bDiscard = ab > -1 ? ab : null;
                 }
-                responses[targetId] = { cardValue: blCard.value, discardIdx: bDiscard };
-                hasDef = true;
+                responses[targetId] = { cardValue: blCard.value, discardIdx: bDiscard }; hasDef = true;
             }
         }
         if(!hasDef) responses[targetId] = { cardValue: null, discardIdx: null };
@@ -995,93 +831,57 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
     }
 
     window.pendingDefense = { 
-        timer: 30, 
-        responses: responses,
+        timer: 30, responses: responses,
         info: { attackerId: attackerId, cardValue: cardValue, targets: [targetId], phaseId: Date.now() }
     };
 
     if (Object.keys(responses).length >= 1) window.pendingDefense.timer = 0;
-
     window.broadcastGameState(false, guides);
 
-    if (targetId === window.game.myId) {
-        window.isDefending = true;
-        window.showDefenseModal(cardValue);
-    }
+    if (targetId === window.game.myId) { window.isDefending = true; window.showDefenseModal(cardValue); }
 
     const interval = setInterval(() => {
         if (!window.pendingDefense) { clearInterval(interval); return; }
         
         if(window.pendingDefense.timer <= 0) {
             clearInterval(interval);
-            const finalResponses = window.pendingDefense.responses;
-            window.pendingDefense = null;
-            
-            let defenseGuides = [];
-            let blocked = false;
+            const finalResponses = window.pendingDefense.responses; window.pendingDefense = null;
+            let defenseGuides = []; let blocked = false;
             
             if (finalResponses && finalResponses[targetId] && finalResponses[targetId].cardValue) {
-                const resp = finalResponses[targetId];
-                const defCardId = resp.cardValue;
-                const tHand = window.game.hands[targetId];
-                const cIdx = tHand.findIndex(c => c.value === defCardId);
+                const resp = finalResponses[targetId]; const defCardId = resp.cardValue;
+                const tHand = window.game.hands[targetId]; const cIdx = tHand.findIndex(c => c.value === defCardId);
                 
                 let actualDefDiscardIdx = resp.discardIdx;
                 if (cIdx > -1) {
                     if (actualDefDiscardIdx !== null && cIdx < actualDefDiscardIdx) actualDefDiscardIdx--;
                     const playedDefCard = tHand.splice(cIdx, 1)[0];
-                    
                     if(!window.game.abilityGraveyard) window.game.abilityGraveyard = [];
                     window.game.abilityGraveyard.push(playedDefCard.value);
-
                     if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: targetId, cards: [playedDefCard] });
-                    
-                    if (targetId !== window.game.myId && typeof window.showAbilityCutin === 'function') {
-                        window.showAbilityCutin(defCardId);
-                    }
-
-                    defenseGuides.push({ from: targetId, to: targetId, text: '防ぐ!', delay: 2500 });
-                    blocked = true;
+                    if (targetId !== window.game.myId && typeof window.showAbilityCutin === 'function') window.showAbilityCutin(defCardId);
+                    defenseGuides.push({ from: targetId, to: targetId, text: '防ぐ!', delay: 2500 }); blocked = true;
                 }
                 
                 if (actualDefDiscardIdx !== null && tHand && tHand.length > actualDefDiscardIdx) {
                     const discCard = tHand.splice(actualDefDiscardIdx, 1)[0];
                     if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: targetId, cards: [discCard] });
-                    if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) {
-                        window.AbilityEngine.triggerDiscardEffect(window.game, targetId, discCard.value, true, discCard);
-                    }
-                    if (discCard.value && String(discCard.value).startsWith('id_')) {
-                        window.game.abilityGraveyard.push(discCard.value);
-                    } else {
-                        window.game.discardPile.push(discCard);
-                        window.game.discardRotations.push(0);
-                    }
+                    if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) window.AbilityEngine.triggerDiscardEffect(window.game, targetId, discCard.value, true, discCard);
+                    if (discCard.value && String(discCard.value).startsWith('id_')) { window.game.abilityGraveyard.push(discCard.value); } 
+                    else { window.game.discardPile.push(discCard); window.game.discardRotations.push(0); }
                 }
 
-                const def = window.AbilityDef[defCardId];
                 if (defCardId === 'id_2') {
-                    window.game.players.filter(px => px.id !== targetId).forEach(px => {
-                        window.AbilityEngine.applyDraw(window.game, px.id, 1);
-                    });
+                    window.game.players.filter(px => px.id !== targetId).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); });
                     const targetP = window.game.players.find(p=>p.id===targetId);
                     if(targetP) targetP.shield = { level: 1, turns: 1 };
-                    if (Math.random() < 0.6) {
-                        window.game.players.filter(px => px.id !== targetId).forEach(px => {
-                            window.AbilityEngine.applyDraw(window.game, px.id, 1);
-                        });
-                    }
+                    if (Math.random() < 0.6) window.game.players.filter(px => px.id !== targetId).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); });
                 } else if (defCardId === 'id_4') {
-                    if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) {
-                        window.AbilityEngine.triggerDiscardEffect(window.game, targetId, 'id_4', false, null);
-                    }
+                    if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) window.AbilityEngine.triggerDiscardEffect(window.game, targetId, 'id_4', false, null);
                 } else if (defCardId === 'id_9') {
-                    window.game.players.filter(px => px.id !== targetId).forEach(px => {
-                        window.AbilityEngine.applyDraw(window.game, px.id, 2);
-                    });
+                    window.game.players.filter(px => px.id !== targetId).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 2); });
                 } else if (defCardId === 'id_18') {
-                    window.game.players.filter(px => px.id !== targetId).forEach(px => {
-                        window.AbilityEngine.applyDraw(window.game, px.id, 1);
-                    });
+                    window.game.players.filter(px => px.id !== targetId).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); });
                     const targetP = window.game.players.find(p=>p.id===targetId);
                     if(targetP) targetP.shield = { level: 1, turns: 2 };
                 } else if (defCardId === 'id_19') {
@@ -1100,28 +900,21 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
                     const targetP = window.game.players.find(p=>p.id===targetId);
                     if (targetP) {
                         if (!targetP.shield) targetP.shield = { level: 0, turns: 0 };
-                        targetP.shield.level += 3;
-                        targetP.shield.turns += 3;
+                        targetP.shield.level += 3; targetP.shield.turns += 3;
                         defenseGuides.push({ from: targetId, to: targetId, text: '🛡️シールド強化!', delay: 2500 });
                     }
                 }
             }
 
             if (blocked) window.game.drawStack = 0; 
-
             window.broadcastGameState(false, defenseGuides);
 
             let someoneWon = false;
-            window.game.players.forEach(p => {
-                if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) {
-                    window.checkWin(p.id); someoneWon = true;
-                }
-            });
+            window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
 
             if (!someoneWon) setTimeout(() => window.checkTurn(), 500); 
         } else {
-            window.pendingDefense.timer--;
-            window.broadcastGameState(true);
+            window.pendingDefense.timer--; window.broadcastGameState(true);
         }
     }, 1000);
 };
@@ -1137,10 +930,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
     const cardValue = playedCards[0].value;
     const def = window.AbilityDef ? window.AbilityDef[cardValue] : null;
 
-    if (!def) {
-        window.executePlay(playerId, indices, false);
-        return;
-    }
+    if (!def) { window.executePlay(playerId, indices, false); return; }
 
     const multiplier = indices.length; 
     const discCard = discardIdx !== null ? originalHand[discardIdx] : null;
@@ -1159,15 +949,12 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
             if(!window.game.abilityGraveyard) window.game.abilityGraveyard = [];
             window.game.abilityGraveyard.push(c.value);
         } else {
-            window.game.discardPile.push(c); 
-            window.game.discardRotations.push(0);
+            window.game.discardPile.push(c); window.game.discardRotations.push(0);
         }
     });
 
     if (cardValue === 'id_26') {
-        setTimeout(() => {
-            window.startJankenPhase(playerId, 0);
-        }, 2500);
+        setTimeout(() => { window.startJankenPhase(playerId, 0); }, 2500);
         return; 
     }
 
@@ -1182,20 +969,17 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
             targets = [playerId]; 
         }
         
-        let responses = {};
-        let needsDefense = false;
+        let responses = {}; let needsDefense = false;
         
         if (cardValue !== 'id_28') { 
             targets.forEach(tid => {
                 const p = window.game.players.find(px=>px.id===tid);
                 if(p && p.type==='bot') {
-                    const bHand = window.game.hands[tid];
-                    let hasDef = false;
+                    const bHand = window.game.hands[tid]; let hasDef = false;
                     if(bHand && def.type !== 'HV' && cardValue !== 'id_5' && cardValue !== 'id_20') {
                         const blIdx = bHand.findIndex(c => c.value && window.AbilityDef && window.AbilityDef[c.value] && window.AbilityDef[c.value].type.includes('BL'));
                         if (blIdx > -1) {
-                            const blCard = bHand[blIdx];
-                            let bDiscard = null;
+                            const blCard = bHand[blIdx]; let bDiscard = null;
                             const bDef = window.AbilityDef[blCard.value];
                             if(bDef && bDef.needsDiscard) {
                                 const nonAb = bHand.findIndex((c, i) => i !== blIdx && !(c.value && String(c.value).startsWith('id_')));
@@ -1204,8 +988,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                                 const ab = bHand.findIndex((c, i) => i !== blIdx && (c.value && String(c.value).startsWith('id_')));
                                 bDiscard = ab > -1 ? ab : null;
                             }
-                            responses[tid] = { cardValue: blCard.value, discardIdx: bDiscard };
-                            hasDef = true;
+                            responses[tid] = { cardValue: blCard.value, discardIdx: bDiscard }; hasDef = true;
                         }
                     }
                     if(!hasDef) responses[tid] = { cardValue: null, discardIdx: null };
@@ -1213,41 +996,39 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                     responses[tid] = { cardValue: null, discardIdx: null };
                 } else if (def.type === 'HV' || cardValue === 'id_5' || cardValue === 'id_20') {
                     responses[tid] = { cardValue: null, discardIdx: null }; 
-                } else {
-                    needsDefense = true;
-                }
+                } else { needsDefense = true; }
             });
         }
 
         if (cardValue === 'id_28' || !needsDefense) {
             let guides = [];
-            if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, responses, multiplier, selectedColor, multiCards, extraData);
+            // ★修正2: AbilityEngineのクラッシュ回避(try-catch)
+            try {
+                if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, responses, multiplier, selectedColor, multiCards, extraData);
+            } catch(e) { console.error("Ability Error:", e); }
+            
             guides.forEach(g => { if(g.delay === undefined) g.delay = 2500; });
             window.broadcastGameState(false, guides);
 
             let someoneWon = false;
-            window.game.players.forEach(p => {
-                if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) {
-                    window.checkWin(p.id); someoneWon = true;
-                }
-            });
+            window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
+            
+            // ★修正3: デッドロック回避（能力解決後に必ずターンを進める）
+            window.game.nextTurn(1); 
             if (!someoneWon) setTimeout(() => window.checkTurn(), 500);
             return;
         }
 
         window.pendingDefense = { 
-            timer: 30, 
-            responses: responses,
+            timer: 30, responses: responses,
             info: { attackerId: playerId, cardValue: cardValue, targets: targets, phaseId: Date.now() }
         };
 
         if (Object.keys(responses).length >= targets.length) window.pendingDefense.timer = 0;
-
         window.broadcastGameState();
 
         if (def.type !== 'HV' && cardValue !== 'id_5' && cardValue !== 'id_20' && targets.includes(window.game.myId) && window.game.myId !== playerId) {
-            window.isDefending = true;
-            window.showDefenseModal(cardValue);
+            window.isDefending = true; window.showDefenseModal(cardValue);
         }
 
         const interval = setInterval(() => {
@@ -1255,9 +1036,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
             
             if(window.pendingDefense.timer <= 0) {
                 clearInterval(interval);
-                const finalResponses = window.pendingDefense.responses;
-                window.pendingDefense = null;
-                
+                const finalResponses = window.pendingDefense.responses; window.pendingDefense = null;
                 let guides = [];
 
                 if (finalResponses) {
@@ -1265,65 +1044,37 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                         const resp = finalResponses[tid];
                         if (resp && resp.cardValue) {
                             const defCardId = resp.cardValue;
-                            const tHand = window.game.hands[tid];
-                            const cIdx = tHand.findIndex(c => c.value === defCardId);
-                            
+                            const tHand = window.game.hands[tid]; const cIdx = tHand.findIndex(c => c.value === defCardId);
                             let actualDefDiscardIdx = resp.discardIdx;
                             if (cIdx > -1) {
                                 if (actualDefDiscardIdx !== null && cIdx < actualDefDiscardIdx) actualDefDiscardIdx--;
                                 const playedDefCard = tHand.splice(cIdx, 1)[0];
-                                
                                 if(!window.game.abilityGraveyard) window.game.abilityGraveyard = [];
                                 window.game.abilityGraveyard.push(playedDefCard.value);
-                                
                                 if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: tid, cards: [playedDefCard] });
-                                
-                                if (tid !== window.game.myId && typeof window.showAbilityCutin === 'function') {
-                                    window.showAbilityCutin(defCardId);
-                                }
+                                if (tid !== window.game.myId && typeof window.showAbilityCutin === 'function') window.showAbilityCutin(defCardId);
                                 guides.push({ from: tid, to: tid, text: '防ぐ!', delay: 2500 });
                             }
                             
                             if (actualDefDiscardIdx !== null && tHand && tHand.length > actualDefDiscardIdx) {
                                 const discCard = tHand.splice(actualDefDiscardIdx, 1)[0];
                                 if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: tid, cards: [discCard] });
-                                if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) {
-                                    window.AbilityEngine.triggerDiscardEffect(window.game, tid, discCard.value, true, discCard);
-                                }
-                                if (discCard.value && String(discCard.value).startsWith('id_')) {
-                                    window.game.abilityGraveyard.push(discCard.value);
-                                } else {
-                                    window.game.discardPile.push(discCard);
-                                    window.game.discardRotations.push(0);
-                                }
+                                if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) window.AbilityEngine.triggerDiscardEffect(window.game, tid, discCard.value, true, discCard);
+                                if (discCard.value && String(discCard.value).startsWith('id_')) { window.game.abilityGraveyard.push(discCard.value); } 
+                                else { window.game.discardPile.push(discCard); window.game.discardRotations.push(0); }
                             }
                             
-                            const def = window.AbilityDef[defCardId];
                             if (defCardId === 'id_2') {
-                                window.game.players.filter(px => px.id !== tid).forEach(px => {
-                                    window.AbilityEngine.applyDraw(window.game, px.id, 1);
-                                });
-                                const targetP = window.game.players.find(p=>p.id===tid);
-                                if(targetP) targetP.shield = { level: 1, turns: 1 };
-                                if (Math.random() < 0.6) {
-                                    window.game.players.filter(px => px.id !== tid).forEach(px => {
-                                        window.AbilityEngine.applyDraw(window.game, px.id, 1);
-                                    });
-                                }
+                                window.game.players.filter(px => px.id !== tid).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); });
+                                const targetP = window.game.players.find(p=>p.id===tid); if(targetP) targetP.shield = { level: 1, turns: 1 };
+                                if (Math.random() < 0.6) window.game.players.filter(px => px.id !== tid).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); });
                             } else if (defCardId === 'id_4') {
-                                if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) {
-                                    window.AbilityEngine.triggerDiscardEffect(window.game, tid, 'id_4', false, null);
-                                }
+                                if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) window.AbilityEngine.triggerDiscardEffect(window.game, tid, 'id_4', false, null);
                             } else if (defCardId === 'id_9') {
-                                window.game.players.filter(px => px.id !== tid).forEach(px => {
-                                    window.AbilityEngine.applyDraw(window.game, px.id, 2);
-                                });
+                                window.game.players.filter(px => px.id !== tid).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 2); });
                             } else if (defCardId === 'id_18') {
-                                window.game.players.filter(px => px.id !== tid).forEach(px => {
-                                    window.AbilityEngine.applyDraw(window.game, px.id, 1);
-                                });
-                                const targetP = window.game.players.find(p=>p.id===tid);
-                                if(targetP) targetP.shield = { level: 1, turns: 2 };
+                                window.game.players.filter(px => px.id !== tid).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); });
+                                const targetP = window.game.players.find(p=>p.id===tid); if(targetP) targetP.shield = { level: 1, turns: 2 };
                             } else if (defCardId === 'id_19') {
                                 window.AbilityEngine.applyDraw(window.game, playerId, 1);
                                 guides.push({ from: tid, to: playerId, text: 'ヴィンディ', delay: 2500 });
@@ -1334,14 +1085,12 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                                     window.AbilityEngine.applyBurn(window.game, bt.id, 1);
                                     guides.push({ from: tid, to: bt.id, text: '🔥燃焼(1T)', delay: 2500 });
                                 }
-                                const targetP = window.game.players.find(p=>p.id===tid);
-                                if (targetP) targetP.shield = { level: 1, turns: 1 };
+                                const targetP = window.game.players.find(p=>p.id===tid); if (targetP) targetP.shield = { level: 1, turns: 1 };
                             } else if (defCardId === 'id_31') {
                                 const targetP = window.game.players.find(p=>p.id===tid);
                                 if (targetP) {
                                     if (!targetP.shield) targetP.shield = { level: 0, turns: 0 };
-                                    targetP.shield.level += 3;
-                                    targetP.shield.turns += 3;
+                                    targetP.shield.level += 3; targetP.shield.turns += 3;
                                     guides.push({ from: tid, to: tid, text: '🛡️シールド強化!', delay: 2500 });
                                 }
                             }
@@ -1349,41 +1098,40 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                     });
                 }
 
-                if (window.AbilityEngine) {
-                    let resolveGuides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, finalResponses, multiplier, selectedColor, multiCards, extraData);
-                    guides = resolveGuides.concat(guides);
-                }
+                try {
+                    if (window.AbilityEngine) {
+                        let resolveGuides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, finalResponses, multiplier, selectedColor, multiCards, extraData);
+                        guides = resolveGuides.concat(guides);
+                    }
+                } catch (e) { console.error("Ability Error:", e); }
+                
                 guides.forEach(g => { if(g.delay === undefined) g.delay = 2500; });
-
                 window.broadcastGameState(false, guides);
 
                 let someoneWon = false;
-                window.game.players.forEach(p => {
-                    if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) {
-                        window.checkWin(p.id); someoneWon = true;
-                    }
-                });
+                window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
 
+                // ★修正3: デッドロック回避
+                window.game.nextTurn(1); 
                 if (!someoneWon) setTimeout(() => window.checkTurn(), 500); 
             } else {
-                window.pendingDefense.timer--;
-                window.broadcastGameState(true);
+                window.pendingDefense.timer--; window.broadcastGameState(true);
             }
         }, 1000);
     } else {
         let guides = [];
-        if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, {}, multiplier, selectedColor, multiCards, extraData);
+        try {
+            if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, {}, multiplier, selectedColor, multiCards, extraData);
+        } catch(e) { console.error("Ability Error:", e); }
         guides.forEach(g => { if(g.delay === undefined) g.delay = 2500; });
         
         window.broadcastGameState(false, guides);
 
         let someoneWon = false;
-        window.game.players.forEach(p => {
-            if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) {
-                window.checkWin(p.id); someoneWon = true;
-            }
-        });
+        window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
 
+        // ★修正3: デッドロック回避
+        window.game.nextTurn(1);
         if (!someoneWon) setTimeout(() => window.checkTurn(), 500);
     }
 };
@@ -1395,8 +1143,9 @@ window.startJankenPhase = function(attackerId, loopCount, fixedTargetId = null) 
     if (!targetId) {
         const others = window.game.players.filter(p => p.id !== attackerId && p.connected);
         if (others.length === 0) {
-            alert("じゃんけんの相手がいません！");
-            window.checkTurn();
+            // ★修正2: ホストブロック回避（alertは使わずスキップ）
+            console.warn("じゃんけんの相手がいません！");
+            window.game.nextTurn(1); window.checkTurn();
             return;
         }
         targetId = others[Math.floor(Math.random() * others.length)].id;
@@ -1404,18 +1153,13 @@ window.startJankenPhase = function(attackerId, loopCount, fixedTargetId = null) 
     
     window.pendingJanken = {
         attackerId, targetId, loopCount,
-        attackerHand: null, targetHand: null,
-        timer: 10,
-        result: null
+        attackerHand: null, targetHand: null, timer: 10, result: null
     };
 
     window.broadcastGameState(); 
 
     window.jankenInterval = setInterval(() => {
-        if (!window.pendingJanken || window.pendingJanken.result) {
-            clearInterval(window.jankenInterval);
-            return;
-        }
+        if (!window.pendingJanken || window.pendingJanken.result) { clearInterval(window.jankenInterval); return; }
         
         window.pendingJanken.timer--;
         if (window.pendingJanken.timer <= 0) {
@@ -1449,8 +1193,7 @@ window.resolveJanken = function() {
     if (window.jankenInterval) clearInterval(window.jankenInterval);
 
     const pJ = window.pendingJanken;
-    const aH = pJ.attackerHand;
-    const tH = pJ.targetHand;
+    const aH = pJ.attackerHand; const tH = pJ.targetHand;
     
     let result = 'draw';
     if (aH === tH) result = 'draw';
@@ -1462,37 +1205,30 @@ window.resolveJanken = function() {
 
     setTimeout(() => {
         let drawCount = 0;
-        if (result === 'win') {
-            drawCount = 2; 
-        } else if (result === 'lose' && pJ.loopCount === 0) {
-            drawCount = 2;
-        }
+        if (result === 'win') drawCount = 2; 
+        else if (result === 'lose' && pJ.loopCount === 0) drawCount = 2;
         
         if (drawCount > 0) {
-            window.AbilityEngine.applyDraw(window.game, pJ.targetId, drawCount, false);
+            try { window.AbilityEngine.applyDraw(window.game, pJ.targetId, drawCount, false); } catch(e){}
             const guides = [{ from: pJ.attackerId, to: pJ.targetId, text: 'じゃんけんドロー!', delay: 0 }];
             window.broadcastGameState(false, guides);
         }
 
         let someoneWon = false;
-        window.game.players.forEach(p => {
-            if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) {
-                window.checkWin(p.id); someoneWon = true;
-            }
-        });
+        window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
 
         if (!someoneWon) {
             const nextLoop = pJ.loopCount + 1;
-            const aId = pJ.attackerId;
-            const tId = pJ.targetId; 
-            window.pendingJanken = null;
-            window.broadcastGameState();
+            const aId = pJ.attackerId; const tId = pJ.targetId; 
+            window.pendingJanken = null; window.broadcastGameState();
 
             if (result === 'win' && nextLoop < 4) {
                 setTimeout(() => window.startJankenPhase(aId, nextLoop), 1000);
             } else if (result === 'draw') {
                 setTimeout(() => window.startJankenPhase(aId, pJ.loopCount, tId), 1000);
             } else {
+                // ★修正3: じゃんけん終了後も確実にターンを進める
+                window.game.nextTurn(1);
                 setTimeout(() => window.checkTurn(), 1000);
             }
         }
@@ -1510,39 +1246,27 @@ window.showJankenUI = function(attackerId, targetId, loopCount) {
         if (window.SE) window.SE.play('hv/id_26');
     }
 
-    overlay.classList.remove('result-showing');
-    overlay.classList.remove('hidden');
+    overlay.classList.remove('result-showing'); overlay.classList.remove('hidden');
     
-    const title = document.getElementById('janken-title');
-    const subtitle = document.getElementById('janken-subtitle');
-    const p1Name = document.getElementById('janken-p1-name');
-    const p2Name = document.getElementById('janken-p2-name');
-    const p1Card = document.getElementById('janken-p1-card');
-    const p2Card = document.getElementById('janken-p2-card');
-    const p1Res = document.getElementById('janken-p1-result');
-    const p2Res = document.getElementById('janken-p2-result');
+    const title = document.getElementById('janken-title'); const subtitle = document.getElementById('janken-subtitle');
+    const p1Name = document.getElementById('janken-p1-name'); const p2Name = document.getElementById('janken-p2-name');
+    const p1Card = document.getElementById('janken-p1-card'); const p2Card = document.getElementById('janken-p2-card');
+    const p1Res = document.getElementById('janken-p1-result'); const p2Res = document.getElementById('janken-p2-result');
     const controls = document.getElementById('janken-controls');
     
     if (title) title.innerText = `じゃんけん 勝負！`;
     if (subtitle) subtitle.innerText = `運命の三姉妹 (Loop: ${loopCount+1}/4)`;
     
-    const aP = window.game.players.find(p=>p.id===attackerId);
-    const tP = window.game.players.find(p=>p.id===targetId);
-    if (p1Name) p1Name.innerText = aP ? aP.name : 'Attacker';
-    if (p2Name) p2Name.innerText = tP ? tP.name : 'Target';
+    const aP = window.game.players.find(p=>p.id===attackerId); const tP = window.game.players.find(p=>p.id===targetId);
+    if (p1Name) p1Name.innerText = aP ? aP.name : 'Attacker'; if (p2Name) p2Name.innerText = tP ? tP.name : 'Target';
     
     if (p1Card) { p1Card.src = window.JANKEN_BACK_IMG; p1Card.style.borderTop = '10px solid transparent'; }
     if (p2Card) { p2Card.src = window.JANKEN_BACK_IMG; p2Card.style.borderTop = '10px solid transparent'; }
-    if (p1Res) p1Res.innerText = ''; 
-    if (p2Res) p2Res.innerText = '';
+    if (p1Res) p1Res.innerText = ''; if (p2Res) p2Res.innerText = '';
     
     if (controls) {
-        if (window.myId === attackerId || window.myId === targetId) {
-            controls.style.display = 'flex';
-        } else {
-            controls.style.display = 'none';
-            if (title) title.innerText = "じゃんけん観戦中...";
-        }
+        if (window.myId === attackerId || window.myId === targetId) { controls.style.display = 'flex'; } 
+        else { controls.style.display = 'none'; if (title) title.innerText = "じゃんけん観戦中..."; }
     }
 };
 
@@ -1550,15 +1274,11 @@ window.playJankenResult = function(attackerId, targetId, aH, tH, result) {
     const overlay = document.getElementById('janken-overlay');
     if (overlay) overlay.classList.add('result-showing'); 
 
-    const p1Card = document.getElementById('janken-p1-card');
-    const p2Card = document.getElementById('janken-p2-card');
-    const p1Res = document.getElementById('janken-p1-result');
-    const p2Res = document.getElementById('janken-p2-result');
-    const controls = document.getElementById('janken-controls');
-    const title = document.getElementById('janken-title');
+    const p1Card = document.getElementById('janken-p1-card'); const p2Card = document.getElementById('janken-p2-card');
+    const p1Res = document.getElementById('janken-p1-result'); const p2Res = document.getElementById('janken-p2-result');
+    const controls = document.getElementById('janken-controls'); const title = document.getElementById('janken-title');
     
-    if (controls) controls.style.display = 'none';
-    if (title) title.innerText = "結果発表！";
+    if (controls) controls.style.display = 'none'; if (title) title.innerText = "結果発表！";
     
     if (p1Card) {
         p1Card.src = `card/custom/jyanken${aH}.png`;
@@ -1574,17 +1294,13 @@ window.playJankenResult = function(attackerId, targetId, aH, tH, result) {
         if (p1Card) p1Card.style.borderTop = '10px solid #fbc02d';
         if (p2Res) { p2Res.innerText = 'Lose'; p2Res.style.color = '#7e57c2'; }
         if (p2Card) p2Card.style.borderTop = '10px solid #7e57c2';
-        
-        if (window.myId === attackerId) { if(window.SE) window.SE.play('win'); }
-        else if (window.myId === targetId) { if(window.SE) window.SE.play('win2'); }
-
+        if (window.myId === attackerId) { if(window.SE) window.SE.play('win'); } else if (window.myId === targetId) { if(window.SE) window.SE.play('win2'); }
     } else if (result === 'lose') {
         if (p1Res) { p1Res.innerText = 'Lose'; p1Res.style.color = '#7e57c2'; }
         if (p1Card) p1Card.style.borderTop = '10px solid #7e57c2';
         if (p2Res) { p2Res.innerText = 'Win'; p2Res.style.color = '#fbc02d'; }
         if (p2Card) p2Card.style.borderTop = '10px solid #fbc02d';
-        if (window.myId === targetId) { if(window.SE) window.SE.play('win'); }
-        else if (window.myId === attackerId) { if(window.SE) window.SE.play('win2'); }
+        if (window.myId === targetId) { if(window.SE) window.SE.play('win'); } else if (window.myId === attackerId) { if(window.SE) window.SE.play('win2'); }
     } else {
         if (p1Res) { p1Res.innerText = 'Draw'; p1Res.style.color = '#aaa'; }
         if (p1Card) p1Card.style.borderTop = '10px solid #aaa';
@@ -1612,22 +1328,16 @@ window.checkTurn = function() {
             if (result.action === 'play') {
                 const playedCards = result.indices.map(i => window.game.hands[current.id][i]);
                 const isAbility = playedCards[0] && playedCards[0].value && String(playedCards[0].value).startsWith('id_');
-                
                 const def = isAbility && window.AbilityDef ? window.AbilityDef[playedCards[0].value] : null;
 
                 if (isAbility && def && def.type === 'BL') {
                     window.socket.emit('request_play_animation', { playerId: current.id, cards: playedCards });
-                    setTimeout(() => {
-                        window.executeAbilityPlay(current.id, result.indices, null, null, null, [], {});
-                    }, playedCards.length * 100 + 400);
+                    setTimeout(() => { window.executeAbilityPlay(current.id, result.indices, null, null, null, [], {}); }, playedCards.length * 100 + 400);
                     return;
                 }
 
                 let willDiscard = (isAbility && def && (def.needsDiscard || def.needsAbilityDiscard)) ? 1 : 0;
-                
-                let botSelectedColor = null;
-                let botMultiDiscardIndices = [];
-                let botDiscardIdx = null;
+                let botSelectedColor = null; let botMultiDiscardIndices = []; let botDiscardIdx = null;
 
                 if (isAbility && def) {
                     if (def.needsColor) botSelectedColor = ['red', 'blue', 'green', 'yellow'][Math.floor(Math.random() * 4)];
@@ -1642,20 +1352,15 @@ window.checkTurn = function() {
                     }
                     if (playedCards[0].value === 'id_20' && botSelectedColor) {
                         const bHand = window.game.hands[current.id];
-                        bHand.forEach((c, i) => {
-                            if (!result.indices.includes(i) && c.color === botSelectedColor) botMultiDiscardIndices.push(i);
-                        });
+                        bHand.forEach((c, i) => { if (!result.indices.includes(i) && c.color === botSelectedColor) botMultiDiscardIndices.push(i); });
                         willDiscard += botMultiDiscardIndices.length;
                     }
                 }
 
                 const remainingCards = window.game.hands[current.id].length - playedCards.length - willDiscard;
-                
                 if (remainingCards === 1 || remainingCards === 0) window.socket.emit('declare_uno', { id: current.id, name: current.name });
                 
                 window.socket.emit('request_play_animation', { playerId: current.id, cards: playedCards });
-                const delay = playedCards.length * 100 + 400;
-                
                 setTimeout(() => {
                     if (isAbility) {
                         let botTargetId = null;
@@ -1663,7 +1368,6 @@ window.checkTurn = function() {
                             const others = window.game.players.filter(p=>p.id!==current.id);
                             if(others.length>0) botTargetId = others[Math.floor(Math.random()*others.length)].id;
                         }
-                        
                         let extraData = {};
                         if (def && def.needsGraveyard) {
                             const gyList = window.game.abilityGraveyard.filter(id => window.AbilityDef[id] && window.AbilityDef[id].rarity !== 'UR');
@@ -1674,12 +1378,9 @@ window.checkTurn = function() {
                             if (p && p.frozen) extraData.debuffToClear = 'frozen';
                             else if (p && p.burnTurns > 0) extraData.debuffToClear = 'burn';
                         }
-
                         window.executeAbilityPlay(current.id, result.indices, botTargetId, botDiscardIdx, botSelectedColor, botMultiDiscardIndices, extraData);
-                    } else {
-                        window.executePlay(current.id, result.indices, true);
-                    }
-                }, delay);
+                    } else { window.executePlay(current.id, result.indices, true); }
+                }, playedCards.length * 100 + 400);
             } else {
                 const drawCount = result.count || 1;
                 window.socket.emit('request_draw_animation', { playerId: current.id, count: drawCount });
@@ -1702,21 +1403,16 @@ window.checkTurn = function() {
                     if (result.action === 'play') {
                         const playedCards = result.indices.map(i => window.game.hands[current.id][i]);
                         const isAbility = playedCards[0] && playedCards[0].value && String(playedCards[0].value).startsWith('id_');
-                        
                         const def = isAbility && window.AbilityDef ? window.AbilityDef[playedCards[0].value] : null;
 
                         if (isAbility && def && def.type === 'BL') {
                             window.socket.emit('request_play_animation', { playerId: current.id, cards: playedCards });
-                            setTimeout(() => {
-                                window.executeAbilityPlay(current.id, result.indices, null, null, null, [], {});
-                            }, playedCards.length * 100 + 400);
+                            setTimeout(() => { window.executeAbilityPlay(current.id, result.indices, null, null, null, [], {}); }, playedCards.length * 100 + 400);
                             return;
                         }
 
                         let willDiscard = (isAbility && def && (def.needsDiscard || def.needsAbilityDiscard)) ? 1 : 0;
-                        let botSelectedColor = null;
-                        let botMultiDiscardIndices = [];
-                        let botDiscardIdx = null;
+                        let botSelectedColor = null; let botMultiDiscardIndices = []; let botDiscardIdx = null;
 
                         if (isAbility && def) {
                             if (def.needsColor) botSelectedColor = ['red', 'blue', 'green', 'yellow'][Math.floor(Math.random() * 4)];
@@ -1731,15 +1427,12 @@ window.checkTurn = function() {
                             }
                             if (playedCards[0].value === 'id_20' && botSelectedColor) {
                                 const bHand = window.game.hands[current.id];
-                                bHand.forEach((c, i) => {
-                                    if (!result.indices.includes(i) && c.color === botSelectedColor) botMultiDiscardIndices.push(i);
-                                });
+                                bHand.forEach((c, i) => { if (!result.indices.includes(i) && c.color === botSelectedColor) botMultiDiscardIndices.push(i); });
                                 willDiscard += botMultiDiscardIndices.length;
                             }
                         }
 
                         const remainingCards = window.game.hands[current.id].length - playedCards.length - willDiscard;
-                        
                         if (remainingCards === 1 || remainingCards === 0) window.socket.emit('declare_uno', { id: current.id, name: current.name });
                         
                         window.socket.emit('request_play_animation', { playerId: current.id, cards: playedCards });
@@ -1750,7 +1443,6 @@ window.checkTurn = function() {
                                     const others = window.game.players.filter(p=>p.id!==current.id);
                                     if(others.length>0) botTargetId = others[Math.floor(Math.random()*others.length)].id;
                                 }
-
                                 let extraData = {};
                                 if (def && def.needsGraveyard) {
                                     const gyList = window.game.abilityGraveyard.filter(id => window.AbilityDef[id] && window.AbilityDef[id].rarity !== 'UR');
@@ -1761,7 +1453,6 @@ window.checkTurn = function() {
                                     if (p && p.frozen) extraData.debuffToClear = 'frozen';
                                     else if (p && p.burnTurns > 0) extraData.debuffToClear = 'burn';
                                 }
-
                                 window.executeAbilityPlay(current.id, result.indices, botTargetId, botDiscardIdx, botSelectedColor, botMultiDiscardIndices, extraData);
                             } else window.executePlay(current.id, result.indices, true);
                         }, playedCards.length * 100 + 400);
@@ -1778,7 +1469,6 @@ window.checkTurn = function() {
 
 window.executePlay = function(playerId, indices, isBot = false) {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
-    
     clearInterval(window.turnTimer); 
     if(window.playerAfkTimes) window.playerAfkTimes[playerId] = 0; 
     
@@ -1790,14 +1480,10 @@ window.executePlay = function(playerId, indices, isBot = false) {
     }
     
     if (result.success) {
-        let guides = [];
-        let isDrawAttack = false;
-        let attackCardVal = null;
-        let targetId = null;
+        let guides = []; let isDrawAttack = false; let attackCardVal = null; let targetId = null;
 
         if (result.lastCard && (result.lastCard.value === '+2' || result.lastCard.value === 'Wild+4')) {
-            attackCardVal = result.lastCard.value;
-            isDrawAttack = true;
+            attackCardVal = result.lastCard.value; isDrawAttack = true;
         }
 
         if (window.checkWin(playerId)) return;
@@ -1805,22 +1491,18 @@ window.executePlay = function(playerId, indices, isBot = false) {
 
         if (result.needsColor) {
             if (isDrawAttack) {
-                if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length === 0) {
-                    // 何もしない
-                } else {
+                if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length > 0) {
                     window.pendingDrawDefenseInfo = { attackerId: playerId, cardValue: attackCardVal };
                 }
             }
             if (isBot) { 
                 window.game.currentColor = ['red', 'blue', 'green', 'yellow'][Math.floor(Math.random() * 4)]; 
                 window.executeColor(playerId, window.game.currentColor); 
-            } 
-            else if (playerId === window.game.myId) { 
+            } else if (playerId === window.game.myId) { 
                 const roomStr = window.currentRoomState ? ` - 部屋ID:${window.currentRoomState.id}` : "";
                 document.getElementById('status-message').innerText = `色を選択してください${roomStr}`; 
                 ColorUI.show(); window.broadcastGameState(false, guides); 
-            } 
-            else { 
+            } else { 
                 const roomStr = window.currentRoomState ? ` - 部屋ID:${window.currentRoomState.id}` : "";
                 document.getElementById('status-message').innerText = `色選択中...${roomStr}`; 
                 window.socket.emit('request_color_select', playerId); window.broadcastGameState(false, guides); 
@@ -1832,12 +1514,10 @@ window.executePlay = function(playerId, indices, isBot = false) {
                 if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length > 0) {
                     window.startDrawDefensePhase(playerId, targetId, attackCardVal, guides);
                 } else {
-                    window.broadcastGameState(false, guides);
-                    window.checkTurn(); 
+                    window.broadcastGameState(false, guides); window.checkTurn(); 
                 }
             } else {
-                window.broadcastGameState(false, guides);
-                window.checkTurn(); 
+                window.broadcastGameState(false, guides); window.checkTurn(); 
             }
         }
     } else {
@@ -1847,7 +1527,6 @@ window.executePlay = function(playerId, indices, isBot = false) {
 
 window.executeColor = function(playerId, color) {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
-    
     if(window.playerAfkTimes) window.playerAfkTimes[playerId] = 0; 
     window.game.currentColor = color; 
     
@@ -1862,17 +1541,13 @@ window.executeColor = function(playerId, color) {
         if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length > 0) {
             window.startDrawDefensePhase(info.attackerId, targetId, info.cardValue, guides);
         } else {
-            window.broadcastGameState(false, guides);
-            window.checkTurn();
+            window.broadcastGameState(false, guides); window.checkTurn();
         }
-    } else {
-        window.checkTurn();
-    }
+    } else { window.checkTurn(); }
 };
 
 window.executeDraw = function(playerId, isBot = false) {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
-
     clearInterval(window.turnTimer);
     if(window.playerAfkTimes) window.playerAfkTimes[playerId] = 0;
     const stack = window.game.drawStack; const count = stack > 0 ? stack : 1;
@@ -1883,7 +1558,6 @@ window.executeDraw = function(playerId, isBot = false) {
 
 window.executeEndTurn = function(playerId) {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
-
     clearInterval(window.turnTimer);
     if(window.playerAfkTimes) window.playerAfkTimes[playerId] = 0; 
     window.game.nextTurn(1); window.checkTurn();
@@ -1959,10 +1633,8 @@ window.handlePlayAction = function() {
     const def = isAbility && window.AbilityDef ? window.AbilityDef[selectedCards[0].value] : null;
 
     if (isAbility && def && def.type === 'BL') {
-        const indicesToSend = [...window.game.selectedIndices]; 
-        const cardsToSend = [...selectedCards];
+        const indicesToSend = [...window.game.selectedIndices]; const cardsToSend = [...selectedCards];
         window.game.selectedIndices = []; window.updateUI();
-        
         window.animateSequentialPlay(indicesToSend, window.game, () => {
             if (window.isHost) {
                 if (window.socket) window.socket.emit('request_play_animation', { playerId: window.game.myId, cards: cardsToSend });
@@ -1978,7 +1650,6 @@ window.handlePlayAction = function() {
     if (!window.game.isMyTurn && !isAbility) {
         window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return;
     }
-    
     if (me.frozen && !isAbility) {
         alert("凍結中は能力カードしか使用できません！"); window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return;
     }
@@ -1993,7 +1664,6 @@ window.handlePlayAction = function() {
 
     let willDiscard = (isAbility && def && (def.needsDiscard || def.needsAbilityDiscard)) ? 1 : 0;
     const finalHandCount = window.game.myHand.length - selectedCards.length - willDiscard;
-
     const willBeActionFinishPenalty = (finalHandCount <= 0 && isAction && window.RuleSettings && !window.RuleSettings.allowActionFinish);
     const willBeAbilityFinishPenalty = (finalHandCount <= 0 && isAbility && window.RuleSettings && !window.RuleSettings.allowAbilityFinish);
     
@@ -2001,13 +1671,8 @@ window.handlePlayAction = function() {
         let penaltyCount = window.RuleSettings.unoPenalty || 2;
         let penaltyMsg = "UNO宣言忘れ！";
         
-        if (willBeActionFinishPenalty) {
-            penaltyCount = window.RuleSettings.actionFinishPenalty || 3;
-            penaltyMsg = "記号上がり禁止！";
-        } else if (willBeAbilityFinishPenalty) {
-            penaltyCount = window.RuleSettings.abilityFinishPenalty || 3;
-            penaltyMsg = "能力上がり禁止！";
-        }
+        if (willBeActionFinishPenalty) { penaltyCount = window.RuleSettings.actionFinishPenalty || 3; penaltyMsg = "記号上がり禁止！"; } 
+        else if (willBeAbilityFinishPenalty) { penaltyCount = window.RuleSettings.abilityFinishPenalty || 3; penaltyMsg = "能力上がり禁止！"; }
 
         window.game.selectedIndices = []; window.updateUI(); 
         alert(`${penaltyMsg} ペナルティとして ${penaltyCount}枚ドローします！`); 
@@ -2017,9 +1682,7 @@ window.handlePlayAction = function() {
             if (window.SE) window.SE.playMultiple('Distribute', penaltyCount, 500);
             if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
                 CardAnimation.animateMultiDraw(penaltyCount, 'player-hand', () => {
-                    window.isDrawing = false;
-                    window.isProcessingPlay = false; 
-                    window.game.selectedIndices = []; window.updateUI();
+                    window.isDrawing = false; window.isProcessingPlay = false; window.game.selectedIndices = []; window.updateUI();
                     if (window.isHost) {
                         if(window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: penaltyCount });
                         for(let i=0; i<penaltyCount; i++) window.game.drawCard(window.game.myId);
@@ -2030,9 +1693,7 @@ window.handlePlayAction = function() {
                     }
                 });
             } else {
-                window.isDrawing = false;
-                window.isProcessingPlay = false; 
-                window.game.selectedIndices = []; window.updateUI();
+                window.isDrawing = false; window.isProcessingPlay = false; window.game.selectedIndices = []; window.updateUI();
                 if (window.isHost) {
                     if(window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: penaltyCount });
                     for(let i=0; i<penaltyCount; i++) window.game.drawCard(window.game.myId);
@@ -2049,13 +1710,11 @@ window.handlePlayAction = function() {
     const shouldAutoUno = window.RuleSettings && window.RuleSettings.unoAuto && (finalHandCount === 1 || finalHandCount === 0) && !window.game.unoDeclared;
     if (shouldAutoUno) window.declareUno();
 
-    const indices = [...window.game.selectedIndices];
-    const playedCards = indices.map(i => window.game.myHand[i]);
+    const indices = [...window.game.selectedIndices]; const playedCards = indices.map(i => window.game.myHand[i]);
 
     if (isAbility) {
         let targetId = null; let discardIdx = null; let selColor = null; let multiDiscardIndices = [];
-        let debuffToClear = null; let graveyardCardId = null;
-        let extraData = {};
+        let debuffToClear = null; let graveyardCardId = null; let extraData = {};
 
         const finishAbilityPlay = () => {
             window.game.selectedIndices = []; window.updateUI();
@@ -2079,11 +1738,8 @@ window.handlePlayAction = function() {
         const step6 = () => {
             if (def && def.needsGraveyard) {
                 window.openGraveyardSelection((selectedId) => {
-                    if (selectedId === false) { 
-                        window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; 
-                    }
-                    graveyardCardId = selectedId;
-                    finishAbilityPlay();
+                    if (selectedId === false) { window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; }
+                    graveyardCardId = selectedId; finishAbilityPlay();
                 });
             } else { finishAbilityPlay(); }
         }
@@ -2092,8 +1748,7 @@ window.handlePlayAction = function() {
         const stepRaia = () => {
             if (cardValue === 'id_33' && !me.usedRaia) {
                 if (confirm("ライアの効果により、次の自分のターン開始時にこのカードを手札に戻しますか？\n(各ターン1回のみ)")) {
-                    extraData.returnRaia = true;
-                    me.usedRaia = true; 
+                    extraData.returnRaia = true; me.usedRaia = true; 
                 }
             }
             step6();
@@ -2101,45 +1756,30 @@ window.handlePlayAction = function() {
 
         const step5 = () => {
             if (def && def.needsDebuffSelect && me.frozen && me.burnTurns > 0) {
-                window.openDebuffSelection((selected) => {
-                    debuffToClear = selected;
-                    stepRaia();
-                });
+                window.openDebuffSelection((selected) => { debuffToClear = selected; stepRaia(); });
             } else if (def && def.needsDebuffSelect) {
-                if (me.frozen) debuffToClear = 'frozen';
-                else if (me.burnTurns > 0) debuffToClear = 'burn';
+                if (me.frozen) debuffToClear = 'frozen'; else if (me.burnTurns > 0) debuffToClear = 'burn';
                 stepRaia();
-            } else {
-                stepRaia();
-            }
+            } else { stepRaia(); }
         };
 
         const step4 = () => {
             if (def && cardValue === 'id_20' && selColor) {
                 const validIndices = [];
-                window.game.myHand.forEach((c, i) => {
-                    if (!indices.includes(i) && i !== discardIdx && c.color === selColor) validIndices.push(i);
-                });
+                window.game.myHand.forEach((c, i) => { if (!indices.includes(i) && i !== discardIdx && c.color === selColor) validIndices.push(i); });
                 if (validIndices.length > 0) {
-                    window.openMultiDiscardSelection(window.game.myHand, validIndices, (selectedMulti) => {
-                        multiDiscardIndices = selectedMulti;
-                        step5();
-                    });
+                    window.openMultiDiscardSelection(window.game.myHand, validIndices, (selectedMulti) => { multiDiscardIndices = selectedMulti; step5(); });
                 } else { step5(); }
             } else { step5(); }
         };
 
         const step3 = () => {
-            if (def && def.needsColor) {
-                ColorUI.show((color) => { selColor = color; step4(); });
-            } else { step4(); }
+            if (def && def.needsColor) { ColorUI.show((color) => { selColor = color; step4(); }); } else { step4(); }
         };
 
         const step2 = () => {
             if (def && (def.needsDiscard || def.needsAbilityDiscard)) {
-                window.openDiscardSelection(window.game.myHand, indices, def, (idx) => { 
-                    discardIdx = idx; step3(); 
-                });
+                window.openDiscardSelection(window.game.myHand, indices, def, (idx) => { discardIdx = idx; step3(); });
             } else { step3(); }
         };
 
@@ -2163,56 +1803,60 @@ window.handlePlayAction = function() {
 
 window.onColorChosen = function(color) { 
     ColorUI.hide(); 
-    if (ColorUI.callback) {
-        let cb = ColorUI.callback;
-        ColorUI.callback = null;
-        cb(color);
-    } else {
+    if (ColorUI.callback) { let cb = ColorUI.callback; ColorUI.callback = null; cb(color); } 
+    else {
         if (window.isHost) window.executeColor(window.game.myId, color); 
         else if (window.socket) window.socket.emit('player_action', { action: 'color', color: color }); 
     }
 };
 
-document.getElementById('draw-btn').onclick = () => {
+// ★修正1: 引くボタンの二重操作をロックで完全阻止
+document.getElementById('draw-btn').onclick = function() {
     if (window.pendingJanken || window.isDrawing || window.isProcessingPlay) return; 
     if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
     if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) return;
     
     window.isDrawing = true; 
+    this.style.pointerEvents = 'none'; // 物理的にもクリック不能にする
+    
     window.tryDrawWithAbility(() => {
         window.game.hasDrawnThisTurn = true; window.updateUI();                    
-        setTimeout(() => { window.isDrawing = false; }, 3000);
+        
         const s = window.game.drawStack; const count = s > 0 ? s : 1;
         if (window.SE) window.SE.playMultiple('Distribute', count, 500);
-        if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
-            CardAnimation.animateMultiDraw(count, 'player-hand', () => {
-                window.isDrawing = false; 
-                if (window.isHost) {
-                    if (window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: count }); 
-                    window.executeDraw(window.game.myId); 
-                } else if (window.socket) window.socket.emit('player_action', { action: 'draw', count: count });
-            });
-        } else {
+        
+        const finishDraw = () => {
             window.isDrawing = false; 
+            document.getElementById('draw-btn').style.pointerEvents = 'auto'; // ロック解除
             if (window.isHost) {
                 if (window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: count }); 
                 window.executeDraw(window.game.myId); 
             } else if (window.socket) window.socket.emit('player_action', { action: 'draw', count: count });
+        };
+
+        if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
+            CardAnimation.animateMultiDraw(count, 'player-hand', finishDraw);
+            setTimeout(() => { window.isDrawing = false; document.getElementById('draw-btn').style.pointerEvents = 'auto'; }, 3000);
+        } else {
+            finishDraw();
         }
     });
 };
 
-document.getElementById('end-turn-btn').onclick = () => {
+// ★修正1: ターン終了ボタンの二重操作をロックで完全阻止
+document.getElementById('end-turn-btn').onclick = function() {
     if (window.pendingJanken || window.isDrawing || window.isProcessingPlay) return; 
     if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
     
     window.isDrawing = true; 
+    this.style.pointerEvents = 'none';
+
     if (window.isHost) {
         window.executeEndTurn(window.game.myId); 
-        setTimeout(() => { window.isDrawing = false; }, 500);
+        setTimeout(() => { window.isDrawing = false; this.style.pointerEvents = 'auto'; }, 500);
     } else if (window.socket) {
         window.socket.emit('player_action', { action: 'end_turn' });
-        setTimeout(() => { window.isDrawing = false; }, 500);
+        setTimeout(() => { window.isDrawing = false; this.style.pointerEvents = 'auto'; }, 500);
     }
 };
 
@@ -2261,20 +1905,13 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initMainSocketEvents() {
-    // ★ 修正: 通信(socket)の準備ができるまで待機する安全処理
-    if (typeof window.socket === 'undefined') {
-        setTimeout(initMainSocketEvents, 100);
-        return;
-    }
+    if (typeof window.socket === 'undefined') { setTimeout(initMainSocketEvents, 100); return; }
 
     window.socket.on('update_game_state', (state) => {
         if (!window.game) return;
-        window.game.deck = state.deck; 
-        window.game.turnIndex = state.turnIndex; 
-        window.game.direction = state.direction; 
-        window.game.discardPile = state.discardPile;
-        window.game.discardRotations = state.discardRotations; 
-        window.game.drawStack = state.drawStack; 
+        window.game.deck = state.deck; window.game.turnIndex = state.turnIndex; 
+        window.game.direction = state.direction; window.game.discardPile = state.discardPile;
+        window.game.discardRotations = state.discardRotations; window.game.drawStack = state.drawStack; 
         window.game.currentColor = state.currentColor;
         if(state.hasDrawnThisTurn !== undefined) window.game.hasDrawnThisTurn = state.hasDrawnThisTurn;
         if(state.abilityGraveyard) window.game.abilityGraveyard = state.abilityGraveyard;
@@ -2285,13 +1922,9 @@ function initMainSocketEvents() {
             state.playersInfo.forEach(info => {
                 let p = window.game.players.find(x => x.id === info.id);
                 if (p) { 
-                    p.frozen = info.frozen; 
-                    p.burnTurns = info.burnTurns; 
-                    p.connected = info.connected;
-                    p.invincibleTurns = info.invincibleTurns || 0;
-                    p.shield = info.shield || { level: 0, turns: 0 };
-                    p.evasion = info.evasion || { level: 0, turns: 0 };
-                    p.usedRaia = info.usedRaia || false;
+                    p.frozen = info.frozen; p.burnTurns = info.burnTurns; p.connected = info.connected;
+                    p.invincibleTurns = info.invincibleTurns || 0; p.shield = info.shield || { level: 0, turns: 0 };
+                    p.evasion = info.evasion || { level: 0, turns: 0 }; p.usedRaia = info.usedRaia || false;
                     newPlayers.push(p);
                 }
             });
@@ -2299,23 +1932,16 @@ function initMainSocketEvents() {
         }
 
         if (window.isInitialDealing && !window.isHost) {
-            if (typeof window.animateInitialDeal === 'function') {
-                window.animateInitialDeal(state.hands, () => {});
-            } else {
-                window.isInitialDealing = false;
-                window.game.hands = state.hands;
-                if (typeof window.updateUI === 'function') window.updateUI();
-            }
+            if (typeof window.animateInitialDeal === 'function') window.animateInitialDeal(state.hands, () => {});
+            else { window.isInitialDealing = false; window.game.hands = state.hands; if (typeof window.updateUI === 'function') window.updateUI(); }
         } else if (!window.isInitialDealing) {
-            window.game.hands = state.hands;
-            if (typeof window.updateUI === 'function') window.updateUI(); 
+            window.game.hands = state.hands; if (typeof window.updateUI === 'function') window.updateUI(); 
         }
 
         const current = window.game.currentPlayer;
         const msgEl = document.getElementById('status-message');
-        if (window.isInitialDealing) {
-            msgEl.innerText = "カードを配っています...";
-        } else if (current) {
+        if (window.isInitialDealing) { msgEl.innerText = "カードを配っています..."; } 
+        else if (current) {
             const roomStr = window.currentRoomState ? ` - 部屋ID:${window.currentRoomState.id}` : "";
             msgEl.innerText = current.id === window.myId ? `あなたの番です${roomStr}` : `${current.name} のターン${roomStr}`;
         }
@@ -2323,15 +1949,10 @@ function initMainSocketEvents() {
         if (state.attackGuides && state.attackGuides.length > 0) {
             state.attackGuides.forEach(g => {
                 const delay = g.delay || 0;
-                setTimeout(() => {
-                    if (typeof window.showAttackGuide === 'function') window.showAttackGuide(g.from, g.to, g.text, g.se);
-                }, delay);
+                setTimeout(() => { if (typeof window.showAttackGuide === 'function') window.showAttackGuide(g.from, g.to, g.text, g.se); }, delay);
             });
         }
-
-        if (typeof window.updatePhaseUI === 'function') {
-            window.updatePhaseUI(state);
-        }
+        if (typeof window.updatePhaseUI === 'function') window.updatePhaseUI(state);
     });
 
     window.socket.on('broadcast_uno', (data) => {
@@ -2365,25 +1986,14 @@ function initMainSocketEvents() {
     });
 
     window.socket.on('back_to_lobby', (roomState) => {
-        window.currentRoomState = roomState;
-        window.isGameOver = false; window.isInitialDealing = false;
+        window.currentRoomState = roomState; window.isGameOver = false; window.isInitialDealing = false;
         document.getElementById('winner-banner').classList.remove('show');
         document.getElementById('draw-curtain').classList.remove('show');
         document.getElementById('game-container').classList.add('hidden'); 
         document.getElementById('lobby-screen').classList.remove('hidden');
-        
-        const manualBtn = document.getElementById('btn-manual');
-        if (manualBtn) manualBtn.classList.remove('hidden');
-
-        const cia = document.getElementById('chat-input-area');
-        if (cia) {
-            cia.style.display = 'none';
-            cia.classList.add('hidden');
-        }
-        
-        const lcia = document.getElementById('lobby-chat-container');
-        if (lcia && window.ChatManager && window.ChatManager.enabled) lcia.style.display = 'block';
-        
+        const manualBtn = document.getElementById('btn-manual'); if (manualBtn) manualBtn.classList.remove('hidden');
+        const cia = document.getElementById('chat-input-area'); if (cia) { cia.style.display = 'none'; cia.classList.add('hidden'); }
+        const lcia = document.getElementById('lobby-chat-container'); if (lcia && window.ChatManager && window.ChatManager.enabled) lcia.style.display = 'block';
         if (typeof renderSlots === 'function') renderSlots(roomState);
     });
 
@@ -2392,58 +2002,41 @@ function initMainSocketEvents() {
         const playerId = data.playerId;
         
         if (data.action === 'play') {
-            // ★ 追加: ホスト側でも、能力解決中は通常カードの割り込みをブロック
             if (window.pendingDefense || window.pendingJanken) return;
-
             window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards });
-            const delay = data.cards.length * 100 + 400;
-            setTimeout(() => {
-                if (typeof window.executePlay === 'function') window.executePlay(playerId, data.indices);
-            }, delay);
+            setTimeout(() => { if (typeof window.executePlay === 'function') window.executePlay(playerId, data.indices); }, data.cards.length * 100 + 400);
         } else if (data.action === 'play_ability') {
-            // ★ 追加: ホスト側でも、能力解決中は新規の能力割り込みをブロック
             if (window.pendingDefense || window.pendingJanken) return;
-
             window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards, isHV: data.isHV });
-            const delay = data.cards.length * 100 + 400;
-            setTimeout(() => {
-                if (typeof window.executeAbilityPlay === 'function') window.executeAbilityPlay(playerId, data.indices, data.targetId, data.discardIdx, data.selectedColor, data.multiDiscardIndices, data.extraData);
-            }, delay);
+            setTimeout(() => { if (typeof window.executeAbilityPlay === 'function') window.executeAbilityPlay(playerId, data.indices, data.targetId, data.discardIdx, data.selectedColor, data.multiDiscardIndices, data.extraData); }, data.cards.length * 100 + 400);
         } else if (data.action === 'defense_response') {
             if (window.pendingDefense && window.pendingDefense.responses) {
                 window.pendingDefense.responses[data.targetId] = { cardValue: data.cardValue || null, discardIdx: data.discardIdx !== undefined ? data.discardIdx : null };
                 if (window.pendingDefense.info && window.pendingDefense.info.targets) {
-                    const targetCount = window.pendingDefense.info.targets.length;
-                    const responseCount = Object.keys(window.pendingDefense.responses).length;
-                    if (responseCount >= targetCount) {
-                        window.pendingDefense.timer = 0;
-                    }
+                    if (Object.keys(window.pendingDefense.responses).length >= window.pendingDefense.info.targets.length) window.pendingDefense.timer = 0;
                 }
             }
         } else if (data.action === 'draw') {
             window.socket.emit('request_draw_animation', { playerId: playerId, count: data.count });
-            const delay = data.count * 100 + 400;
-            setTimeout(() => { if (typeof window.executeDraw === 'function') window.executeDraw(playerId); }, delay);
+            setTimeout(() => { if (typeof window.executeDraw === 'function') window.executeDraw(playerId); }, data.count * 100 + 400);
         } else if (data.action === 'end_turn') {
             if (typeof window.executeEndTurn === 'function') window.executeEndTurn(playerId);
         } else if (data.action === 'color') {
             if (typeof window.executeColor === 'function') window.executeColor(playerId, data.color);
         } else if (data.action === 'draw_penalty') {
             window.socket.emit('request_draw_animation', { playerId: playerId, count: data.count });
-            const delay = data.count * 100 + 400;
             setTimeout(() => {
                 if (typeof window.game !== 'undefined' && typeof window.game.drawCard === 'function') {
                     for(let i=0; i<data.count; i++) window.game.drawCard(playerId);
-                    if (typeof window.executeEndTurn === 'function') window.executeEndTurn(playerId); // ペナルティ後はターン終了
+                    if (typeof window.executeEndTurn === 'function') window.executeEndTurn(playerId); 
                 }
-            }, delay);
+            }, data.count * 100 + 400);
         } else if (data.action === 'ability_reset') {
             if (window.game && typeof window.game.replaceAbilityCards === 'function') {
                 window.game.replaceAbilityCards(playerId, data.cards);
                 if (typeof window.broadcastGameState === 'function') window.broadcastGameState(true);
             }
-        } 
-        else if (data.action === 'janken_choice') {
+        } else if (data.action === 'janken_choice') {
             if (window.pendingJanken && !window.pendingJanken.result) {
                 if (playerId === window.pendingJanken.attackerId) window.pendingJanken.attackerHand = data.choice;
                 if (playerId === window.pendingJanken.targetId) window.pendingJanken.targetHand = data.choice;
@@ -2462,21 +2055,11 @@ function initMainSocketEvents() {
     });
 
     window.socket.on('draw_animation', (data) => {
-        if (data.playerId !== window.myId) {
-            if (typeof window.drawOpponentAnimation === 'function') window.drawOpponentAnimation(data.playerId, data.count);
-        }
+        if (data.playerId !== window.myId) { if (typeof window.drawOpponentAnimation === 'function') window.drawOpponentAnimation(data.playerId, data.count); }
     });
 
-    window.socket.on('show_color_selector', () => {
-        if (typeof ColorUI !== 'undefined' && ColorUI.show) ColorUI.show();
-    });
-
-    window.socket.on('receive_chat', (data) => {
-        if (window.ChatManager && typeof window.ChatManager.showMsg === 'function') {
-            window.ChatManager.showMsg(data.message, data.senderName);
-        }
-    });
+    window.socket.on('show_color_selector', () => { if (typeof ColorUI !== 'undefined' && ColorUI.show) ColorUI.show(); });
+    window.socket.on('receive_chat', (data) => { if (window.ChatManager && typeof window.ChatManager.showMsg === 'function') window.ChatManager.showMsg(data.message, data.senderName); });
 }
 
-// 最後に処理を呼び出す
 initMainSocketEvents();
