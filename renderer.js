@@ -116,15 +116,16 @@ const Renderer = {
             if (p.evasion && p.evasion.turns > 0 && p.evasion.level > 0) statusIcons += `<span style="margin-right:3px;">💨${p.evasion.level}(${p.evasion.turns}T)</span>`;
             if (p.frozen) statusIcons += `<span style="margin-right:3px;">❄️(1T)</span>`;
             if (p.burnTurns > 0) statusIcons += `<span style="margin-right:3px;">🔥(${p.burnTurns}T)</span>`;
-            if (p.lacerationTurns > 0) {
-    statusStr += `💢${p.lacerationTurns}`;
-}
-if (p.resurrectionEveCount === 0 || p.resurrectionMisaCount === 0) {
-    statusStr += `🌟`; // 蘇生が未使用(待機中)であることを示すアイコン
-}
+            
             if (numLockCount > 0) statusIcons += `<span style="margin-right:3px;">🔒${numLockCount}(${numLockTurns}T)</span>`;
             if (symLockCount > 0) statusIcons += `<span style="margin-right:3px;">🗝️${symLockCount}(${symLockTurns}T)</span>`;
-
+            
+            if (p.lacerationTurns > 0) {
+            statusIcons += `<span style="margin-right:3px;">💢(${p.lacerationTurns}T)</span>`;
+            }
+            if (p.resurrectionEveCount === 0 || p.resurrectionMisaCount === 0) {
+                statusIcons += `<span style="margin-right:3px;">🌟</span>`;
+            }
             const badge = document.createElement('div');
             badge.className = `circle-player-badge other-player-badge ${isTurn ? 'active-turn' : ''} ${isPredictTurn ? 'predict-turn' : ''} ${isOffline ? 'offline' : ''} ${p.id === game.myId ? 'my-badge' : ''}`;
             badge.dataset.id = p.id; 
