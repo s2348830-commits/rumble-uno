@@ -877,32 +877,34 @@ window.handlePlayAction = function() {
         let penaltyCount = window.RuleSettings.unoPenalty || 2; let penaltyMsg = "UNO宣言忘れ！";
         if (willBeActionFinishPenalty) { penaltyCount = window.RuleSettings.actionFinishPenalty || 3; penaltyMsg = "記号上がり禁止！"; } 
         else if (willBeAbilityFinishPenalty) { penaltyCount = window.RuleSettings.abilityFinishPenalty || 3; penaltyMsg = "能力上がり禁止！"; }
+        
         window.game.selectedIndices = []; window.updateUI(); alert(`${penaltyMsg} ペナルティとして ${penaltyCount}枚ドローします！`); window.isDrawing = true; 
         
         const wasMyTurnLocal = window.game.isMyTurn;
 
         window.tryDrawWithAbility(() => {
+            // ★修正2: アニメーションの終了を待たず、即座にサーバーへペナルティ通信を送る！
+            if (window.isHost) { 
+                if(window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: penaltyCount }); 
+                for(let i=0; i<penaltyCount; i++) window.game.drawCard(window.game.myId); 
+                if(wasMyTurnLocal) window.executeEndTurn(window.game.myId); else window.broadcastGameState(true);
+            } 
+            else { 
+                window.waitingForServerResponse = true; 
+                if(window.socket) { window.socket.emit('player_action', { action: 'draw_penalty', count: penaltyCount, wasMyTurn: wasMyTurnLocal }); } 
+            }
+
+            // アニメーションは見た目だけ実行
             if (window.SE) window.SE.playMultiple('Distribute', penaltyCount, 500);
             if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
                 CardAnimation.animateMultiDraw(penaltyCount, 'player-hand', () => {
                     window.isDrawing = false; window.isProcessingPlay = false; window.game.selectedIndices = []; window.updateUI();
-                    if (window.isHost) { 
-                        if(window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: penaltyCount }); 
-                        for(let i=0; i<penaltyCount; i++) window.game.drawCard(window.game.myId); 
-                        if(wasMyTurnLocal) window.executeEndTurn(window.game.myId); else window.broadcastGameState(true);
-                    } 
-                    else { window.waitingForServerResponse = true; if(window.socket) { window.socket.emit('player_action', { action: 'draw_penalty', count: penaltyCount, wasMyTurn: wasMyTurnLocal }); } }
                 });
             } else {
                 window.isDrawing = false; window.isProcessingPlay = false; window.game.selectedIndices = []; window.updateUI();
-                if (window.isHost) { 
-                    if(window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: penaltyCount }); 
-                    for(let i=0; i<penaltyCount; i++) window.game.drawCard(window.game.myId); 
-                    if(wasMyTurnLocal) window.executeEndTurn(window.game.myId); else window.broadcastGameState(true);
-                } 
-                else { window.waitingForServerResponse = true; if(window.socket) { window.socket.emit('player_action', { action: 'draw_penalty', count: penaltyCount, wasMyTurn: wasMyTurnLocal }); } }
             }
-        }); return; 
+        }); 
+        return; 
     }
 
     if (window.RuleSettings && window.RuleSettings.unoAuto && (finalHandCount === 1 || finalHandCount === 0) && !window.game.unoDeclared) window.declareUno();
@@ -958,11 +960,13 @@ document.getElementById('draw-btn').onclick = () => {
     window.isDrawing = true; 
     window.waitingForServerResponse = true;
     
+    // ★修正1: クリックした瞬間に物理的にボタンを隠し、二重クリックを防止
+    document.getElementById('draw-btn').classList.add('hidden');
+    
     window.tryDrawWithAbility(() => {
         const s = window.game.drawStack; const count = s > 0 ? s : 1;
         
-        // ★修正: アニメーションの終了を待たず、即座にサーバーに通信を送る！
-        // これにより、途中で同期が来て画面が再描画されても進行が止まらなくなります。
+        // ★通信を即座に行う
         if (window.isHost) {
             if (window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: count });
             window.executeDraw(window.game.myId);
@@ -972,7 +976,6 @@ document.getElementById('draw-btn').onclick = () => {
 
         if (window.SE) window.SE.playMultiple('Distribute', count, 500);
 
-        // アニメーションはあくまで「見た目」としてだけ動かす
         if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
             CardAnimation.animateMultiDraw(count, 'player-hand', () => {
                 window.isDrawing = false;
@@ -981,7 +984,6 @@ document.getElementById('draw-btn').onclick = () => {
             window.isDrawing = false;
         }
         
-        // サーバーからの同期が遅れた場合のための保険ロック解除
         setTimeout(() => { window.waitingForServerResponse = false; }, 2000);
     });
 };
