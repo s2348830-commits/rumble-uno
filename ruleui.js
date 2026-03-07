@@ -284,7 +284,7 @@ if (typeof window.RuleSettings === 'undefined') {
             const items = grid.querySelectorAll('.custom-card-item');
             items.forEach(item => {
                 const id = item.dataset.id;
-                const maxCount = (id === 'id_20' || id === 'id_25' || id === 'id_26') ? 1 : 4;
+                const maxCount = (id === 'id_20' || id === 'id_25' || id === 'id_26' || id === 'id_35') ? 1 : 4;
                 const count = this.customCards.filter(c => c === id).length;
                 item.dataset.count = count;
                 const countSpan = item.querySelector('.custom-card-count');
