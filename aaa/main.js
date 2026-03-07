@@ -228,16 +228,14 @@ window.applyWildColorOverlay = function() {
                 const overlay = document.createElement('div');
                 overlay.className = 'wild-color-overlay';
                 
+                // ロック(レイやシャミール)のように、カード全体を半透明の色でベタ塗りする
                 let baseColor = 'rgba(255, 255, 255, 0.5)';
-                let borderColor = 'white';
-                if (window.game.currentColor === 'red') { baseColor = 'rgba(211, 47, 47, 0.6)'; borderColor = '#ff5252'; }
-                else if (window.game.currentColor === 'blue') { baseColor = 'rgba(25, 118, 210, 0.6)'; borderColor = '#448aff'; }
-                else if (window.game.currentColor === 'green') { baseColor = 'rgba(56, 142, 60, 0.6)'; borderColor = '#69f0ae'; }
-                else if (window.game.currentColor === 'yellow') { baseColor = 'rgba(251, 192, 45, 0.6)'; borderColor = '#ffff00'; }
+                if (window.game.currentColor === 'red') baseColor = 'rgba(211, 47, 47, 0.6)';
+                else if (window.game.currentColor === 'blue') baseColor = 'rgba(25, 118, 210, 0.6)';
+                else if (window.game.currentColor === 'green') baseColor = 'rgba(56, 142, 60, 0.6)';
+                else if (window.game.currentColor === 'yellow') baseColor = 'rgba(251, 192, 45, 0.6)';
                 
                 overlay.style.backgroundColor = baseColor;
-                overlay.style.boxShadow = `0 0 15px ${borderColor}`;
-                overlay.style.border = `3px solid ${borderColor}`;
                 
                 topCardEl.style.position = 'relative';
                 topCardEl.appendChild(overlay);
@@ -1590,7 +1588,6 @@ window.resolveJanken = function() {
             } else {
                 window.pendingJanken = null;
                 window.broadcastGameState();
-                window.game.nextTurn(1);
                 setTimeout(() => window.checkTurn(), 1000);
             }
         }
@@ -1647,7 +1644,7 @@ window.playJankenResult = function(attackerId, targetId, aH, tH, result) {
     if (result === 'win' || result === 'draw') {
         setTimeout(() => {
             if (window.SE) window.SE.play('hv/id_25');
-        }, 500);
+        }, 1000);
     }
 
     const p1Card = document.getElementById('janken-p1-card');
