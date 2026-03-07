@@ -2467,20 +2467,24 @@ function initMainSocketEvents() {
                 }
             }
         } else if (data.action === 'draw') {
-            // 【完全ガード】 他の処理中、またはターンが違う場合は弾く
+            // 【完全ガード】 その人のターンじゃなければ無視！
             if (!current || current.id !== playerId) return;
-            if (window.isProcessingPlay) return; // ★ 演出待ちの隙間を埋めるロック
-            if (window.game.hasDrawnThisTurn && window.game.drawStack === 0) return;
+            if (window.isProcessingPlay) return; 
+            
+            // ★超重要修正：スタックの有無や状況に関わらず、ドロー要求は「1ターンに絶対に1回だけ」受け付ける！
+            if (window.game.hasDrawnThisTurn) return;
 
-            // ★命令を受信した「瞬間」に処理中フラグを立てて、2回目の割り込みを100%防ぐ！
+            // ★命令を受信した「瞬間」にフラグを立てて心のシャッターを閉じ、2回目の通信を完全ブロック！
             window.isProcessingPlay = true;
-            if (window.game.drawStack === 0) window.game.hasDrawnThisTurn = true;
+            window.game.hasDrawnThisTurn = true;
 
             window.socket.emit('request_draw_animation', { playerId: playerId, count: data.count });
-            const delay = data.count * 100 + 400;
+            
+            // 安全対策：もし不正な通信が来ても最低1枚として扱う
+            const safeCount = (typeof data.count === 'number' && data.count > 0) ? data.count : 1;
+            const delay = safeCount * 100 + 400;
             
             setTimeout(() => { 
-                // アニメーション完了後にロックを解除して実際にカードを引かせる
                 window.isProcessingPlay = false;
                 if (typeof window.executeDraw === 'function') window.executeDraw(playerId); 
             }, delay);
