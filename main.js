@@ -497,10 +497,7 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
             let guides = []; if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, responses, multiplier, selectedColor, multiCards, extraData);
             guides.forEach(g => { if(g.delay === undefined) g.delay = 2500; }); 
             let someoneWon = false; window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
-            if (!someoneWon) { 
-                window.broadcastGameState(false, guides); 
-                if(wasMyTurn) { setTimeout(() => window.checkTurn(), 500); } 
-            } else { window.broadcastGameState(false, guides); }
+            window.broadcastGameState(false, guides); 
             return;
         }
 
@@ -533,7 +530,7 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
                                 if (discCard.value && String(discCard.value).startsWith('id_')) { window.game.abilityGraveyard.push(discCard.value); } else { window.game.discardPile.push(discCard); window.game.discardRotations.push(0); }
                             }
                             const def = window.AbilityDef[defCardId];
-                            if (defCardId === 'id_2') { window.game.players.filter(px => px.id !== tid).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); }); const targetP = window.game.players.find(p=>p.id===targetId); if(targetP) targetP.shield = { level: 1, turns: 1 }; if (Math.random() < 0.6) { window.game.players.filter(px => px.id !== tid).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); }); } }
+                            if (defCardId === 'id_2') { window.game.players.filter(px => px.id !== targetId).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); }); const targetP = window.game.players.find(p=>p.id===targetId); if(targetP) targetP.shield = { level: 1, turns: 1 }; if (Math.random() < 0.6) { window.game.players.filter(px => px.id !== targetId).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); }); } }
                             else if (defCardId === 'id_4') { if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) { window.AbilityEngine.triggerDiscardEffect(window.game, tid, 'id_4', false, null); } }
                             else if (defCardId === 'id_9') { window.game.players.filter(px => px.id !== tid).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 2); }); }
                             else if (defCardId === 'id_18') { window.game.players.filter(px => px.id !== tid).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); }); const targetP = window.game.players.find(p=>p.id===targetId); if(targetP) targetP.shield = { level: 1, turns: 2 }; }
@@ -788,7 +785,7 @@ window.tryDrawWithAbility = function(callback) {
 window.handlePlayAction = function() {
     if (window.game.selectedIndices.length === 0 || window.isGameOver || window.isInitialDealing || window.isDrawing) return;
     
-    if (window.isAnimating || window.waitingForServerResponse || window.pendingJanken || window.pendingDefense || window.currentDefensePhaseId || window.isDefending || window.isProcessingPlay) {
+    if (window.waitingForServerResponse || window.pendingJanken || window.pendingDefense || window.currentDefensePhaseId || window.isDefending || window.isProcessingPlay) {
         alert("現在、通信または効果処理中です。解決するまでお待ちください。"); window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return;
     }
     
@@ -975,7 +972,15 @@ function initMainSocketEvents() {
             window.isDefending = false;
             window.currentDefensePhaseId = null;
             window.hasRespondedDefense = false;
-            window.isAnimating = false; // アニメーションのスタックも強制解除
+            window.isAnimating = false; 
+            window.pendingJanken = null;
+            window.pendingDefense = null;
+            
+            // ダイアログが開いていないなら isProcessingPlay も強制解除
+            const isChoosing = document.querySelector('.action-popup:not(.hidden)');
+            if (!isChoosing) {
+                window.isProcessingPlay = false;
+            }
         } else {
             window.isServerProcessingAbility = true;
         }
