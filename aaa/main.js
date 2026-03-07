@@ -180,23 +180,17 @@ window.showAbilityResetUI = function(maxCount) {
 };
 
 window.animateInitialDeal = function(targetHands, callback) {
-    if (window.isDealAnimationRunning) return;
-    window.isDealAnimationRunning = true;
+    if (window.isDealAnimationRunning) return; window.isDealAnimationRunning = true;
     const playerIds = window.game.players.map(p => p.id); window.game.hands = {}; playerIds.forEach(id => { window.game.hands[id] = []; }); window.updateUI(); 
     const deckEl = document.getElementById('deck-visual'); 
     if (!deckEl) { window.isDealAnimationRunning = false; window.game.hands = JSON.parse(JSON.stringify(targetHands)); window.updateUI(); if (callback) callback(); return; }
-    
-    const handSize = targetHands[playerIds[0]] ? targetHands[playerIds[0]].length : 0; 
-    const totalDeals = handSize * playerIds.length;
+    const handSize = targetHands[playerIds[0]] ? targetHands[playerIds[0]].length : 0; const totalDeals = handSize * playerIds.length;
     if (totalDeals === 0) { window.isDealAnimationRunning = false; window.isInitialDealing = false; window.game.hands = JSON.parse(JSON.stringify(targetHands)); window.updateUI(); if (callback) callback(); return; }
-    
-    const startRect = deckEl.getBoundingClientRect(); 
-    let dealIndex = 0; let completedDeals = 0; 
+    const startRect = deckEl.getBoundingClientRect(); let dealIndex = 0; let completedDeals = 0; 
     function checkComplete() {
         completedDeals++;
         if (completedDeals >= totalDeals) {
-            window.isDealAnimationRunning = false;
-            window.game.hands = JSON.parse(JSON.stringify(targetHands)); window.updateUI(); window.isInitialDealing = false;
+            window.isDealAnimationRunning = false; window.game.hands = JSON.parse(JSON.stringify(targetHands)); window.updateUI(); window.isInitialDealing = false;
             if (window.RuleSettings && window.RuleSettings.abilityResetCount > 0) { if (typeof window.showAbilityResetUI === 'function') { window.showAbilityResetUI(window.RuleSettings.abilityResetCount); } if (window.isHost) { setTimeout(() => { window.broadcastGameState(); window.checkTurn(); }, 13000); } } else { window.updateUI(); if (window.isHost) setTimeout(() => window.checkTurn(), 500); }
             if (callback) callback();
         }
@@ -351,6 +345,7 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
 
 window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, selectedColor = null, multiDiscardIndices = [], extraData = {}) {
     if (!window.isHost) return;
+    
     const hand = window.game.hands[playerId]; if (!hand || !hand[indices[0]]) return; 
     const originalHand = [...hand]; const playedCards = indices.map(i => originalHand[i]); const cardValue = playedCards[0].value; const def = window.AbilityDef ? window.AbilityDef[cardValue] : null;
     if (!def) { window.executePlay(playerId, indices, false); return; }
@@ -685,7 +680,7 @@ window.handlePlayAction = function() {
     if (window.pendingDefense || window.currentDefensePhaseId) { alert("現在、他の能力が処理中です。解決するまでお待ちください。"); window.game.selectedIndices = []; window.updateUI(); return; }
     if (window.isProcessingPlay) return; window.isProcessingPlay = true;
     
-    if (!window.game.isMyTurn) { alert("今はあなたのターンではありません！"); window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; }
+    if (!window.game.isMyTurn) { window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; }
 
     const me = window.game.players.find(p => p.id === window.game.myId); const selectedCards = window.game.selectedIndices.map(i => window.game.myHand[i]); const lastCard = selectedCards[selectedCards.length - 1]; const cardValue = lastCard.value;
     if (!lastCard) { window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; }
@@ -870,7 +865,7 @@ function initMainSocketEvents() {
         } else if (data.action === 'play_ability') {
             if (window.pendingDefense || window.pendingJanken) return;
             if (playerId !== window.game.currentPlayer.id) return;
-            window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards, isHV: data.isHV }); const delay = data.cards.length * 100 + 400; setTimeout(() => { if (typeof window.executeAbilityPlay === 'function') window.executeAbilityPlay(playerId, data.indices, data.targetId, data.discardIdx, selectedColor, multiDiscardIndices, extraData); }, delay);
+            window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards, isHV: data.isHV }); const delay = data.cards.length * 100 + 400; setTimeout(() => { if (typeof window.executeAbilityPlay === 'function') window.executeAbilityPlay(playerId, data.indices, data.targetId, data.discardIdx, data.selectedColor, data.multiDiscardIndices, data.extraData); }, delay);
         } else if (data.action === 'defense_response') {
             if (window.pendingDefense && window.pendingDefense.responses) {
                 window.pendingDefense.responses[data.targetId] = { cardValue: data.cardValue || null, discardIdx: data.discardIdx !== undefined ? data.discardIdx : null };
