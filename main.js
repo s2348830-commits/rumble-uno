@@ -2613,12 +2613,16 @@ const btnOpenCustomCards = document.getElementById("btn-open-custom-cards");
     const btnCloseCustomCards = document.getElementById("btn-close-custom-cards");
     if (btnCloseCustomCards) {
         btnCloseCustomCards.onclick = () => {
-            const overlay = document.getElementById("custom-card-overlay");
-            if (overlay) {
-                overlay.classList.add("hidden");
-                if (window.SE) window.SE.play('touch_to_start'); // お好みで閉じる時の音
-            }
-        };
+    const overlay = document.getElementById("custom-card-overlay");
+    if (overlay) {
+        overlay.classList.add("hidden");
+        if (window.SE) window.SE.play('page');
+        
+        // ★ここを追加：詳細パネルも一緒に消す
+        const infoPanel = document.getElementById('ability-info');
+        if (infoPanel) infoPanel.style.opacity = 0;
     }
+};
+}
 
 initMainSocketEvents();

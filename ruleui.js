@@ -105,13 +105,28 @@ if (typeof window !== 'undefined' && !window.RuleUIManager) {
                     if(info) info.style.opacity = 0;
                 };
                 infoIcon.onclick = (e) => {
-                    e.stopPropagation();
-                    const info = document.getElementById('ability-info');
-                    if(info) {
-                        if (info.style.opacity == 1) { info.style.opacity = 0; } 
-                        else { info.innerText = `${def.name}\n${def.desc}`; info.style.opacity = 1; }
-                    }
-                };
+    e.stopPropagation();
+    // 画面全体から説明パネルを探す
+    let infoPanel = document.getElementById('ability-info');
+    
+    // もし説明パネルがなければ、その場で作る（エラー防止）
+    if (!infoPanel) {
+        infoPanel = document.createElement('div');
+        infoPanel.id = 'ability-info';
+        infoPanel.style.cssText = "position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.9); color:white; padding:15px; border-radius:10px; z-index:100000; pointer-events:none; transition:0.3s; opacity:0; white-space:pre-wrap; border:1px solid #f1c40f; width:80%; max-width:400px; text-align:center;";
+        document.body.appendChild(infoPanel);
+    }
+
+    // 表示・非表示の切り替え
+    if (infoPanel.style.opacity == 1 && infoPanel.innerText.includes(def.name)) {
+        infoPanel.style.opacity = 0;
+    } else {
+        infoPanel.innerText = `【${def.name}】\n${def.desc}`;
+        infoPanel.style.opacity = 1;
+        // 5秒後に自動で消えるようにする（親切設計）
+        setTimeout(() => { if(infoPanel) infoPanel.style.opacity = 0; }, 5000);
+    }
+};
 
                 const nameDiv = document.createElement('div');
                 nameDiv.className = 'custom-card-name';
