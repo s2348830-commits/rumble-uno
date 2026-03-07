@@ -1,5 +1,5 @@
 /**
- * main.js (UI重複・連打防止・能力クラッシュ・じゃんけんフリーズ 完全解決版)
+ * main.js (UI重複・終了ボタン非表示・能力フリーズ 完全解決版)
  */
 
 if (window.AbilityDef && window.AbilityDef['id_33']) {
@@ -108,6 +108,8 @@ window.isDrawClicked = false;
 window.handleDrawClick = function(e) {
     if (e) e.preventDefault();
     if (window.isDrawClicked) return;
+    
+    // アニメーション中や相手のターン、通信中などの場合は全てブロック
     if (window.isAnimating || window.pendingJanken || window.isDrawing || window.isProcessingPlay || window.waitingForServerResponse || window.isServerProcessingAbility) return; 
     if (!window.game || !window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
     if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) return;
@@ -127,16 +129,20 @@ window.handleDrawClick = function(e) {
         
         if (window.isHost) {
             if (window.socket) window.socket.emit('request_draw_animation', { playerId: currentId, count: count });
-            window.executeDraw(currentId);
-            window.isDrawing = false;
-            window.waitingForServerResponse = false;
+            
+            // ★ホストも遅延実行（アニメーション中のフリーズ防止）
+            const delay = count * 100 + 400;
+            setTimeout(() => {
+                window.executeDraw(currentId);
+                window.isDrawing = false;
+                window.waitingForServerResponse = false;
+            }, delay);
         } else {
             if (window.socket) window.socket.emit('player_action', { action: 'draw', playerId: currentId, count: count });
             setTimeout(() => { window.isDrawing = false; window.waitingForServerResponse = false; }, 2000);
         }
 
         if (window.SE) window.SE.playMultiple('Distribute', count, 500);
-
         if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
             CardAnimation.animateMultiDraw(count, 'player-hand', () => {});
         }
@@ -183,32 +189,57 @@ if (!window.hasBoundGlobalEvents) {
     });
 }
 
-// ★UI更新時はすべての重複ボタンの表示を同期させる（削除はしない）
+// ==========================================
+// ★修正2: UIの完全管理。まだ引いていない時は終了ボタンを出さない。
+// ==========================================
 window.updateUI = function() { 
     if(window.game && window.game.players && window.game.players.length > 0) { 
-        Renderer.updateAll(window.game); 
+        if(typeof Renderer !== 'undefined') Renderer.updateAll(window.game); 
         window.checkFinalSprint(); 
         
+        // 重複したボタンを物理的に削除（1つだけ残す）
         const drawBtns = document.querySelectorAll('#draw-btn');
+        if (drawBtns.length > 1) {
+            for(let i = 1; i < drawBtns.length; i++) drawBtns[i].remove();
+        }
         const endBtns = document.querySelectorAll('#end-turn-btn');
-        const isMyTurnAndCanAct = window.game.currentPlayer && window.game.currentPlayer.id === window.getMyId() && !window.isGameOver && !window.isInitialDealing && !window.pendingJanken && !window.pendingDefense;
+        if (endBtns.length > 1) {
+            for(let i = 1; i < endBtns.length; i++) endBtns[i].remove();
+        }
 
-        endBtns.forEach(btn => {
-            if (isMyTurnAndCanAct) { btn.classList.remove('hidden'); btn.style.pointerEvents = 'auto'; }
-            else { btn.classList.add('hidden'); btn.style.pointerEvents = 'none'; }
-        });
+        const drawBtn = document.getElementById('draw-btn');
+        const endBtn = document.getElementById('end-turn-btn');
         
-        drawBtns.forEach(btn => {
+        // すべての処理・通信が平和に終わっている時だけ操作可能にする
+        const isMyTurnAndCanAct = window.game.currentPlayer && window.game.currentPlayer.id === window.getMyId() 
+            && !window.isGameOver && !window.isInitialDealing 
+            && !window.pendingJanken && !window.pendingDefense
+            && !window.isDrawing && !window.isProcessingPlay 
+            && !window.waitingForServerResponse && !window.isServerProcessingAbility;
+
+        if (endBtn) {
+            if (isMyTurnAndCanAct) { 
+                // ★修正: ドロー済みの場合のみ終了ボタンを表示する
+                if (window.game.hasDrawnThisTurn) {
+                    endBtn.classList.remove('hidden'); endBtn.style.pointerEvents = 'auto'; 
+                } else {
+                    endBtn.classList.add('hidden'); endBtn.style.pointerEvents = 'none'; 
+                }
+            }
+            else { endBtn.classList.add('hidden'); endBtn.style.pointerEvents = 'none'; }
+        }
+        
+        if (drawBtn) {
             if (isMyTurnAndCanAct) {
                 if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) {
-                    btn.classList.add('hidden'); btn.style.pointerEvents = 'none';
+                    drawBtn.classList.add('hidden'); drawBtn.style.pointerEvents = 'none';
                 } else {
-                    btn.classList.remove('hidden'); btn.style.pointerEvents = 'auto';
+                    drawBtn.classList.remove('hidden'); drawBtn.style.pointerEvents = 'auto';
                 }
             } else {
-                btn.classList.add('hidden'); btn.style.pointerEvents = 'none';
+                drawBtn.classList.add('hidden'); drawBtn.style.pointerEvents = 'none';
             }
-        });
+        }
     } 
 };
 
@@ -639,6 +670,7 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
 
             if (cardValue === 'id_28' || !needsDefense) {
                 let guides = []; 
+                // ★修正: 能力解決処理のエラーガード
                 try {
                     if (window.AbilityEngine && window.AbilityEngine.resolve) { 
                         const resGuides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, responses, multiplier, selectedColor, multiCards, extraData); 
@@ -650,6 +682,7 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
                 let someoneWon = false; window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
                 
                 window.broadcastGameState(false, guides); 
+                // ★修正: wasMyTurnという制限を外し、常にゲームを再開させる
                 if (!someoneWon) { setTimeout(() => window.checkTurn(), 500); } 
                 return;
             }
@@ -757,6 +790,7 @@ window.checkJankenReady = function() {
     if (window.pendingJanken && window.pendingJanken.attackerHand && window.pendingJanken.targetHand && !window.pendingJanken.result) { if (window.jankenInterval) clearInterval(window.jankenInterval); window.resolveJanken(); }
 };
 
+// ★修正: じゃんけん終了後のフリーズ完全防止
 window.resolveJanken = function() {
     if (window.jankenInterval) clearInterval(window.jankenInterval);
     try {
@@ -1046,9 +1080,13 @@ window.handlePlayAction = function() {
             if (yes) {
                 const indicesToSend = [...window.game.selectedIndices]; const cardsToSend = [...selectedCards]; window.game.selectedIndices = []; window.updateUI();
                 
+                // ★修正: ホストも参加者もアニメーション待ちを入れてから通信する
                 if (window.isHost) { 
                     if (window.socket) window.socket.emit('request_play_animation', { playerId: currentId, cards: cardsToSend }); 
-                    window.executeAbilityPlay(currentId, indicesToSend, cardsToSend, null, null, null, [], { isBlankPlay: true }); 
+                    const delay = cardsToSend.length * 100 + 400;
+                    setTimeout(() => {
+                        window.executeAbilityPlay(currentId, indicesToSend, cardsToSend, null, null, null, [], { isBlankPlay: true }); 
+                    }, delay);
                 } else { 
                     window.waitingForServerResponse = true; 
                     if (window.socket) { window.socket.emit('player_action', { action: 'play_ability', playerId: currentId, indices: indicesToSend, cards: cardsToSend, targetId: null, discardIdx: null, selectedColor: null, multiDiscardIndices: [], isHV: false, extraData: { isBlankPlay: true } }); } 
@@ -1057,7 +1095,7 @@ window.handlePlayAction = function() {
                 window.animateSequentialPlay(indicesToSend, window.game, () => {
                     window.isProcessingPlay = false; 
                 });
-                setTimeout(() => { window.isProcessingPlay = false; }, 1500); 
+                setTimeout(() => { window.isProcessingPlay = false; }, 2000); 
             } else {
                 window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false;
             }
@@ -1087,9 +1125,12 @@ window.handlePlayAction = function() {
         window.tryDrawWithAbility(() => {
             if (window.isHost) { 
                 if(window.socket) window.socket.emit('request_draw_animation', { playerId: currentId, count: penaltyCount }); 
-                for(let i=0; i<penaltyCount; i++) window.game.drawCard(currentId); 
-                if(wasMyTurnLocal) window.executeEndTurn(currentId); else window.broadcastGameState(true);
-                window.isDrawing = false; window.isProcessingPlay = false;
+                const delay = penaltyCount * 100 + 400;
+                setTimeout(() => {
+                    for(let i=0; i<penaltyCount; i++) window.game.drawCard(currentId); 
+                    if(wasMyTurnLocal) window.executeEndTurn(currentId); else window.broadcastGameState(true);
+                    window.isDrawing = false; window.isProcessingPlay = false;
+                }, delay);
             } 
             else { 
                 window.waitingForServerResponse = true; 
@@ -1121,9 +1162,13 @@ window.handlePlayAction = function() {
             const isHVActivated = (cardValue === 'id_20') || !!(def && def.needsAbilityDiscard && discardIdx !== null); 
             window.showAbilityCutin(cardsToSend[0].value, isHVActivated);
             
+            // ★修正: ホストも遅延実行でタイミングを合わせる
             if (window.isHost) { 
                 if (window.socket) window.socket.emit('request_play_animation', { playerId: currentId, cards: cardsToSend, isHV: isHVActivated }); 
-                window.executeAbilityPlay(currentId, indicesToSend, cardsToSend, targetId, discardIdx, selColor, multiDiscardIndices, extraData); 
+                const delay = cardsToSend.length * 100 + 400;
+                setTimeout(() => {
+                    window.executeAbilityPlay(currentId, indicesToSend, cardsToSend, targetId, discardIdx, selColor, multiDiscardIndices, extraData); 
+                }, delay);
             } else { 
                 window.waitingForServerResponse = true; 
                 if (window.socket) { window.socket.emit('player_action', { action: 'play_ability', playerId: currentId, indices: indicesToSend, cards: cardsToSend, targetId: targetId, discardIdx: discardIdx, selectedColor: selColor, multiDiscardIndices: multiDiscardIndices, isHV: isHVActivated, extraData: extraData }); } 
@@ -1132,7 +1177,7 @@ window.handlePlayAction = function() {
             window.animateSequentialPlay(indices, window.game, () => {
                 window.isProcessingPlay = false; 
             });
-            setTimeout(() => { window.isProcessingPlay = false; }, 1500);
+            setTimeout(() => { window.isProcessingPlay = false; }, 2000);
         };
         
         const step6 = () => { if (def && def.needsGraveyard) { window.openGraveyardSelection((selectedId) => { if (selectedId === false) { window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; } graveyardCardId = selectedId; finishAbilityPlay(); }); } else { finishAbilityPlay(); } };
@@ -1150,9 +1195,13 @@ window.handlePlayAction = function() {
     window.game.selectedIndices = []; window.updateUI();
     const indicesToSend = [...indices]; const cardsToSend = [...playedCards];
     
+    // ★修正: ホストも遅延実行でタイミングを合わせる
     if (window.isHost) { 
         if (window.socket) window.socket.emit('request_play_animation', { playerId: currentId, cards: cardsToSend }); 
-        window.executePlay(currentId, indicesToSend); 
+        const delay = cardsToSend.length * 100 + 400;
+        setTimeout(() => {
+            window.executePlay(currentId, indicesToSend); 
+        }, delay);
     } else { 
         window.waitingForServerResponse = true; 
         if (window.socket) window.socket.emit('player_action', { action: 'play', playerId: currentId, indices: indicesToSend, cards: cardsToSend }); 
@@ -1161,7 +1210,7 @@ window.handlePlayAction = function() {
     window.animateSequentialPlay(indices, window.game, () => {
         window.isProcessingPlay = false; 
     });
-    setTimeout(() => { window.isProcessingPlay = false; }, 1500);
+    setTimeout(() => { window.isProcessingPlay = false; }, 2000);
 };
 
 window.onColorChosen = function(color) { 
