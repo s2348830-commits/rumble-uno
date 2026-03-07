@@ -2,7 +2,6 @@
  * main.js
  */
 
-// ライアの説明文を上書き
 if (window.AbilityDef && window.AbilityDef['id_33']) {
     window.AbilityDef['id_33'].desc = '【AT】自分以外のプレイヤーを一人指定し1枚ドローさせる。自分のターン中にこのカードを使用した場合、自分のターン終了後にこのカードを手札に戻してもよい。(各ターン1回のみ)';
 }
@@ -602,7 +601,6 @@ window.checkTurn = function() {
 
 window.executePlay = function(playerId, indices, isBot = false) {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
-    if (playerId !== window.game.currentPlayer.id) return;
     clearInterval(window.turnTimer); if(window.playerAfkTimes) window.playerAfkTimes[playerId] = 0; 
     const result = window.game.playCards(playerId, indices);
     if (result.penalty) { document.getElementById('status-message').innerText = `${result.penaltyReason}上がり禁止ペナルティ！`; window.broadcastGameState(); setTimeout(window.checkTurn, 1000); return; }
@@ -629,7 +627,6 @@ window.executePlay = function(playerId, indices, isBot = false) {
 
 window.executeColor = function(playerId, color) {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
-    if (playerId !== window.game.currentPlayer.id) return;
     if(window.playerAfkTimes) window.playerAfkTimes[playerId] = 0; window.game.currentColor = color; 
     const info = window.pendingDrawDefenseInfo; window.pendingDrawDefenseInfo = null; window.game.nextTurn(1); 
     if (info) { const targetId = window.game.currentPlayer.id; const guides = [{ from: info.attackerId, to: targetId, text: info.cardValue, delay: 0 }]; if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length > 0) { window.startDrawDefensePhase(info.attackerId, targetId, info.cardValue, guides); } else { window.broadcastGameState(false, guides); window.checkTurn(); } } 
@@ -685,7 +682,6 @@ window.handlePlayAction = function() {
     if (window.game.selectedIndices.length === 0 || window.isGameOver || window.isInitialDealing || window.isDrawing) return;
     if (window.pendingJanken) return; 
     
-    // ★追加: 処理中・防御処理中は一切の割り込みを禁止
     if (window.pendingDefense || window.currentDefensePhaseId || window.isDefending) { alert("現在、効果処理または防御処理中です。解決するまでお待ちください。"); window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; }
     if (window.isProcessingPlay) return; window.isProcessingPlay = true;
     
@@ -694,12 +690,22 @@ window.handlePlayAction = function() {
 
     const isAbility = selectedCards[0] && selectedCards[0].value && String(selectedCards[0].value).startsWith('id_'); const isAction = !/^[0-9]$/.test(lastCard.value) && !isAbility; const def = isAbility && window.AbilityDef ? window.AbilityDef[selectedCards[0].value] : null;
 
-    // ★追加: 防御カードを手札から能動的に出すことをブロック
     if (isAbility && def && def.type === 'BL') {
-        alert("防御カード(BL)は攻撃を受けた時にのみ使用できます。"); window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return;
+        window.showConfirm("攻撃を受けた時でないと効果は発動しませんがそれでも出しますか？", (yes) => {
+            if (yes) {
+                const indicesToSend = [...window.game.selectedIndices]; const cardsToSend = [...selectedCards]; window.game.selectedIndices = []; window.updateUI();
+                window.animateSequentialPlay(indicesToSend, window.game, () => {
+                    if (window.isHost) { if (window.socket) window.socket.emit('request_play_animation', { playerId: window.game.myId, cards: cardsToSend }); window.executeAbilityPlay(window.game.myId, indicesToSend, null, null, null, [], { isBlankPlay: true }); } 
+                    else if (window.socket) { window.socket.emit('player_action', { action: 'play_ability', indices: indicesToSend, cards: cardsToSend, targetId: null, discardIdx: null, selectedColor: null, multiDiscardIndices: [], isHV: false, extraData: { isBlankPlay: true } }); }
+                    window.isProcessingPlay = false; 
+                });
+            } else {
+                window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false;
+            }
+        });
+        return;
     }
 
-    // ★追加: 自分のターンでない場合は、能力カード以外はブロック
     if (!window.game.isMyTurn && !isAbility) { alert("今はあなたのターンではありません！"); window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; }
     
     if (me.frozen && !isAbility) { alert("凍結中は能力カードしか使用できません！"); window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; }
@@ -763,7 +769,6 @@ window.handlePlayAction = function() {
         };
         const step6 = () => { if (def && def.needsGraveyard) { window.openGraveyardSelection((selectedId) => { if (selectedId === false) { window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; } graveyardCardId = selectedId; finishAbilityPlay(); }); } else { finishAbilityPlay(); } }
         
-        // ★修正: ライア(id_33)は「自分のターン中」のみ回収ダイアログを出す
         window.localRaiaReturnedTurn = window.localRaiaReturnedTurn || -1;
         const stepRaia = () => { 
             if (cardValue === 'id_33' && window.game.isMyTurn && !me.usedRaia) { 
@@ -896,7 +901,6 @@ function initMainSocketEvents() {
             window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards }); const delay = data.cards.length * 100 + 400; setTimeout(() => { if (typeof window.executePlay === 'function') window.executePlay(playerId, data.indices); }, delay);
         } else if (data.action === 'play_ability') {
             if (window.pendingDefense || window.pendingJanken) return;
-            // ★修正: 他人のターンでも能力カード発動を受け付けるように、ターンチェックのブロックを外しました
             window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards, isHV: data.isHV }); const delay = data.cards.length * 100 + 400; setTimeout(() => { if (typeof window.executeAbilityPlay === 'function') window.executeAbilityPlay(playerId, data.indices, data.targetId, data.discardIdx, data.selectedColor, data.multiDiscardIndices, data.extraData); }, delay);
         } else if (data.action === 'defense_response') {
             if (window.pendingDefense && window.pendingDefense.responses) {
