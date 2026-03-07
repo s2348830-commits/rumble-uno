@@ -1,5 +1,5 @@
 /**
- * main.js (UI重複・連打防止・能力クラッシュ・じゃんけんフリーズ 完全解決版)
+ * main.js
  */
 
 if (window.AbilityDef && window.AbilityDef['id_33']) {
@@ -101,9 +101,7 @@ window.initVolumeControl = function() {
 
 const ColorUI = { callback: null, show: function(cb = null) { this.callback = cb; document.getElementById('color-selector').classList.remove('hidden'); }, hide: function() { document.getElementById('color-selector').classList.add('hidden'); } };
 
-// ==========================================
-// ★イベントの一元化とUIの競合排除
-// ==========================================
+// ★イベントの一元化による連打防止
 window.isDrawClicked = false;
 window.handleDrawClick = function(e) {
     if (e) e.preventDefault();
@@ -172,6 +170,7 @@ window.handleEndTurnClick = function(e) {
     }
 };
 
+// ★全クリックイベントの監視
 if (!window.hasBoundGlobalEvents) {
     window.hasBoundGlobalEvents = true;
     document.body.addEventListener('click', (e) => {
@@ -186,6 +185,7 @@ if (!window.hasBoundGlobalEvents) {
     });
 }
 
+// ★重複ボタンの削除とUIの正確な切り替え
 window.updateUI = function() { 
     if(window.game && window.game.players && window.game.players.length > 0) { 
         if(typeof Renderer !== 'undefined') Renderer.updateAll(window.game); 
@@ -200,7 +200,6 @@ window.updateUI = function() {
         const endBtn = document.getElementById('end-turn-btn');
         
         const isChoosing = document.querySelector('.action-popup:not(.hidden)') !== null;
-
         const isMyTurnAndCanAct = window.game.currentPlayer && window.game.currentPlayer.id === window.getMyId() 
             && !window.isGameOver && !window.isInitialDealing 
             && !window.pendingJanken && !window.pendingDefense
@@ -215,8 +214,7 @@ window.updateUI = function() {
                 } else {
                     endBtn.classList.add('hidden'); endBtn.style.pointerEvents = 'none'; 
                 }
-            }
-            else { endBtn.classList.add('hidden'); endBtn.style.pointerEvents = 'none'; }
+            } else { endBtn.classList.add('hidden'); endBtn.style.pointerEvents = 'none'; }
         }
         
         if (drawBtn) {
@@ -232,12 +230,6 @@ window.updateUI = function() {
             }
         }
     } 
-};
-
-window.checkFinalSprint = function() {
-    if (window.isGameOver || window.isInitialDealing) { window.SE.stopLoop('final_sprint'); return; }
-    let hasUno = false; if (window.game.hands) Object.values(window.game.hands).forEach(h => { if (h.length === 1) hasUno = true; });
-    if (hasUno) window.SE.startLoop('final_sprint'); else window.SE.stopLoop('final_sprint');
 };
 
 window.updatePhaseUI = function(state) {
@@ -256,7 +248,6 @@ window.updatePhaseUI = function(state) {
 
     if (state.jankenPhase) {
         if (!window.isJankenShowing) { if (typeof window.showJankenUI === 'function') window.showJankenUI(state.jankenPhase.attackerId, state.jankenPhase.targetId, state.jankenPhase.loopCount); window.isJankenShowing = true; }
-        
         const jTimer = document.getElementById('janken-timer');
         if (jTimer && state.jankenPhase.timer !== undefined) jTimer.innerText = state.jankenPhase.timer;
 
@@ -271,7 +262,6 @@ window.updatePhaseUI = function(state) {
             if (p1Res) p1Res.innerText = ''; if (p2Res) p2Res.innerText = '';
             
             const iHaveChosen = (window.getMyId() === state.jankenPhase.attackerId && state.jankenPhase.attackerHand) || (window.getMyId() === state.jankenPhase.targetId && state.jankenPhase.targetHand);
-            
             if (iHaveChosen) {
                 if (title) title.innerText = "相手を待っています...";
                 const controls = document.getElementById('janken-controls');
@@ -513,7 +503,7 @@ window.showDefenseModal = function(attackCardValue) {
     modal.classList.remove('hidden');
 };
 
-// ★エラーガードを追加した防御フェーズ
+// ★無敵のTry-Catch装甲を追加した防御解決フェーズ
 window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides) {
     try {
         let responses = {}; const p = window.game.players.find(px => px.id === targetId);
@@ -678,6 +668,7 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
                 let someoneWon = false; window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
                 
                 window.broadcastGameState(false, guides); 
+                // ★修正: wasMyTurnという制限を外し、常にゲームを再開させる
                 if (!someoneWon) { setTimeout(() => window.checkTurn(), 500); } 
                 return;
             }
@@ -694,7 +685,7 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
                     clearInterval(interval); const finalResponses = window.pendingDefense.responses; window.pendingDefense = null; let guides = [];
                     if (finalResponses) {
                         Object.keys(finalResponses).forEach(tid => {
-                            // 未回答をnullで埋める
+                            // 未回答を強制null埋め
                             if (!finalResponses[tid]) finalResponses[tid] = { cardValue: null, discardIdx: null };
                             const resp = finalResponses[tid];
                             if (resp && resp.cardValue) {
@@ -1176,6 +1167,7 @@ window.handlePlayAction = function() {
         return; 
     }
 
+    // 通常カード
     window.game.selectedIndices = []; window.updateUI();
     const indicesToSend = [...indices]; const cardsToSend = [...playedCards];
     
@@ -1228,7 +1220,7 @@ function initMainSocketEvents() {
         window.pendingJanken = null;
         window.pendingDefense = null;
         
-        // ★修正: ポップアップ展開中（操作中）はフラグを保持して上書きを防ぐ
+        // ポップアップ中はフラグ上書きを防ぐ
         const isChoosing = (!window.isHost && window.getMyId()) && (document.querySelector('.action-popup:not(.hidden)') !== null);
         if (!isChoosing) {
             window.isProcessingPlay = false;
@@ -1252,7 +1244,6 @@ function initMainSocketEvents() {
         
         if (window.isInitialDealing && !window.isHost) { if (typeof window.animateInitialDeal === 'function') { window.animateInitialDeal(state.hands, () => {}); } else { window.isInitialDealing = false; window.game.hands = state.hands; if (typeof window.updateUI === 'function') window.updateUI(); } } 
         else if (!window.isInitialDealing) { 
-            // 選択中でなければ手札を更新
             if (!isChoosing) { window.game.hands = state.hands; if (typeof window.updateUI === 'function') window.updateUI(); } 
         }
         
