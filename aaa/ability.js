@@ -21,21 +21,22 @@ window.AbilityDef = {
     'id_17': { rarity: 'SR', type: 'BL', name: 'カシウス', desc: '【BL】防御時、手札1枚選んで捨てる。', needsDiscard: true },
     'id_18': { rarity: 'SR', type: 'AT_BL', name: 'グレイス', desc: '【AT/BL】他全員に1枚引かせる。その後自分にシールドIを2ターン付与する。' },
     'id_19': { rarity: 'SR', type: 'BL', name: 'ヴィンディ', desc: '【BL】防御時手札1枚捨てる。攻撃者に1枚引かせる。', needsDiscard: true },
-    'id_20': { rarity: 'UR', type: 'HV', name: '幽艶レベッカ', desc: '【HV】トリック・オア・キャロット。色を指定でき、指定した色のカードを好きな枚数重ねて場に出す。(記号効果は適用されない)', needsColor: true },
+    'id_20': { rarity: 'UR', type: 'HV', name: '幽艶レベッカ', desc: '【HV】トリック・オア・キャロット。色を指定でき、指定した色以外のカードを全て山札に戻す。(記号効果は適用されない)(能力カードは適応外、既存のUNOのカードのみ)', needsColor: true },
     'id_21': { rarity: 'SR', type: 'AT', name: 'アヤメ', desc: '【AT】自分以外のプレイヤーを一人指定し、そのプレイヤーにカードを3枚引かせる。', needsTarget: true },
     'id_22': { rarity: 'SSR', type: 'HE', name: '遊鈴', desc: '【HE】自分のデバフ(凍結/燃焼)を1つ解除し、自分以外の全員に1枚カードを引かせる。', needsDebuffSelect: true },
     'id_23': { rarity: 'SSR', type: 'HE', name: 'ダンタ', desc: '【HE】自分を1ターン無敵状態にし、デバフを1つランダムに解除する。' },
     'id_24': { rarity: 'R', type: 'AT', name: 'アクアヘッド', desc: '【AT】自分以外のランダムなプレイヤーに燃焼を1ターン付与する。' },
-    'id_25': { rarity: 'UR', type: 'HE', name: 'ミサ', desc: '【HE】自分のカード1枚をワイルドにし、使用されたSSR以下の能力カードを1枚手札に戻す。', needsGraveyard: true },
-    'id_26': { rarity: 'UR', type: 'AT', name: '運命の三姉妹', desc: '【AT】ランダム他1人とじゃんけん。初回は結果によらず相手2ドロー。勝てば相手2ドローし再戦(最大4回)。', needsJanken: true },
-    'id_27': { rarity: 'SR', type: 'HE', name: 'クララ', desc: '【HE】自分の手札をランダムに2枚捨てる。' },
+    'id_25': { rarity: 'UR', type: 'HV', name: 'ミサ', desc: '【HV】自分のカード1枚をワイルドにし、使用されたSSR以下の能力カードを1枚手札に戻す。使用後、蘇生・ミサが0なら付与。', needsGraveyard: true },
+    'id_26': { rarity: 'UR', type: 'HV', name: '運命の三姉妹', desc: '【HV】ランダム他1人とじゃんけん。初回は結果によらず相手2ドロー。勝つかあいこで相手2ドローし自分は通常カード1枚破棄。その後別の人と再戦(最大4回)。' },
+    'id_27': { rarity: 'SR', type: 'HE', name: 'クララ', desc: '【HE】45%の確率で自分の手札をランダムに2枚捨てる。' },
     'id_28': { rarity: 'SSR', type: 'AT', name: 'リナ', desc: '【AT】ランダムなプレイヤーに2ターン燃焼を付与する。その後そのプレイヤーに1枚引かせる(防御不可)。' },
     'id_29': { rarity: 'SSR', type: 'AT', name: 'エロス', desc: '【AT】自分以外の全員に75%の確率で2枚引かせる。' },
     'id_30': { rarity: 'SSR', type: 'BL', name: 'カシャ', desc: '【BL】防御時、ランダムなプレイヤーに燃焼を1ターン付与し、自分にシールドIを1ターン付与する。' },
     'id_31': { rarity: 'SSR', type: 'BL', name: 'カレン', desc: '【BL】防御時、自分のシールドIIIを3ターン付与する。また、既にシールドがある場合は重複する。' },
     'id_32': { rarity: 'SSR', type: 'AT', name: 'フェイ', desc: '【AT】自分以外のランダムなプレイヤーに燃焼(2T開始時固定1ドロー)を付与(3回発動)。既に燃焼がある場合は重複する。' },
     'id_33': { rarity: 'SSR', type: 'AT', name: 'ライア', desc: '【AT】自分以外のプレイヤーを一人指定し1枚ドローさせる。発動後このカードを手札に戻してもよい。(各ターン1回のみ)', needsTarget: true },
-    'id_34': { rarity: 'SSR', type: 'HE', name: 'オリヴィア', desc: '【HE】自分に回避I(20%の確率で攻撃を防ぐ)を1ターン付与する。' }
+    'id_34': { rarity: 'SSR', type: 'HE', name: 'オリヴィア', desc: '【HE】自分に回避I(20%の確率で攻撃を防ぐ)を1ターン付与する。' },
+    'id_35': { rarity: 'UR', type: 'HV', name: 'イヴ', desc: '【HV】ランダム1名に燃焼2T、他全員に裂傷(ドロー時+1枚)2T付与。使用後、蘇生・イヴが0なら付与(被強制ドロー時に手札に戻る)。' }
 };
 
 window.AbilityEngine = {
@@ -52,15 +53,23 @@ window.AbilityEngine = {
         const t = game.players.find(p => p.id === targetId);
         if (!t) return 0;
         if (t.invincibleTurns > 0) return 0; 
-        if (this.checkEvasion(t)) return -1; 
+        if (blockable && this.checkEvasion(t)) return -1; 
         
-        let actualDrawn = count;
-        
-        for (let i = 0; i < count; i++) {
-            game.drawCard(targetId); 
+        let totalCount = count;
+        if (t.laceration && t.laceration > 0) {
+            totalCount += 1;
         }
-        if (count > 0 && window.isHost && window.socket) {
-            window.socket.emit('request_draw_animation', { playerId: targetId, count: count });
+
+        let actualDrawn = 0;
+        for (let i = 0; i < totalCount; i++) {
+            if (game.drawCard(targetId)) actualDrawn++;
+        }
+        
+        if (actualDrawn > 0) {
+            if (typeof window !== 'undefined' && window.isHost && window.socket) {
+                window.socket.emit('request_draw_animation', { playerId: targetId, count: actualDrawn });
+            }
+            if (game.triggerRevive) game.triggerRevive(targetId);
         }
         return actualDrawn;
     },
@@ -112,9 +121,24 @@ window.AbilityEngine = {
         }
 
         if (abilityId === 'id_20') {
-            if (multiCards && multiCards.length > 0) {
-                if (window.isHost && window.socket) window.socket.emit('request_play_animation', { playerId: attackerId, cards: multiCards });
-                guides.push({ from: attackerId, to: attackerId, text: `${selectedColor}を${multiCards.length}枚消費` });
+            const hand = game.hands[attackerId];
+            if (hand && selectedColor) {
+                let newHand = [];
+                let returnedCount = 0;
+                hand.forEach(c => {
+                    const isAbility = c.value && String(c.value).startsWith('id_');
+                    if (!isAbility && c.color !== selectedColor) {
+                        game.deck.push(c);
+                        returnedCount++;
+                    } else {
+                        newHand.push(c);
+                    }
+                });
+                game.hands[attackerId] = newHand;
+                if (returnedCount > 0) {
+                    game.deck = UNORules.shuffle(game.deck);
+                    guides.push({ from: attackerId, to: attackerId, text: `${returnedCount}枚山札へ` });
+                }
             }
             return guides; 
         }
@@ -123,13 +147,30 @@ window.AbilityEngine = {
             
             if (abilityId === 'id_32') {
                 for (let i = 0; i < 3; i++) {
-                    // ★修正2: 対象が0人の場合のクラッシュ対策
                     if (others.length > 0) {
                         const tid = others[Math.floor(Math.random() * others.length)].id;
                         const res = this.applyBurn(game, tid, 2);
                         if (res === -1) guides.push({ from: attackerId, to: tid, text: '💨回避!' });
                         else guides.push({ from: attackerId, to: tid, text: '🔥燃焼(2T)', se: 'fire' });
                     }
+                }
+            }
+
+            if (abilityId === 'id_35') {
+                if (others.length > 0) {
+                    const burnTarget = others[Math.floor(Math.random() * others.length)].id;
+                    const bRes = this.applyBurn(game, burnTarget, 2);
+                    if (bRes === -1) guides.push({ from: attackerId, to: burnTarget, text: '💨回避!' });
+                    else guides.push({ from: attackerId, to: burnTarget, text: '🔥燃焼(2T)', se: 'fire' });
+                }
+                others.forEach(p => {
+                    p.laceration = (p.laceration || 0) + 2;
+                    guides.push({ from: attackerId, to: p.id, text: '🩸裂傷(2T)' });
+                });
+                const self = game.players.find(p => p.id === attackerId);
+                if (self && self.usedReviveEve === 0) {
+                    self.hasReviveEve = true;
+                    guides.push({ from: attackerId, to: attackerId, text: '蘇生・イヴ付与' });
                 }
             }
 
@@ -233,7 +274,7 @@ window.AbilityEngine = {
                 }
             }
 
-            if (def.type === 'HE' || def.type === 'HE_BL') {
+            if (def.type === 'HE' || def.type === 'HE_BL' || def.type === 'HV') {
                 if (abilityId === 'id_3' && costPaid) {
                     guides.push({ from: attackerId, to: attackerId, text: '1枚捨てる' });
                 } else if (abilityId === 'id_5') {
@@ -333,18 +374,28 @@ window.AbilityEngine = {
                         const gIdx = game.abilityGraveyard.indexOf(extraData.graveyardCardId);
                         if (gIdx > -1) game.abilityGraveyard.splice(gIdx, 1);
                     }
-                    guides.push({ from: attackerId, to: attackerId, text: 'ワイルド化＆回収' });
+                    const self = game.players.find(p => p.id === attackerId);
+                    if (self && self.usedReviveMisa === 0) {
+                        self.hasReviveMisa = true;
+                        guides.push({ from: attackerId, to: attackerId, text: 'ワイルド化＆回収(蘇生付与)' });
+                    } else {
+                        guides.push({ from: attackerId, to: attackerId, text: 'ワイルド化＆回収' });
+                    }
                 } else if (abilityId === 'id_27') {
-                    const tHand = game.hands[attackerId];
-                    if (tHand && tHand.length > 0) {
-                        let dropCount = Math.min(2, tHand.length);
-                        for (let i = 0; i < dropCount; i++) {
-                            const rIdx = Math.floor(Math.random() * tHand.length);
-                            const dropCard = tHand.splice(rIdx, 1)[0];
-                            game.discardPile.push(dropCard);
-                            game.discardRotations.push(0);
+                    if (Math.random() < 0.45) {
+                        const tHand = game.hands[attackerId];
+                        if (tHand && tHand.length > 0) {
+                            let dropCount = Math.min(2, tHand.length);
+                            for (let i = 0; i < dropCount; i++) {
+                                const rIdx = Math.floor(Math.random() * tHand.length);
+                                const dropCard = tHand.splice(rIdx, 1)[0];
+                                game.discardPile.push(dropCard);
+                                game.discardRotations.push(0);
+                            }
+                            guides.push({ from: attackerId, to: attackerId, text: `2枚破棄` });
                         }
-                        guides.push({ from: attackerId, to: attackerId, text: `2枚破棄` });
+                    } else {
+                        guides.push({ from: attackerId, to: attackerId, text: `不発...` });
                     }
                 } else if (abilityId === 'id_34') {
                     const self = game.players.find(p=>p.id === attackerId);
@@ -352,6 +403,12 @@ window.AbilityEngine = {
                     guides.push({ from: attackerId, to: attackerId, text: '💨回避I(1T)' });
                 }
             }
+        }
+        
+        if (game.pendingReviveGuides && game.pendingReviveGuides.length > 0) {
+            game.pendingReviveGuides.forEach(g => { if(g.delay === undefined) g.delay = 2500; });
+            guides = guides.concat(game.pendingReviveGuides);
+            game.pendingReviveGuides = [];
         }
         return guides;
     }
