@@ -1,5 +1,5 @@
 /**
- * main.js (UI重複・二重ドロー・能力クラッシュ 完全修正版)
+ * main.js (UI重複・連打防止・能力クラッシュ・じゃんけんフリーズ 完全修正版)
  */
 
 if (window.AbilityDef && window.AbilityDef['id_33']) {
@@ -101,32 +101,111 @@ window.initVolumeControl = function() {
 
 const ColorUI = { callback: null, show: function(cb = null) { this.callback = cb; document.getElementById('color-selector').classList.remove('hidden'); }, hide: function() { document.getElementById('color-selector').classList.add('hidden'); } };
 
-// ★修正: 重複ボタンが存在しても「最初の要素」だけを操作するようにし、UIのちらつきや二重送信を防ぐ
+// ★ボタンクリックのハンドラー（重複登録・連打を防ぐ安全な関数）
+window.isDrawClicked = false;
+window.handleDrawClick = function(e) {
+    if (window.isDrawClicked) return;
+    if (window.isAnimating || window.pendingJanken || window.isDrawing || window.isProcessingPlay || window.waitingForServerResponse || window.isServerProcessingAbility) return; 
+    if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
+    if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) return;
+    
+    window.isDrawClicked = true;
+    setTimeout(() => { window.isDrawClicked = false; }, 1000); 
+    
+    window.isDrawing = true; 
+    window.waitingForServerResponse = true;
+
+    document.querySelectorAll('#draw-btn').forEach(b => { b.classList.add('hidden'); b.style.pointerEvents = 'none'; });
+    
+    window.tryDrawWithAbility(() => {
+        const s = window.game.drawStack; const count = s > 0 ? s : 1;
+        const currentId = window.getMyId();
+        
+        if (window.isHost) {
+            if (window.socket) window.socket.emit('request_draw_animation', { playerId: currentId, count: count });
+            window.executeDraw(currentId);
+            window.isDrawing = false;
+            window.waitingForServerResponse = false;
+        } else {
+            if (window.socket) window.socket.emit('player_action', { action: 'draw', playerId: currentId, count: count });
+            setTimeout(() => { window.isDrawing = false; window.waitingForServerResponse = false; }, 1000);
+        }
+
+        if (window.SE) window.SE.playMultiple('Distribute', count, 500);
+
+        if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
+            CardAnimation.animateMultiDraw(count, 'player-hand', () => {});
+        }
+        setTimeout(() => { document.querySelectorAll('#draw-btn').forEach(b => b.style.pointerEvents = 'auto'); }, 1500);
+    });
+};
+
+window.isEndClicked = false;
+window.handleEndTurnClick = function(e) {
+    if (window.isEndClicked) return;
+    if (window.pendingJanken || window.waitingForServerResponse || window.isServerProcessingAbility) return; 
+    if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
+    
+    window.isEndClicked = true;
+    setTimeout(() => { window.isEndClicked = false; }, 1000);
+
+    window.waitingForServerResponse = true;
+    document.querySelectorAll('#draw-btn').forEach(b => b.classList.add('hidden'));
+    document.querySelectorAll('#end-turn-btn').forEach(b => { b.classList.add('hidden'); b.style.pointerEvents = 'none'; });
+    
+    const currentId = window.getMyId();
+    if (window.isHost) {
+        window.executeEndTurn(currentId);
+        window.waitingForServerResponse = false;
+        window.isProcessingPlay = false;
+    } else {
+        if (window.socket) window.socket.emit('player_action', { action: 'end_turn', playerId: currentId });
+        setTimeout(() => { window.waitingForServerResponse = false; window.isProcessingPlay = false; }, 1000);
+    }
+    setTimeout(() => { document.querySelectorAll('#end-turn-btn').forEach(b => b.style.pointerEvents = 'auto'); }, 1500);
+};
+
+// ★ボタンの重複を排除し、安全に表示を切り替える
 window.updateUI = function() { 
     if(window.game && window.game.players && window.game.players.length > 0) { 
         Renderer.updateAll(window.game); 
         window.checkFinalSprint(); 
         
+        // 重複したボタンを物理的に削除（1つだけ残す）
         const drawBtns = document.querySelectorAll('#draw-btn');
+        if (drawBtns.length > 1) {
+            for(let i = 1; i < drawBtns.length; i++) drawBtns[i].remove();
+        }
         const endBtns = document.querySelectorAll('#end-turn-btn');
+        if (endBtns.length > 1) {
+            for(let i = 1; i < endBtns.length; i++) endBtns[i].remove();
+        }
+
+        const drawBtn = document.getElementById('draw-btn');
+        const endBtn = document.getElementById('end-turn-btn');
+        
+        // 重複しないように確実に関数を紐付ける
+        if (drawBtn) drawBtn.onclick = window.handleDrawClick;
+        if (endBtn) endBtn.onclick = window.handleEndTurnClick;
+
         const isMyTurnAndCanAct = window.game.currentPlayer && window.game.currentPlayer.id === window.getMyId() && !window.isGameOver && !window.isInitialDealing && !window.pendingJanken && !window.pendingDefense;
 
-        endBtns.forEach(btn => {
-            if (isMyTurnAndCanAct) btn.classList.remove('hidden');
-            else btn.classList.add('hidden');
-        });
+        if (endBtn) {
+            if (isMyTurnAndCanAct) { endBtn.classList.remove('hidden'); endBtn.style.pointerEvents = 'auto'; }
+            else endBtn.classList.add('hidden');
+        }
         
-        drawBtns.forEach(btn => {
+        if (drawBtn) {
             if (isMyTurnAndCanAct) {
                 if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) {
-                    btn.classList.add('hidden');
+                    drawBtn.classList.add('hidden');
                 } else {
-                    btn.classList.remove('hidden');
+                    drawBtn.classList.remove('hidden'); drawBtn.style.pointerEvents = 'auto';
                 }
             } else {
-                btn.classList.add('hidden');
+                drawBtn.classList.add('hidden');
             }
-        });
+        }
     } 
 };
 
@@ -597,7 +676,6 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
                                 if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) { window.AbilityEngine.triggerDiscardEffect(window.game, tid, discCard.value, true, discCard); }
                                 if (discCard && discCard.value && String(discCard.value).startsWith('id_')) { window.game.abilityGraveyard.push(discCard.value); } else if (discCard) { window.game.discardPile.push(discCard); window.game.discardRotations.push(0); }
                             }
-                            // ★修正: 防御効果処理のエラーガード
                             try {
                                 if (defCardId === 'id_2') { window.game.players.filter(px => px.id !== tid).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); }); const targetP = window.game.players.find(p=>p.id===targetId); if(targetP) targetP.shield = { level: 1, turns: 1 }; if (Math.random() < 0.6) { window.game.players.filter(px => px.id !== tid).forEach(px => { window.AbilityEngine.applyDraw(window.game, px.id, 1); }); } }
                                 else if (defCardId === 'id_4') { if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) { window.AbilityEngine.triggerDiscardEffect(window.game, tid, 'id_4', false, null); } }
@@ -1059,91 +1137,65 @@ window.onColorChosen = function(color) {
     ColorUI.hide(); if (ColorUI.callback) { let cb = ColorUI.callback; ColorUI.callback = null; cb(color); } else { if (window.isHost) window.executeColor(window.getMyId(), color); else { window.waitingForServerResponse = true; if (window.socket) window.socket.emit('player_action', { action: 'color', playerId: window.getMyId(), color: color }); } }
 };
 
-// ★連打・二重操作防止フラグ
-let isDrawClicked = false;
-let isEndClicked = false;
-
-document.addEventListener('DOMContentLoaded', () => {
+// ★連打・二重操作防止用のイベントハンドラー
+window.handleDrawClick = function(e) {
+    if (window.isDrawClicked) return;
+    if (window.isAnimating || window.pendingJanken || window.isDrawing || window.isProcessingPlay || window.waitingForServerResponse || window.isServerProcessingAbility) return; 
+    if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
+    if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) return;
     
-    // ★HTML上の重複した不要なボタンを物理的に削除する（二重表示の根本対策）
-    const drawBtns = document.querySelectorAll('#draw-btn');
-    if (drawBtns.length > 1) {
-        for(let i = 1; i < drawBtns.length; i++) drawBtns[i].remove();
-    }
-    const endBtns = document.querySelectorAll('#end-turn-btn');
-    if (endBtns.length > 1) {
-        for(let i = 1; i < endBtns.length; i++) endBtns[i].remove();
-    }
+    window.isDrawClicked = true;
+    window.isDrawing = true; 
+    window.waitingForServerResponse = true;
 
-    // 残った正規のボタンにだけ、1度だけイベントを紐付ける
-    const drawBtn = document.getElementById('draw-btn');
-    if (drawBtn) {
-        drawBtn.onclick = (e) => {
-            if (isDrawClicked) return;
-            if (window.isAnimating || window.pendingJanken || window.isDrawing || window.isProcessingPlay || window.waitingForServerResponse || window.isServerProcessingAbility) return; 
-            if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
-            if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) return;
-            
-            isDrawClicked = true;
-            setTimeout(() => { isDrawClicked = false; }, 1000); 
-            
-            window.isDrawing = true; 
-            window.waitingForServerResponse = true;
-
-            drawBtn.classList.add('hidden');
-            
-            window.tryDrawWithAbility(() => {
-                const s = window.game.drawStack; const count = s > 0 ? s : 1;
-                const currentId = window.getMyId();
-                
-                if (window.isHost) {
-                    if (window.socket) window.socket.emit('request_draw_animation', { playerId: currentId, count: count });
-                    window.executeDraw(currentId);
-                    window.isDrawing = false;
-                    window.waitingForServerResponse = false;
-                } else {
-                    if (window.socket) window.socket.emit('player_action', { action: 'draw', playerId: currentId, count: count });
-                    setTimeout(() => { window.isDrawing = false; window.waitingForServerResponse = false; }, 1000);
-                }
-
-                if (window.SE) window.SE.playMultiple('Distribute', count, 500);
-
-                if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
-                    CardAnimation.animateMultiDraw(count, 'player-hand', () => {});
-                }
-            });
-        };
-    }
-
-    const endBtn = document.getElementById('end-turn-btn');
-    if (endBtn) {
-        endBtn.onclick = (e) => {
-            if (isEndClicked) return;
-            if (window.pendingJanken || window.waitingForServerResponse || window.isServerProcessingAbility) return; 
-            if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
-            
-            isEndClicked = true;
-            setTimeout(() => { isEndClicked = false; }, 1000);
-
-            window.waitingForServerResponse = true;
-            if (drawBtn) drawBtn.classList.add('hidden');
-            endBtn.classList.add('hidden');
-            
-            const currentId = window.getMyId();
-            if (window.isHost) {
-                window.executeEndTurn(currentId);
-                window.waitingForServerResponse = false;
-                window.isProcessingPlay = false;
-            } else {
-                if (window.socket) window.socket.emit('player_action', { action: 'end_turn', playerId: currentId });
-                setTimeout(() => { window.waitingForServerResponse = false; window.isProcessingPlay = false; }, 1000);
-            }
-        };
-    }
+    document.querySelectorAll('#draw-btn').forEach(b => { b.classList.add('hidden'); b.style.pointerEvents = 'none'; });
     
-    if(window.ensureModalsExist) window.ensureModalsExist(); 
-    if(window.initVolumeControl) window.initVolumeControl(); 
-});
+    window.tryDrawWithAbility(() => {
+        const s = window.game.drawStack; const count = s > 0 ? s : 1;
+        const currentId = window.getMyId();
+        
+        if (window.isHost) {
+            if (window.socket) window.socket.emit('request_draw_animation', { playerId: currentId, count: count });
+            window.executeDraw(currentId);
+            window.isDrawing = false;
+            window.waitingForServerResponse = false;
+        } else {
+            if (window.socket) window.socket.emit('player_action', { action: 'draw', playerId: currentId, count: count });
+            setTimeout(() => { window.isDrawing = false; window.waitingForServerResponse = false; }, 1000);
+        }
+
+        if (window.SE) window.SE.playMultiple('Distribute', count, 500);
+
+        if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
+            CardAnimation.animateMultiDraw(count, 'player-hand', () => {});
+        }
+        setTimeout(() => { window.isDrawClicked = false; document.querySelectorAll('#draw-btn').forEach(b => b.style.pointerEvents = 'auto'); }, 1500);
+    });
+};
+
+window.handleEndTurnClick = function(e) {
+    if (window.isEndClicked) return;
+    if (window.pendingJanken || window.waitingForServerResponse || window.isServerProcessingAbility) return; 
+    if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
+    
+    window.isEndClicked = true;
+    window.waitingForServerResponse = true;
+    document.querySelectorAll('#draw-btn').forEach(b => b.classList.add('hidden'));
+    document.querySelectorAll('#end-turn-btn').forEach(b => { b.classList.add('hidden'); b.style.pointerEvents = 'none'; });
+    
+    const currentId = window.getMyId();
+    if (window.isHost) {
+        window.executeEndTurn(currentId);
+        window.waitingForServerResponse = false;
+        window.isProcessingPlay = false;
+    } else {
+        if (window.socket) window.socket.emit('player_action', { action: 'end_turn', playerId: currentId });
+        setTimeout(() => { window.waitingForServerResponse = false; window.isProcessingPlay = false; }, 1000);
+    }
+    setTimeout(() => { window.isEndClicked = false; document.querySelectorAll('#end-turn-btn').forEach(b => b.style.pointerEvents = 'auto'); }, 1500);
+};
+
+document.getElementById('uno-btn').onclick = window.declareUno;
 
 (() => {
     const btnManual = document.getElementById('btn-manual'), manualOverlay = document.getElementById('manual-overlay'), manualImage = document.getElementById('manual-image'), manualPrev = document.getElementById('manual-prev'), manualNext = document.getElementById('manual-next'), manualClose = document.getElementById('manual-close'), manualIndicators = document.getElementById('manual-indicators');
@@ -1168,13 +1220,17 @@ function initMainSocketEvents() {
         
         window.waitingForServerResponse = false;
         window.isDrawing = false;
-        window.isProcessingPlay = false;
         window.isDefending = false;
         window.currentDefensePhaseId = null;
         window.hasRespondedDefense = false;
         window.isAnimating = false; 
         window.pendingJanken = null;
         window.pendingDefense = null;
+        
+        // ★修正: ポップアップが画面に出ていなければロックを自動解除（フリーズ防止の自己修復）
+        if (!document.querySelector('.action-popup:not(.hidden)')) {
+            window.isProcessingPlay = false;
+        }
 
         if (state.defensePhase || state.jankenPhase) {
             window.isServerProcessingAbility = true;
@@ -1291,4 +1347,8 @@ function initMainSocketEvents() {
     window.socket.on('show_color_selector', () => { if (typeof ColorUI !== 'undefined' && ColorUI.show) ColorUI.show(); });
     window.socket.on('receive_chat', (data) => { if (window.ChatManager && typeof window.ChatManager.showMsg === 'function') { window.ChatManager.showMsg(data.message, data.senderName); } });
 }
+
+// 初期化呼び出し
+if(window.ensureModalsExist) window.ensureModalsExist();
+if(window.initVolumeControl) window.initVolumeControl();
 initMainSocketEvents();
