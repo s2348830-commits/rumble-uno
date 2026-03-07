@@ -136,56 +136,70 @@ class UNOGame {
         }
     }
 
+    // ★統合された drawCard 関数
     drawCard(targetId, ignoreShield = false, forced = false) {
         const t = this.players.find(p => p.id === targetId);
-        if (!t) return false; // プレイヤーが見つからない場合は中断
+        if (!t) return false;
         
+        // 無敵状態ならドローしない
         if (t.invincibleTurns > 0) return false;
 
-        // 【蘇生チェック】 +2, +4, または能力によるドロー(forced)時に発動
-        if (forced) {
+        // 【蘇生判定】
+        // 能力によるドロー(forced) または +2, +4の累積(this.drawStack > 0) を「強制ドロー」と判定
+        const isPenaltyOrAbilityDraw = forced || (this.drawStack > 0);
+
+        if (isPenaltyOrAbilityDraw) {
+            // イヴの蘇生チェック (resurrectionEveCount が 0:未使用 の場合のみ実行)
             if (t.resurrectionEveCount === 0) {
-                t.resurrectionEveCount = 1;
+                t.resurrectionEveCount = 1; // 使用済みに更新
                 this.hands[targetId].push({ color: 'black', value: 'id_35' });
             }
+            // ミサの蘇生チェック
             if (t.resurrectionMisaCount === 0) {
-                t.resurrectionMisaCount = 1;
+                t.resurrectionMisaCount = 1; // 使用済みに更新
                 this.hands[targetId].push({ color: 'black', value: 'id_25' });
             }
         }
 
-        // シールド判定
+        // シールド判定 (通常ドローまたはシールド有効時)
         if (!ignoreShield && t.shield && t.shield.turns > 0 && t.shield.level > 0) {
             t.shield.level--; 
             if (t.shield.level <= 0) t.shield.turns = 0;
             return true; 
         }
 
-        // 山札切れ時のリシャッフル
+        // 山札切れ時のリシャッフル処理
         if (this.deck.length === 0) {
-            if (this.discardPile.length <= 1) return false;
+            if (this.discardPile.length <= 1) {
+                if (typeof window !== 'undefined') window.isGameOver = true; 
+                return false;
+            }
             const top = this.discardPile.pop();
             const topRot = this.discardRotations.pop();
 
             const newDeck = []; const newDiscardPile = []; const newDiscardRotations = [];
             for(let i = 0; i < this.discardPile.length; i++) {
                 const c = this.discardPile[i];
+                // 能力カードは山札に戻さない
                 if (c.value && String(c.value).startsWith('id_')) {
                     newDiscardPile.push(c); newDiscardRotations.push(this.discardRotations[i]);
                 } else { newDeck.push(c); }
             }
+            
             if (newDeck.length === 0) {
                 this.discardPile.push(top); this.discardRotations.push(topRot);
                 return false;
             }
+            
             this.deck = UNORules.shuffle(newDeck);
             this.discardPile = newDiscardPile; this.discardRotations = newDiscardRotations;
             this.discardPile.push(top); this.discardRotations.push(topRot);
         }
 
-        // カードを引く
+        // カードを1枚引く
         if (this.hands[targetId] && this.deck.length > 0) {
             this.hands[targetId].push(this.deck.pop());
+            // 手札が2枚以上になればUNO宣言は無効化
             if (targetId === this.myId && this.hands[targetId].length > 1) this.unoDeclared = false;
             return true;
         }
@@ -216,7 +230,6 @@ class UNOGame {
             const isAbility = lastCard.value && String(lastCard.value).startsWith('id_');
             const isAction = !/^[0-9]$/.test(lastCard.value) && !isAbility;
             
-            // ★修正4: ペナルティ判定のズレ（能力で捨てるカードも考慮）
             const def = (isAbility && typeof window !== 'undefined' && window.AbilityDef) ? window.AbilityDef[lastCard.value] : null;
             const willDiscard = (isAbility && def && (def.needsDiscard || def.needsAbilityDiscard)) ? 1 : 0;
             const finalHandCount = hand.length - selectedCards.length - willDiscard;
@@ -264,50 +277,6 @@ class UNOGame {
             return { success: true, lastCard: lastCard };
         }
         return { success: false };
-    }
-
-    drawCard(targetId, ignoreShield = false) {
-        const t = this.players.find(p => p.id === targetId);
-        if (t && t.invincibleTurns > 0) return false;
-        if (!ignoreShield && t && t.shield && t.shield.turns > 0 && t.shield.level > 0) {
-            t.shield.level--; if (t.shield.level <= 0) t.shield.turns = 0;
-            return true; 
-        }
-
-        if (this.deck.length === 0) {
-            if (this.discardPile.length <= 1) {
-                if (typeof window !== 'undefined') window.isGameOver = true; 
-                if (window.isHost && typeof window.socket !== 'undefined') window.socket.emit('announce_draw');
-                return false;
-            }
-            const top = this.discardPile.pop();
-            const topRot = this.discardRotations.pop();
-
-            const newDeck = []; const newDiscardPile = []; const newDiscardRotations = [];
-            for(let i = 0; i < this.discardPile.length; i++) {
-                const c = this.discardPile[i];
-                if (c.value && String(c.value).startsWith('id_')) {
-                    newDiscardPile.push(c); newDiscardRotations.push(this.discardRotations[i]);
-                } else { newDeck.push(c); }
-            }
-
-            // ★修正4: 無限ループ回避（新しく補充できるカードが1枚もない場合はドロー不可とする）
-            if (newDeck.length === 0) {
-                this.discardPile.push(top); this.discardRotations.push(topRot);
-                return false;
-            }
-            
-            this.deck = UNORules.shuffle(newDeck);
-            this.discardPile = newDiscardPile; this.discardRotations = newDiscardRotations;
-            this.discardPile.push(top); this.discardRotations.push(topRot);
-        }
-
-        if (this.hands[targetId] && this.deck.length > 0) {
-            this.hands[targetId].push(this.deck.pop());
-            if (targetId === this.myId && this.hands[targetId].length > 1) this.unoDeclared = false;
-            return true;
-        }
-        return false;
     }
 
     lockRandomCard(attackerId, targetId, type, count = 1, turns = 1) {
