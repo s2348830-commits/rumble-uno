@@ -131,10 +131,14 @@ if (typeof window !== 'undefined' && !window.RuleUIManager) {
                 container.appendChild(item);
             });
 
-            document.getElementById('setting-initial-custom-hand').addEventListener('change', (e) => {
-                this.initialCustomHandSize = parseInt(e.target.value);
-                if (window.isHost) this.broadcastSettings();
-            });
+            // ★修正: 要素が存在するか確認してからイベントを登録し、エラーによる処理の中断を防ぐ
+            const customHandSelect = document.getElementById('setting-initial-custom-hand');
+            if (customHandSelect) {
+                customHandSelect.addEventListener('change', (e) => {
+                    this.initialCustomHandSize = parseInt(e.target.value);
+                    if (window.isHost) this.broadcastSettings();
+                });
+            }
         },
 
         addCard: function(id, maxLimit) {
