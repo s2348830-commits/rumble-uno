@@ -161,9 +161,6 @@ window.broadcastGameState = function(skipUIUpdate = false, attackGuides = []) {
     if (!window.isHost) return;
     const playersInfo = window.game.players.map(p => ({ id: p.id, connected: p.connected, frozen: p.frozen, burnTurns: p.burnTurns, invincibleTurns: p.invincibleTurns, shield: p.shield, evasion: p.evasion, usedRaia: p.usedRaia }));
     const state = { deck: window.game.deck, turnIndex: window.game.turnIndex, direction: window.game.direction, hands: window.game.hands, discardPile: window.game.discardPile, discardRotations: window.game.discardRotations, drawStack: window.game.drawStack, currentColor: window.game.currentColor, playersInfo: playersInfo, hasDrawnThisTurn: window.game.hasDrawnThisTurn, defensePhase: window.pendingDefense ? window.pendingDefense.info : null, defenseTimer: window.pendingDefense ? window.pendingDefense.timer : 0, attackGuides: attackGuides, abilityGraveyard: window.game.abilityGraveyard, jankenPhase: window.pendingJanken, customDeck: window.game.customDeck };
-    
-    window.isServerProcessingAbility = (state.defensePhase !== null || state.jankenPhase !== null);
-
     if (window.socket) window.socket.emit('sync_game_state', state);
     if (!skipUIUpdate) { window.lastGameStateFingerprint = ""; window.updateUI(); }
     window.updatePhaseUI(state);
@@ -401,7 +398,7 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
 
 window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetId, discardIdx, selectedColor = null, multiDiscardIndices = [], extraData = {}) {
     if (!window.isHost) return;
-    const hand = window.game.hands[playerId]; if (!hand || playedCardsData.length === 0) return; 
+    const hand = window.game.hands[playerId]; if (!hand || !playedCardsData || playedCardsData.length === 0) return; 
     
     const wasMyTurn = (playerId === window.game.currentPlayer.id);
     const cardValue = playedCardsData[0].value; const def = window.AbilityDef ? window.AbilityDef[cardValue] : null;
@@ -737,6 +734,7 @@ window.executeDraw = function(playerId, isBot = false) {
     for(let i=0; i<count; i++) { if(!window.game.drawCard(playerId)) { if(window.isGameOver) return; break; } }
     if (stack > 0) { window.game.drawStack = 0; window.game.nextTurn(1); window.checkTurn(); } 
     else { if (isBot) { window.game.nextTurn(1); window.checkTurn(); } else { window.game.hasDrawnThisTurn = true; window.broadcastGameState(); } }
+    window.waitingForServerResponse = false;
 };
 
 window.executeEndTurn = function(playerId) {
@@ -955,11 +953,13 @@ function initMainSocketEvents() {
         window.waitingForServerResponse = false;
         window.isServerProcessingAbility = (state.defensePhase !== null || state.jankenPhase !== null);
         
+        if (typeof window.updatePhaseUI === 'function') { window.updatePhaseUI(state); }
+        
         const isChoosing = (!window.isHost && window.game.myId) && ((window.game.selectedIndices && window.game.selectedIndices.length > 0) || window.isProcessingPlay || window.isDrawing || document.querySelector('.action-popup:not(.hidden)'));
         const currentFingerprint = JSON.stringify(state);
         if (window.lastGameStateFingerprint === currentFingerprint && !window.isInitialDealing) return;
         window.lastGameStateFingerprint = currentFingerprint;
-
+        
         window.game.deck = state.deck; window.game.turnIndex = state.turnIndex; window.game.direction = state.direction; window.game.discardPile = state.discardPile; window.game.discardRotations = state.discardRotations; window.game.drawStack = state.drawStack; window.game.currentColor = state.currentColor;
         if(state.hasDrawnThisTurn !== undefined) window.game.hasDrawnThisTurn = state.hasDrawnThisTurn; if(state.abilityGraveyard) window.game.abilityGraveyard = state.abilityGraveyard; if(state.customDeck) window.game.customDeck = state.customDeck;
         if (state.playersInfo) { let newPlayers = []; state.playersInfo.forEach(info => { let p = window.game.players.find(x => x.id === info.id); if (p) { p.frozen = info.frozen; p.burnTurns = info.burnTurns; p.connected = info.connected; p.invincibleTurns = info.invincibleTurns || 0; p.shield = info.shield || { level: 0, turns: 0 }; p.evasion = info.evasion || { level: 0, turns: 0 }; p.usedRaia = info.usedRaia || false; newPlayers.push(p); } }); if (newPlayers.length === window.game.players.length) window.game.players = newPlayers; }
@@ -971,7 +971,6 @@ function initMainSocketEvents() {
         if (window.isInitialDealing) { msgEl.innerText = "カードを配っています..."; } 
         else if (current) { const roomStr = window.currentRoomState ? ` - 部屋ID:${window.currentRoomState.id}` : ""; msgEl.innerText = current.id === window.myId ? `あなたの番です${roomStr}` : `${current.name} のターン${roomStr}`; }
         if (state.attackGuides && state.attackGuides.length > 0) { state.attackGuides.forEach(g => { const delay = g.delay || 0; setTimeout(() => { if (typeof window.showAttackGuide === 'function') window.showAttackGuide(g.from, g.to, g.text, g.se); }, delay); }); }
-        if (typeof window.updatePhaseUI === 'function') { window.updatePhaseUI(state); }
     });
 
     window.socket.on('broadcast_uno', (data) => {
