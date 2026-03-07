@@ -320,7 +320,6 @@ window.openDebuffSelection = function(callback) {
 window.showDefenseModal = function(attackCardValue) {
     window.ensureModalsExist(); const modal = document.getElementById('defense-modal'), list = document.getElementById('defense-modal-list'), title = document.getElementById('defense-title'), desc = document.getElementById('defense-desc'), qArea = document.getElementById('defense-question-area'), sArea = document.getElementById('defense-select-area'), btnYes = document.getElementById('btn-defense-yes'), btnNo = document.getElementById('btn-defense-no'), btnCancel = document.getElementById('btn-cancel-defense');
     
-    // ★修正: ホスト自身が防御対象の場合、通信せずに直接pendingDefenseを更新してフリーズを防ぐ
     const sendResponse = (cardValue, discardIdx) => {
         window.hasRespondedDefense = true; modal.classList.add('hidden');
         if (window.isHost) {
@@ -498,7 +497,10 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
             let guides = []; if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, responses, multiplier, selectedColor, multiCards, extraData);
             guides.forEach(g => { if(g.delay === undefined) g.delay = 2500; }); 
             let someoneWon = false; window.game.players.forEach(p => { if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) { window.checkWin(p.id); someoneWon = true; } });
-            window.broadcastGameState(false, guides); 
+            if (!someoneWon) { 
+                window.broadcastGameState(false, guides); 
+                if(wasMyTurn) { setTimeout(() => window.checkTurn(), 500); } 
+            } else { window.broadcastGameState(false, guides); }
             return;
         }
 
@@ -559,7 +561,7 @@ window.executeAbilityPlay = function(playerId, indices, playedCardsData, targetI
 window.startJankenPhase = function(attackerId, loopCount, fixedTargetId = null, wasMyTurn = true) {
     if (window.jankenInterval) clearInterval(window.jankenInterval);
     let targetId = fixedTargetId;
-    if (!targetId) { const others = window.game.players.filter(p => p.id !== attackerId && p.connected); if (others.length === 0) { alert("じゃんけんの相手がいません！"); return; } targetId = others[Math.floor(Math.random() * others.length)].id; }
+    if (!targetId) { const others = window.game.players.filter(p => p.id !== attackerId && p.connected); if (others.length === 0) { alert("じゃんけんの相手がいません！"); if(wasMyTurn){ window.checkTurn(); } return; } targetId = others[Math.floor(Math.random() * others.length)].id; }
     window.pendingJanken = { attackerId, targetId, loopCount, attackerHand: null, targetHand: null, timer: 10, result: null, wasMyTurn: wasMyTurn };
     window.broadcastGameState(); 
     window.jankenInterval = setInterval(() => {
@@ -746,7 +748,6 @@ window.executeDraw = function(playerId, isBot = false) {
     for(let i=0; i<count; i++) { if(!window.game.drawCard(playerId)) { if(window.isGameOver) return; break; } }
     if (stack > 0) { window.game.drawStack = 0; window.game.nextTurn(1); window.checkTurn(); } 
     else { if (isBot) { window.game.nextTurn(1); window.checkTurn(); } else { window.game.hasDrawnThisTurn = true; window.broadcastGameState(); } }
-    window.waitingForServerResponse = false;
 };
 
 window.executeEndTurn = function(playerId) {
@@ -787,7 +788,7 @@ window.tryDrawWithAbility = function(callback) {
 window.handlePlayAction = function() {
     if (window.game.selectedIndices.length === 0 || window.isGameOver || window.isInitialDealing || window.isDrawing) return;
     
-    if (window.waitingForServerResponse || window.pendingJanken || window.pendingDefense || window.currentDefensePhaseId || window.isDefending || window.isProcessingPlay) {
+    if (window.isAnimating || window.waitingForServerResponse || window.pendingJanken || window.pendingDefense || window.currentDefensePhaseId || window.isDefending || window.isProcessingPlay) {
         alert("現在、通信または効果処理中です。解決するまでお待ちください。"); window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return;
     }
     
@@ -968,12 +969,13 @@ function initMainSocketEvents() {
         
         window.waitingForServerResponse = false;
         
-        // ★修正: サーバーが処理中でなければ、あらゆるローカルのロックフラグを強制解除する（フェイルセーフ）
+        // ★フェイルセーフ: サーバーが防御やじゃんけんの処理中でないなら、クライアント側の全てのロックを強制リセット
         if (state.defensePhase === null && state.jankenPhase === null) {
             window.isServerProcessingAbility = false;
             window.isDefending = false;
             window.currentDefensePhaseId = null;
             window.hasRespondedDefense = false;
+            window.isAnimating = false; // アニメーションのスタックも強制解除
         } else {
             window.isServerProcessingAbility = true;
         }
