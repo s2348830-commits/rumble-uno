@@ -2325,72 +2325,87 @@ window.onColorChosen = function(color) {
     }
 };
 
-document.getElementById('draw-btn').onclick = function() {
-    if (window.pendingJanken || window.isDrawing || window.isProcessingPlay) return; 
-    if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
-    if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) return;
-    
-    window.isDrawing = true; 
-    this.disabled = true;
-    this.style.pointerEvents = 'none'; 
-    this.style.opacity = '0.5'; 
-    
-    window.tryDrawWithAbility(() => {
-        window.game.hasDrawnThisTurn = true; 
-        window.updateUI();                    
-        
-        const s = window.game.drawStack; 
-        let count = s > 0 ? s : 1;
-        const me = window.game.players.find(p=>p.id===window.game.myId);
-        if (me && me.laceration > 0) count += 1; // 裂傷の場合は+1枚
-        
-        if (window.isHost) {
-            if (window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: count }); 
-            window.executeDraw(window.game.myId); 
-        } else if (window.socket) {
-            window.socket.emit('player_action', { action: 'draw', count: count });
-        }
+// ★修正: エラーを防止するため、画面読み込み後にボタンの存在を確認してからイベントを付与する
+document.addEventListener('DOMContentLoaded', () => { 
+    if(window.ensureModalsExist) window.ensureModalsExist();
+    if(window.initVolumeControl) window.initVolumeControl(); 
 
-        if (window.SE) window.SE.playMultiple('Distribute', count, 500);
+    const drawBtn = document.getElementById('draw-btn');
+    if (drawBtn) {
+        drawBtn.onclick = function() {
+            if (window.pendingJanken || window.isDrawing || window.isProcessingPlay) return; 
+            if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
+            if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) return;
+            
+            window.isDrawing = true; 
+            this.disabled = true;
+            this.style.pointerEvents = 'none'; 
+            this.style.opacity = '0.5'; 
+            
+            window.tryDrawWithAbility(() => {
+                window.game.hasDrawnThisTurn = true; 
+                window.updateUI();                    
+                
+                const s = window.game.drawStack; 
+                let count = s > 0 ? s : 1;
+                const me = window.game.players.find(p=>p.id===window.game.myId);
+                if (me && me.laceration > 0) count += 1; // 裂傷の場合は+1枚
+                
+                if (window.isHost) {
+                    if (window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: count }); 
+                    window.executeDraw(window.game.myId); 
+                } else if (window.socket) {
+                    window.socket.emit('player_action', { action: 'draw', count: count });
+                }
 
-        const finishDraw = () => {
-            window.isDrawing = false; 
-            const btn = document.getElementById('draw-btn');
-            if (btn) {
-                btn.style.pointerEvents = 'auto'; 
-                btn.disabled = false;
-                btn.style.opacity = '1';
-            }
+                if (window.SE) window.SE.playMultiple('Distribute', count, 500);
+
+                const finishDraw = () => {
+                    window.isDrawing = false; 
+                    if (drawBtn) {
+                        drawBtn.style.pointerEvents = 'auto'; 
+                        drawBtn.disabled = false;
+                        drawBtn.style.opacity = '1';
+                    }
+                };
+
+                if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
+                    CardAnimation.animateMultiDraw(count, 'player-hand', finishDraw);
+                    setTimeout(finishDraw, 3000); 
+                } else {
+                    setTimeout(finishDraw, 500);
+                }
+            });
         };
-
-        if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
-            CardAnimation.animateMultiDraw(count, 'player-hand', finishDraw);
-            setTimeout(finishDraw, 3000); 
-        } else {
-            setTimeout(finishDraw, 500);
-        }
-    });
-};
-
-document.getElementById('end-turn-btn').onclick = () => {
-    if (window.pendingJanken || window.isDrawing || window.isProcessingPlay) return; 
-    if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
-    
-    window.isDrawing = true; 
-    document.getElementById('end-turn-btn').style.pointerEvents = 'none'; 
-
-    if (window.isHost) {
-        window.executeEndTurn(window.game.myId); 
-    } else if (window.socket) {
-        window.socket.emit('player_action', { action: 'end_turn' });
     }
-    
-    setTimeout(() => { 
-        window.isDrawing = false; 
-        const btn = document.getElementById('end-turn-btn');
-        if (btn) btn.style.pointerEvents = 'auto'; 
-    }, 1000); 
-};
+
+    const endTurnBtn = document.getElementById('end-turn-btn');
+    if (endTurnBtn) {
+        endTurnBtn.onclick = () => {
+            if (window.pendingJanken || window.isDrawing || window.isProcessingPlay) return; 
+            if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
+            
+            window.isDrawing = true; 
+            endTurnBtn.style.pointerEvents = 'none'; 
+
+            if (window.isHost) {
+                window.executeEndTurn(window.game.myId); 
+            } else if (window.socket) {
+                window.socket.emit('player_action', { action: 'end_turn' });
+            }
+            
+            setTimeout(() => { 
+                window.isDrawing = false; 
+                if (endTurnBtn) endTurnBtn.style.pointerEvents = 'auto'; 
+            }, 1000); 
+        };
+    }
+
+    const unoBtn = document.getElementById('uno-btn');
+    if (unoBtn) {
+        unoBtn.onclick = window.declareUno;
+    }
+});
 
 document.getElementById('uno-btn').onclick = window.declareUno;
 
