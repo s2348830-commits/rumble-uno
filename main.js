@@ -2595,12 +2595,27 @@ function initMainSocketEvents() {
         }
     });
 }
-document.getElementById("btn-open-custom-cards").onclick = () => {
-    document.getElementById("custom-card-overlay").classList.remove("hidden");
-};
 
-document.getElementById("btn-close-custom-cards").onclick = () => {
-    document.getElementById("custom-card-overlay").classList.add("hidden");
-};
+const btnOpenCustomCards = document.getElementById("btn-open-custom-cards");
+    if (btnOpenCustomCards) {
+        btnOpenCustomCards.onclick = () => {
+            const overlay = document.getElementById("custom-card-overlay");
+            if (overlay) {
+                overlay.classList.remove("hidden");
+                if (window.SE) window.SE.play('touch_to_start'); // お好みで開く時の音
+            }
+        };
+    }
+
+    const btnCloseCustomCards = document.getElementById("btn-close-custom-cards");
+    if (btnCloseCustomCards) {
+        btnCloseCustomCards.onclick = () => {
+            const overlay = document.getElementById("custom-card-overlay");
+            if (overlay) {
+                overlay.classList.add("hidden");
+                if (window.SE) window.SE.play('touch_to_start'); // お好みで閉じる時の音
+            }
+        };
+    }
 
 initMainSocketEvents();
