@@ -66,7 +66,7 @@ if (typeof window !== 'undefined' && !window.RuleUIManager) {
         initialCustomHandSize: 2,
 
         init: function() {
-            const container = document.getElementById('custom-card-list');
+            const container = document.getElementById('custom-card-grid');
             if (!container) return;
             container.innerHTML = '';
             
