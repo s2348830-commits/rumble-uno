@@ -948,9 +948,11 @@ window.onColorChosen = function(color) {
 };
 
 document.getElementById('draw-btn').onclick = () => {
+    // 致命的なロックがかかっている場合は無視
     if (window.isAnimating || window.pendingJanken || window.isDrawing || window.isProcessingPlay || window.waitingForServerResponse || window.isServerProcessingAbility) return; 
     if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
     
+    // すでに引いている場合はルールに従ってブロック
     if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) return;
     
     window.isDrawing = true; 
@@ -958,23 +960,29 @@ document.getElementById('draw-btn').onclick = () => {
     
     window.tryDrawWithAbility(() => {
         const s = window.game.drawStack; const count = s > 0 ? s : 1;
+        
+        // ★修正: アニメーションの終了を待たず、即座にサーバーに通信を送る！
+        // これにより、途中で同期が来て画面が再描画されても進行が止まらなくなります。
+        if (window.isHost) {
+            if (window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: count });
+            window.executeDraw(window.game.myId);
+        } else if (window.socket) {
+            window.socket.emit('player_action', { action: 'draw', count: count });
+        }
+
         if (window.SE) window.SE.playMultiple('Distribute', count, 500);
 
-        const finalizeDrawAction = () => {
-            if (window.isHost) {
-                if (window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: count });
-                window.executeDraw(window.game.myId);
-            } else if (window.socket) {
-                window.socket.emit('player_action', { action: 'draw', count: count });
-            }
-            setTimeout(() => { window.isDrawing = false; window.waitingForServerResponse = false; }, 2000);
-        };
-
+        // アニメーションはあくまで「見た目」としてだけ動かす
         if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
-            CardAnimation.animateMultiDraw(count, 'player-hand', finalizeDrawAction);
+            CardAnimation.animateMultiDraw(count, 'player-hand', () => {
+                window.isDrawing = false;
+            });
         } else {
-            finalizeDrawAction();
+            window.isDrawing = false;
         }
+        
+        // サーバーからの同期が遅れた場合のための保険ロック解除
+        setTimeout(() => { window.waitingForServerResponse = false; }, 2000);
     });
 };
 
