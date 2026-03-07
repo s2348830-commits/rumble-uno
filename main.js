@@ -333,7 +333,10 @@ window.updatePhaseUI = function(state) {
         window.jankenResultPlayed = false;
         window.currentJankenLoopId = null; 
         const jOverlay = document.getElementById('janken-overlay');
-        if (jOverlay && !jOverlay.classList.contains('result-showing')) jOverlay.classList.add('hidden');
+        if (jOverlay) {
+            jOverlay.classList.remove('result-showing');
+            jOverlay.classList.add('hidden');
+        }
     }
 };
 
@@ -1535,7 +1538,6 @@ window.showJankenUI = function(attackerId, targetId, loopCount) {
     const jankenLoopId = `${attackerId}-${targetId}-${loopCount}`;
     if (window.currentJankenLoopId !== jankenLoopId) {
         window.currentJankenLoopId = jankenLoopId;
-        if (window.SE) window.SE.play('hv/id_26');
     }
 
     overlay.classList.remove('result-showing');
