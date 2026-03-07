@@ -1646,7 +1646,7 @@ window.playJankenResult = function(attackerId, targetId, aH, tH, result) {
     // ★追加: 能力カード使用者が勝つまたはあいこになった時に0.5秒待って音を流す
     if (result === 'win' || result === 'draw') {
         setTimeout(() => {
-            if (window.SE) window.SE.play('hv/id_26');
+            if (window.SE) window.SE.play('hv/id_25');
         }, 500);
     }
 
