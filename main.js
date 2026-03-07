@@ -388,7 +388,10 @@ window.updatePhaseUI = function(state) {
         window.jankenResultPlayed = false;
         window.currentJankenLoopId = null; 
         const jOverlay = document.getElementById('janken-overlay');
-        if (jOverlay && !jOverlay.classList.contains('result-showing')) jOverlay.classList.add('hidden');
+        if (jOverlay) {
+            jOverlay.classList.remove('result-showing'); // ★追加: 結果表示状態を解除
+            jOverlay.classList.add('hidden'); // ★追加: 確実に非表示にする
+        }
     }
 };
 
