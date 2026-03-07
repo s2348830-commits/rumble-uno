@@ -1676,13 +1676,7 @@ window.checkTurn = function() {
                         const discIdx = bHand.findIndex((c, i) => !result.indices.includes(i) && !(c.value && String(c.value).startsWith('id_')));
                         botDiscardIdx = discIdx > -1 ? discIdx : (bHand.length > result.indices.length ? bHand.findIndex((c,i)=>!result.indices.includes(i)) : null);
                     }
-                    if (playedCards[0].value === 'id_20' && botSelectedColor) {
-                        const bHand = window.game.hands[current.id];
-                        bHand.forEach((c, i) => {
-                            if (!result.indices.includes(i) && c.color === botSelectedColor) botMultiDiscardIndices.push(i);
-                        });
-                        willDiscard += botMultiDiscardIndices.length;
-                    }
+                    
                 }
 
                 const remainingCards = window.game.hands[current.id].length - playedCards.length - willDiscard;
@@ -1764,13 +1758,6 @@ window.checkTurn = function() {
                                 const bHand = window.game.hands[current.id];
                                 const discIdx = bHand.findIndex((c, i) => !result.indices.includes(i) && !(c.value && String(c.value).startsWith('id_')));
                                 botDiscardIdx = discIdx > -1 ? discIdx : (bHand.length > result.indices.length ? bHand.findIndex((c,i)=>!result.indices.includes(i)) : null);
-                            }
-                            if (playedCards[0].value === 'id_20' && botSelectedColor) {
-                                const bHand = window.game.hands[current.id];
-                                bHand.forEach((c, i) => {
-                                    if (!result.indices.includes(i) && c.color === botSelectedColor) botMultiDiscardIndices.push(i);
-                                });
-                                willDiscard += botMultiDiscardIndices.length;
                             }
                         }
 
@@ -2178,19 +2165,9 @@ window.handlePlayAction = function() {
             }
         };
 
+        // ▼ 修正後（これだけに書き換える）
         const step4 = () => {
-            if (def && cardValue === 'id_20' && selColor) {
-                const validIndices = [];
-                window.game.myHand.forEach((c, i) => {
-                    if (!indices.includes(i) && i !== discardIdx && c.color === selColor) validIndices.push(i);
-                });
-                if (validIndices.length > 0) {
-                    window.openMultiDiscardSelection(window.game.myHand, validIndices, (selectedMulti) => {
-                        multiDiscardIndices = selectedMulti;
-                        step5();
-                    });
-                } else { step5(); }
-            } else { step5(); }
+            step5(); // レベッカのカード選択は自動化されたためスキップ
         };
 
         const step3 = () => {
