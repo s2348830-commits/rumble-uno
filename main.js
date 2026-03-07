@@ -1461,18 +1461,40 @@ window.resolveJanken = function() {
     window.broadcastGameState(); 
 
     setTimeout(() => {
-        let drawCount = 0;
-        if (result === 'win') {
-            drawCount = 2; 
+        let drawCount = 2; // 初回は結果によらず2ドロー
+        let winOrDrawDrawn = false;
+
+        if (result === 'win' || result === 'draw') {
+            winOrDrawDrawn = true;
+            // 相手2ドロー
+            window.AbilityEngine.applyDraw(window.game, pJ.targetId, drawCount, false, true);
+            
+            // 自分はランダムな「既存カード」を1枚捨てる
+            const aHand = window.game.hands[pJ.attackerId];
+            if (aHand) {
+                const normalCardIndices = [];
+                aHand.forEach((c, idx) => {
+                    const isAb = c.value && String(c.value).startsWith('id_');
+                    if (!isAb) normalCardIndices.push(idx);
+                });
+
+                if (normalCardIndices.length > 0) {
+                    const rIdx = normalCardIndices[Math.floor(Math.random() * normalCardIndices.length)];
+                    const discCard = aHand.splice(rIdx, 1)[0];
+                    window.game.discardPile.push(discCard);
+                    window.game.discardRotations.push(0);
+                } else {
+                    // 捨てれるカードがない場合は相手に+1ドロー
+                    window.AbilityEngine.applyDraw(window.game, pJ.targetId, 1, false, true);
+                }
+            }
         } else if (result === 'lose' && pJ.loopCount === 0) {
-            drawCount = 2;
+            // 初回負けの場合も相手2ドローのみ
+            window.AbilityEngine.applyDraw(window.game, pJ.targetId, drawCount, false, true);
         }
         
-        if (drawCount > 0) {
-            window.AbilityEngine.applyDraw(window.game, pJ.targetId, drawCount, false);
-            const guides = [{ from: pJ.attackerId, to: pJ.targetId, text: 'じゃんけんドロー!', delay: 0 }];
-            window.broadcastGameState(false, guides);
-        }
+        const guides = [{ from: pJ.attackerId, to: pJ.targetId, text: 'じゃんけんドロー!', delay: 0 }];
+        window.broadcastGameState(false, guides);
 
         let someoneWon = false;
         window.game.players.forEach(p => {
@@ -1484,14 +1506,12 @@ window.resolveJanken = function() {
         if (!someoneWon) {
             const nextLoop = pJ.loopCount + 1;
             const aId = pJ.attackerId;
-            const tId = pJ.targetId; 
             window.pendingJanken = null;
             window.broadcastGameState();
 
-            if (result === 'win' && nextLoop < 4) {
+            // 勝つもしくはあいこだった場合、最大4回まで「新しいランダムな相手」と再戦可能
+            if ((result === 'win' || result === 'draw') && nextLoop < 4) {
                 setTimeout(() => window.startJankenPhase(aId, nextLoop), 1000);
-            } else if (result === 'draw') {
-                setTimeout(() => window.startJankenPhase(aId, pJ.loopCount, tId), 1000);
             } else {
                 setTimeout(() => window.checkTurn(), 1000);
             }

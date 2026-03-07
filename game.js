@@ -31,6 +31,10 @@ class UNOGame {
             p.frozen = false; p.burnTurns = 0; p.invincibleTurns = 0; 
             p.shield = { level: 0, turns: 0 }; p.evasion = { level: 0, turns: 0 }; 
             p.frozenBurnImmune = false; p.usedRaia = false; p.raiaReturnPending = false;
+            // 追加
+            p.lacerationTurns = 0; 
+            p.resurrectionEveCount = -1; // -1:未所持, 0:未使用, 1:使用済み
+            p.resurrectionMisaCount = -1;
         });
         this.myId = myId;
     }
@@ -79,21 +83,13 @@ class UNOGame {
         this.direction = 1; this.drawStack = 0; this.unoDeclared = false;
     }
 
-    replaceAbilityCards(playerId, oldCardValues) {
-        const hand = this.hands[playerId];
-        if (!hand) return;
-        oldCardValues.forEach(val => {
-            const idx = hand.findIndex(c => c.value === val);
-            if (idx > -1) { hand.splice(idx, 1); this.customDeck.push({ color: 'black', value: val }); }
-        });
-        this.customDeck = UNORules.shuffle(this.customDeck);
-        oldCardValues.forEach(() => { if (this.customDeck.length > 0) hand.push(this.customDeck.pop()); });
-    }
-
     nextTurn(skipCount = 1) {
         if (this.currentPlayer) {
-            this.currentPlayer.frozen = false; this.currentPlayer.frozenBurnImmune = false;
+            this.currentPlayer.frozen = false; 
+            this.currentPlayer.frozenBurnImmune = false;
             if (this.currentPlayer.invincibleTurns > 0) this.currentPlayer.invincibleTurns--;
+            if (this.currentPlayer.lacerationTurns > 0) this.currentPlayer.lacerationTurns--; // 裂傷減少
+            
             if (this.currentPlayer.shield && this.currentPlayer.shield.turns > 0) {
                 this.currentPlayer.shield.turns--;
                 if (this.currentPlayer.shield.turns <= 0) this.currentPlayer.shield.level = 0;
@@ -124,24 +120,10 @@ class UNOGame {
 
         if (this.currentPlayer && this.currentPlayer.burnTurns > 0) {
             if (this.currentPlayer.invincibleTurns <= 0 && !this.currentPlayer.frozenBurnImmune) {
-                this.drawCard(this.currentPlayer.id);
+                this.drawCard(this.currentPlayer.id, false, true); // 燃焼ドローも強制扱い
                 if (window.isHost && window.socket) window.socket.emit('request_draw_animation', { playerId: this.currentPlayer.id, count: 1 });
             }
             this.currentPlayer.burnTurns--;
-        }
-    }
-
-    toggleSelect(index) {
-        const card = this.myHand[index];
-        if (!card) return;
-        const foundPos = this.selectedIndices.indexOf(index);
-        if (foundPos > -1) { this.selectedIndices.splice(foundPos, 1); } 
-        else {
-            if (this.selectedIndices.length > 0) {
-                const first = this.myHand[this.selectedIndices[0]];
-                if (card.value === first.value) this.selectedIndices.push(index);
-                else this.selectedIndices = [index];
-            } else this.selectedIndices.push(index);
         }
     }
 
@@ -155,7 +137,6 @@ class UNOGame {
             const isAbility = lastCard.value && String(lastCard.value).startsWith('id_');
             const isAction = !/^[0-9]$/.test(lastCard.value) && !isAbility;
             
-            // ★修正4: ペナルティ判定のズレ（能力で捨てるカードも考慮）
             const def = (isAbility && typeof window !== 'undefined' && window.AbilityDef) ? window.AbilityDef[lastCard.value] : null;
             const willDiscard = (isAbility && def && (def.needsDiscard || def.needsAbilityDiscard)) ? 1 : 0;
             const finalHandCount = hand.length - selectedCards.length - willDiscard;
@@ -205,9 +186,22 @@ class UNOGame {
         return { success: false };
     }
 
-    drawCard(targetId, ignoreShield = false) {
+    drawCard(targetId, ignoreShield = false, forced = false) {
         const t = this.players.find(p => p.id === targetId);
         if (t && t.invincibleTurns > 0) return false;
+
+        // 蘇生チェック（ミサ・イヴ）: +2, +4, 能力ドロー時に発動
+        if (forced && t) {
+            if (t.resurrectionEveCount === 0) {
+                t.resurrectionEveCount = 1;
+                this.hands[targetId].push({ color: 'black', value: 'id_35' });
+            }
+            if (t.resurrectionMisaCount === 0) {
+                t.resurrectionMisaCount = 1;
+                this.hands[targetId].push({ color: 'black', value: 'id_25' });
+            }
+        }
+
         if (!ignoreShield && t && t.shield && t.shield.turns > 0 && t.shield.level > 0) {
             t.shield.level--; if (t.shield.level <= 0) t.shield.turns = 0;
             return true; 
@@ -216,7 +210,6 @@ class UNOGame {
         if (this.deck.length === 0) {
             if (this.discardPile.length <= 1) {
                 if (typeof window !== 'undefined') window.isGameOver = true; 
-                if (window.isHost && typeof window.socket !== 'undefined') window.socket.emit('announce_draw');
                 return false;
             }
             const top = this.discardPile.pop();
@@ -229,13 +222,10 @@ class UNOGame {
                     newDiscardPile.push(c); newDiscardRotations.push(this.discardRotations[i]);
                 } else { newDeck.push(c); }
             }
-
-            // ★修正4: 無限ループ回避（新しく補充できるカードが1枚もない場合はドロー不可とする）
             if (newDeck.length === 0) {
                 this.discardPile.push(top); this.discardRotations.push(topRot);
                 return false;
             }
-            
             this.deck = UNORules.shuffle(newDeck);
             this.discardPile = newDiscardPile; this.discardRotations = newDiscardRotations;
             this.discardPile.push(top); this.discardRotations.push(topRot);
@@ -260,7 +250,6 @@ class UNOGame {
             if (type === 'symbol') return !isNum;
             return true;
         });
-        
         for (let i = 0; i < count; i++) {
             if (candidates.length > 0) {
                 const r = Math.floor(Math.random() * candidates.length);
