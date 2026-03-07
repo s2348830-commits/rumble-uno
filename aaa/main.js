@@ -1,7 +1,7 @@
 /**
  * main.js
  */
-window.game = new UNOGame(); window.playerAfkTimes = {}; window.turnTimer = null; window.isGameOver = false; window.isDrawing = false; window.isInitialDealing = false; window.isDefending = false; 
+window.game = new UNOGame(); window.playerAfkTimes = {}; window.turnTimer = null; window.isGameOver = false; window.isDrawing = false; window.isInitialDealing = false; window.isDefending = false; window.isDealAnimationRunning = false;
 window.pendingDrawDefenseInfo = null; window.pendingJanken = null; window.isProcessingPlay = false; window.currentDefensePhaseId = null; window.hasRespondedDefense = false; window.currentJankenLoopId = null; 
 window.lastGameStateFingerprint = ""; window.hostSyncInterval = null; 
 window.JANKEN_BACK_IMG = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 60'%3E%3Crect width='40' height='60' rx='6' fill='%23222' stroke='%23444' stroke-width='2'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23fff' font-size='24' font-family='sans-serif' font-weight='bold'%3E?%3C/text%3E%3C/svg%3E";
@@ -180,13 +180,22 @@ window.showAbilityResetUI = function(maxCount) {
 };
 
 window.animateInitialDeal = function(targetHands, callback) {
+    if (window.isDealAnimationRunning) return;
+    window.isDealAnimationRunning = true;
     const playerIds = window.game.players.map(p => p.id); window.game.hands = {}; playerIds.forEach(id => { window.game.hands[id] = []; }); window.updateUI(); 
-    const deckEl = document.getElementById('deck-visual'); if (!deckEl) { window.game.hands = JSON.parse(JSON.stringify(targetHands)); window.updateUI(); if (callback) callback(); return; }
-    const startRect = deckEl.getBoundingClientRect(); const handSize = targetHands[playerIds[0]] ? targetHands[playerIds[0]].length : 0; const totalDeals = handSize * playerIds.length;
+    const deckEl = document.getElementById('deck-visual'); 
+    if (!deckEl) { window.isDealAnimationRunning = false; window.game.hands = JSON.parse(JSON.stringify(targetHands)); window.updateUI(); if (callback) callback(); return; }
+    
+    const handSize = targetHands[playerIds[0]] ? targetHands[playerIds[0]].length : 0; 
+    const totalDeals = handSize * playerIds.length;
+    if (totalDeals === 0) { window.isDealAnimationRunning = false; window.isInitialDealing = false; window.game.hands = JSON.parse(JSON.stringify(targetHands)); window.updateUI(); if (callback) callback(); return; }
+    
+    const startRect = deckEl.getBoundingClientRect(); 
     let dealIndex = 0; let completedDeals = 0; 
     function checkComplete() {
         completedDeals++;
         if (completedDeals >= totalDeals) {
+            window.isDealAnimationRunning = false;
             window.game.hands = JSON.parse(JSON.stringify(targetHands)); window.updateUI(); window.isInitialDealing = false;
             if (window.RuleSettings && window.RuleSettings.abilityResetCount > 0) { if (typeof window.showAbilityResetUI === 'function') { window.showAbilityResetUI(window.RuleSettings.abilityResetCount); } if (window.isHost) { setTimeout(() => { window.broadcastGameState(); window.checkTurn(); }, 13000); } } else { window.updateUI(); if (window.isHost) setTimeout(() => window.checkTurn(), 500); }
             if (callback) callback();
@@ -342,8 +351,6 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
 
 window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, selectedColor = null, multiDiscardIndices = [], extraData = {}) {
     if (!window.isHost) return;
-    if (playerId !== window.game.currentPlayer.id) return;
-    
     const hand = window.game.hands[playerId]; if (!hand || !hand[indices[0]]) return; 
     const originalHand = [...hand]; const playedCards = indices.map(i => originalHand[i]); const cardValue = playedCards[0].value; const def = window.AbilityDef ? window.AbilityDef[cardValue] : null;
     if (!def) { window.executePlay(playerId, indices, false); return; }
@@ -620,6 +627,7 @@ window.executePlay = function(playerId, indices, isBot = false) {
 
 window.executeColor = function(playerId, color) {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
+    if (playerId !== window.game.currentPlayer.id) return;
     if(window.playerAfkTimes) window.playerAfkTimes[playerId] = 0; window.game.currentColor = color; 
     const info = window.pendingDrawDefenseInfo; window.pendingDrawDefenseInfo = null; window.game.nextTurn(1); 
     if (info) { const targetId = window.game.currentPlayer.id; const guides = [{ from: info.attackerId, to: targetId, text: info.cardValue, delay: 0 }]; if (window.RuleSettings && window.RuleSettings.customCards && window.RuleSettings.customCards.length > 0) { window.startDrawDefensePhase(info.attackerId, targetId, info.cardValue, guides); } else { window.broadcastGameState(false, guides); window.checkTurn(); } } 
@@ -628,6 +636,7 @@ window.executeColor = function(playerId, color) {
 
 window.executeDraw = function(playerId, isBot = false) {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
+    if (playerId !== window.game.currentPlayer.id) return;
     clearInterval(window.turnTimer); if(window.playerAfkTimes) window.playerAfkTimes[playerId] = 0;
     const stack = window.game.drawStack; const count = stack > 0 ? stack : 1;
     for(let i=0; i<count; i++) { if(!window.game.drawCard(playerId)) { if(window.isGameOver) return; break; } }
@@ -637,6 +646,7 @@ window.executeDraw = function(playerId, isBot = false) {
 
 window.executeEndTurn = function(playerId) {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
+    if (playerId !== window.game.currentPlayer.id) return;
     clearInterval(window.turnTimer); if(window.playerAfkTimes) window.playerAfkTimes[playerId] = 0; window.game.nextTurn(1); window.checkTurn();
 };
 
@@ -675,6 +685,8 @@ window.handlePlayAction = function() {
     if (window.pendingDefense || window.currentDefensePhaseId) { alert("現在、他の能力が処理中です。解決するまでお待ちください。"); window.game.selectedIndices = []; window.updateUI(); return; }
     if (window.isProcessingPlay) return; window.isProcessingPlay = true;
     
+    if (!window.game.isMyTurn) { alert("今はあなたのターンではありません！"); window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; }
+
     const me = window.game.players.find(p => p.id === window.game.myId); const selectedCards = window.game.selectedIndices.map(i => window.game.myHand[i]); const lastCard = selectedCards[selectedCards.length - 1]; const cardValue = lastCard.value;
     if (!lastCard) { window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; }
 
@@ -684,7 +696,6 @@ window.handlePlayAction = function() {
         alert("防御カード(BL)は攻撃を受けた時にのみ使用できます。"); window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return;
     }
 
-    if (!window.game.isMyTurn) { window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; }
     if (me.frozen && !isAbility) { alert("凍結中は能力カードしか使用できません！"); window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; }
     if (selectedCards.some(c => c.lockedTurns && c.lockedTurns > 0)) { alert("ロックされているカードは使用できません！"); window.game.selectedIndices = []; window.updateUI(); window.isProcessingPlay = false; return; }
 
@@ -859,16 +870,23 @@ function initMainSocketEvents() {
         } else if (data.action === 'play_ability') {
             if (window.pendingDefense || window.pendingJanken) return;
             if (playerId !== window.game.currentPlayer.id) return;
-            window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards, isHV: data.isHV }); const delay = data.cards.length * 100 + 400; setTimeout(() => { if (typeof window.executeAbilityPlay === 'function') window.executeAbilityPlay(playerId, data.indices, data.targetId, data.discardIdx, data.selectedColor, data.multiDiscardIndices, data.extraData); }, delay);
+            window.socket.emit('request_play_animation', { playerId: playerId, cards: data.cards, isHV: data.isHV }); const delay = data.cards.length * 100 + 400; setTimeout(() => { if (typeof window.executeAbilityPlay === 'function') window.executeAbilityPlay(playerId, data.indices, data.targetId, data.discardIdx, selectedColor, multiDiscardIndices, extraData); }, delay);
         } else if (data.action === 'defense_response') {
             if (window.pendingDefense && window.pendingDefense.responses) {
                 window.pendingDefense.responses[data.targetId] = { cardValue: data.cardValue || null, discardIdx: data.discardIdx !== undefined ? data.discardIdx : null };
                 if (window.pendingDefense.info && window.pendingDefense.info.targets) { const targetCount = window.pendingDefense.info.targets.length; const responseCount = Object.keys(window.pendingDefense.responses).length; if (responseCount >= targetCount) window.pendingDefense.timer = 0; }
             }
         } else if (data.action === 'draw') {
+            if (playerId !== window.game.currentPlayer.id) return;
             window.socket.emit('request_draw_animation', { playerId: playerId, count: data.count }); const delay = data.count * 100 + 400; setTimeout(() => { if (typeof window.executeDraw === 'function') window.executeDraw(playerId); }, delay);
-        } else if (data.action === 'end_turn') { if (typeof window.executeEndTurn === 'function') window.executeEndTurn(playerId); } 
-        else if (data.action === 'color') { if (typeof window.executeColor === 'function') window.executeColor(playerId, data.color); } 
+        } else if (data.action === 'end_turn') { 
+            if (playerId !== window.game.currentPlayer.id) return;
+            if (typeof window.executeEndTurn === 'function') window.executeEndTurn(playerId); 
+        } 
+        else if (data.action === 'color') { 
+            if (playerId !== window.game.currentPlayer.id) return;
+            if (typeof window.executeColor === 'function') window.executeColor(playerId, data.color); 
+        } 
         else if (data.action === 'draw_penalty') {
             window.socket.emit('request_draw_animation', { playerId: playerId, count: data.count }); const delay = data.count * 100 + 400;
             setTimeout(() => { if (typeof window.game !== 'undefined' && typeof window.game.drawCard === 'function') { for(let i=0; i<data.count; i++) window.game.drawCard(playerId); if (typeof window.executeEndTurn === 'function') window.executeEndTurn(playerId); } }, delay);
