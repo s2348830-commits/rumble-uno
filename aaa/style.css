@@ -379,7 +379,7 @@ button.disabled-btn { opacity: 0.5; cursor: not-allowed; }
     border-radius: var(--font-corner, 10px);
     pointer-events: none;
     box-sizing: border-box;
-    z-index: 10;
+    z-index: 50; /* ★カード内の文字やアイコン（通常z-index:1〜10）の上に確実に色を被せるため高めに設定 */
 }
 
 @keyframes pulseDiscard {

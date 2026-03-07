@@ -228,12 +228,12 @@ window.applyWildColorOverlay = function() {
                 const overlay = document.createElement('div');
                 overlay.className = 'wild-color-overlay';
                 
-                // ロック(レイやシャミール)のように、カード全体を半透明の色でベタ塗りする
-                let baseColor = 'rgba(255, 255, 255, 0.5)';
-                if (window.game.currentColor === 'red') baseColor = 'rgba(211, 47, 47, 0.6)';
-                else if (window.game.currentColor === 'blue') baseColor = 'rgba(25, 118, 210, 0.6)';
-                else if (window.game.currentColor === 'green') baseColor = 'rgba(56, 142, 60, 0.6)';
-                else if (window.game.currentColor === 'yellow') baseColor = 'rgba(251, 192, 45, 0.6)';
+                // 透明度を 0.6 → 0.9 に引き上げ、カード自体がその色になったように見せる
+                let baseColor = 'rgba(255, 255, 255, 0.9)';
+                if (window.game.currentColor === 'red') baseColor = 'rgba(211, 47, 47, 0.9)';
+                else if (window.game.currentColor === 'blue') baseColor = 'rgba(25, 118, 210, 0.9)';
+                else if (window.game.currentColor === 'green') baseColor = 'rgba(56, 142, 60, 0.9)';
+                else if (window.game.currentColor === 'yellow') baseColor = 'rgba(251, 192, 45, 0.9)';
                 
                 overlay.style.backgroundColor = baseColor;
                 
