@@ -2385,12 +2385,19 @@ function initMainSocketEvents() {
         }
 
         if (window.isInitialDealing && !window.isHost) {
-            if (typeof window.animateInitialDeal === 'function') {
-                window.animateInitialDeal(state.hands, () => {});
-            } else {
-                window.isInitialDealing = false;
-                window.game.hands = state.hands;
-                if (typeof window.updateUI === 'function') window.updateUI();
+            // ★追加: アニメーションが既に始まっているかチェックする
+            if (!window.isDealAnimationStarted) {
+                window.isDealAnimationStarted = true;
+                if (typeof window.animateInitialDeal === 'function') {
+                    window.animateInitialDeal(state.hands, () => {
+                        window.isDealAnimationStarted = false; // 終わったらロック解除
+                    });
+                } else {
+                    window.isInitialDealing = false;
+                    window.isDealAnimationStarted = false;
+                    window.game.hands = state.hands;
+                    if (typeof window.updateUI === 'function') window.updateUI();
+                }
             }
         } else if (!window.isInitialDealing) {
             window.game.hands = state.hands;
@@ -2453,6 +2460,7 @@ function initMainSocketEvents() {
     window.socket.on('back_to_lobby', (roomState) => {
         window.currentRoomState = roomState;
         window.isGameOver = false; window.isInitialDealing = false;
+        window.isDealAnimationStarted = false; // ★追加: 状態をリセット
         document.getElementById('winner-banner').classList.remove('show');
         document.getElementById('draw-curtain').classList.remove('show');
         document.getElementById('game-container').classList.add('hidden'); 
