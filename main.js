@@ -266,23 +266,23 @@ window.updateUI = function() {
     if(window.game && window.game.players && window.game.players.length > 0) { 
         Renderer.updateAll(window.game); 
         
-        // 👇👇 ★追加: 場のワイルドカードを指定色に染める処理 👇👇
+        //  ★修正: 場のワイルドカードを指定色に染める処理
         const discardPile = window.game.discardPile;
         if (discardPile && discardPile.length > 0) {
             const topCard = discardPile[discardPile.length - 1];
             
-            // 「カード本来の色(黒など)」と「現在の指定色(赤など)」が違う場合に染める
+            // 「カード本来の色」と「現在の指定色」が違う（＝色指定カードである）場合に染める
             if (window.game.currentColor && topCard.color !== window.game.currentColor) {
                 const discardEl = document.getElementById('discard-pile');
-                if (discardEl && discardEl.lastChild) {
-                    const topCardEl = discardEl.lastChild; // 場の一番上のカードDOM
+                // ★修正1: lastChild ではなく lastElementChild を使い、確実にカードDOMを取得
+                if (discardEl && discardEl.lastElementChild) {
+                    const topCardEl = discardEl.lastElementChild; 
                     
-                    // 色ごとの半透明フィルター色と枠線の色
                     const colorMap = {
-                        'red': 'rgba(255, 82, 82, 0.45)',
-                        'blue': 'rgba(3, 169, 244, 0.45)',
-                        'green': 'rgba(139, 195, 74, 0.45)',
-                        'yellow': 'rgba(255, 235, 59, 0.45)'
+                        'red': 'rgba(255, 82, 82, 0.55)',
+                        'blue': 'rgba(3, 169, 244, 0.55)',
+                        'green': 'rgba(139, 195, 74, 0.55)',
+                        'yellow': 'rgba(255, 235, 59, 0.55)'
                     };
                     const borderMap = {
                         'red': '#ff5252',
@@ -295,10 +295,8 @@ window.updateUI = function() {
                     const bdColor = borderMap[window.game.currentColor];
                     
                     if (bgColor && bdColor) {
-                        // 重ねるために position が static の場合は relative にする
-                        if (getComputedStyle(topCardEl).position === 'static') {
-                            topCardEl.style.position = 'relative';
-                        }
+                        // ★修正2: 要素に相対位置を強制的に設定して、フィルターの基準にする
+                        topCardEl.style.position = 'relative';
                         
                         let overlay = topCardEl.querySelector('.wild-color-overlay');
                         if (!overlay) {
@@ -309,22 +307,20 @@ window.updateUI = function() {
                             overlay.style.left = '0';
                             overlay.style.width = '100%';
                             overlay.style.height = '100%';
-                            overlay.style.borderRadius = 'inherit'; // カードの丸みに合わせる
-                            overlay.style.pointerEvents = 'none'; // クリックの邪魔をしない
-                            overlay.style.zIndex = '10'; 
+                            overlay.style.borderRadius = '8px'; // ★修正3: 角丸を固定値に
+                            overlay.style.pointerEvents = 'none'; 
+                            overlay.style.zIndex = '100'; // ★修正4: 確実に一番手前に出す
                             overlay.style.boxSizing = 'border-box';
                             topCardEl.appendChild(overlay);
                         }
                         
-                        // 色を反映（半透明の背景色＋太めの枠線＋内側の光彩）
                         overlay.style.backgroundColor = bgColor;
                         overlay.style.border = `4px solid ${bdColor}`;
-                        overlay.style.boxShadow = `inset 0 0 15px ${bdColor}`;
+                        overlay.style.boxShadow = `inset 0 0 20px ${bgColor}`;
                     }
                 }
             }
         }
-        // 👆👆 追加ここまで 👆👆
 
         window.checkFinalSprint(); 
     } 
