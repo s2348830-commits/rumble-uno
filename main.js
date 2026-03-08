@@ -266,15 +266,12 @@ window.updateUI = function() {
     if(window.game && window.game.players && window.game.players.length > 0) { 
         Renderer.updateAll(window.game); 
         
-        //  ★修正: 場のワイルドカードを指定色に染める処理
+        // --- 場のワイルドカードを指定色に染める処理 ---
         const discardPile = window.game.discardPile;
         if (discardPile && discardPile.length > 0) {
             const topCard = discardPile[discardPile.length - 1];
-            
-            // 「カード本来の色」と「現在の指定色」が違う（＝色指定カードである）場合に染める
             if (window.game.currentColor && topCard.color !== window.game.currentColor) {
                 const discardEl = document.getElementById('discard-pile');
-                // ★修正1: lastChild ではなく lastElementChild を使い、確実にカードDOMを取得
                 if (discardEl && discardEl.lastElementChild) {
                     const topCardEl = discardEl.lastElementChild; 
                     
@@ -295,9 +292,7 @@ window.updateUI = function() {
                     const bdColor = borderMap[window.game.currentColor];
                     
                     if (bgColor && bdColor) {
-                        // ★修正2: 要素に相対位置を強制的に設定して、フィルターの基準にする
                         topCardEl.style.position = 'relative';
-                        
                         let overlay = topCardEl.querySelector('.wild-color-overlay');
                         if (!overlay) {
                             overlay = document.createElement('div');
@@ -307,9 +302,9 @@ window.updateUI = function() {
                             overlay.style.left = '0';
                             overlay.style.width = '100%';
                             overlay.style.height = '100%';
-                            overlay.style.borderRadius = '8px'; // ★修正3: 角丸を固定値に
+                            overlay.style.borderRadius = '8px';
                             overlay.style.pointerEvents = 'none'; 
-                            overlay.style.zIndex = '100'; // ★修正4: 確実に一番手前に出す
+                            overlay.style.zIndex = '100'; 
                             overlay.style.boxSizing = 'border-box';
                             topCardEl.appendChild(overlay);
                         }
@@ -321,6 +316,24 @@ window.updateUI = function() {
                 }
             }
         }
+
+        //  ★追加: 選択した手札を一番手前に表示する処理 
+        const handEl = document.getElementById('player-hand');
+        if (handEl && window.game.selectedIndices) {
+            Array.from(handEl.children).forEach((cardEl, idx) => {
+                // z-indexを効かせるためにrelativeを付与
+                cardEl.style.position = 'relative'; 
+                
+                if (window.game.selectedIndices.includes(idx)) {
+                    // 選択中（浮き上がっている）カードは確実に一番手前に出す
+                    cardEl.style.zIndex = '1000';
+                } else {
+                    // 選択されていないカードは通常通り（右にあるカードほど上になるように順序をつける）
+                    cardEl.style.zIndex = idx;
+                }
+            });
+        }
+        // 👆👆 追加ここまで 👆👆
 
         window.checkFinalSprint(); 
     } 
