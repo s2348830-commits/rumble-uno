@@ -304,10 +304,18 @@ window.updatePhaseUI = function(state) {
     }
 
     if (state.jankenPhase) {
-        if (!window.isJankenShowing) {
-            if (typeof window.showJankenUI === 'function') window.showJankenUI(state.jankenPhase.attackerId, state.jankenPhase.targetId, state.jankenPhase.loopCount);
+        // 現在のじゃんけんの組み合わせと回数を元にIDを作成
+        const newLoopId = `${state.jankenPhase.attackerId}-${state.jankenPhase.targetId}-${state.jankenPhase.loopCount}`;
+        
+        // ★修正: UIが表示されていない、または「新しい回（再戦）」に入った時にUIを再セットしてボタンを出す
+        if (!window.isJankenShowing || window.currentJankenLoopId !== newLoopId) {
+            if (typeof window.showJankenUI === 'function') {
+                window.showJankenUI(state.jankenPhase.attackerId, state.jankenPhase.targetId, state.jankenPhase.loopCount);
+            }
             window.isJankenShowing = true;
+            window.jankenResultPlayed = false; // ★ここで結果再生フラグも確実にリセットする
         }
+
         const jTimer = document.getElementById('janken-timer');
         if (jTimer) jTimer.innerText = state.jankenPhase.timer;
 
@@ -329,9 +337,6 @@ window.updatePhaseUI = function(state) {
                 window.jankenResultPlayed = true;
                 if (typeof window.playJankenResult === 'function') window.playJankenResult(state.jankenPhase.attackerId, state.jankenPhase.targetId, state.jankenPhase.attackerHand, state.jankenPhase.targetHand, state.jankenPhase.result);
             }
-        } else {
-            // ★追加: 次の再戦(ループ)が始まったら、結果再生フラグをfalseに戻す！
-            window.jankenResultPlayed = false;
         }
     } else {
         window.isJankenShowing = false;
