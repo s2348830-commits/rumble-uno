@@ -2385,7 +2385,15 @@ function initMainSocketEvents() {
         }
 
         if (window.isInitialDealing && !window.isHost) {
-            // ★追加: アニメーションが既に始まっているかチェックする
+            
+            // ★追加: ゲーム開始時に設定画面や説明書が開いていたら強制的に閉じる
+            // (お使いのID名に合わせて複数の可能性を列挙しています)
+            ['rule-overlay', 'setting-overlay', 'settings-overlay', 'manual-overlay'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.add('hidden');
+            });
+
+            // ★前回の修正で追加したアニメーションロック処理
             if (!window.isDealAnimationStarted) {
                 window.isDealAnimationStarted = true;
                 if (typeof window.animateInitialDeal === 'function') {

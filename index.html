@@ -203,8 +203,10 @@
         <div style="position: absolute; top: -15px; left: 5px; z-index: 10000;">
             <div id="btn-uno-auto" class="btn-chat-toggle" style="padding: 4px 10px;">UNOオート: OFF</div>
         </div>
-        <div style="position: absolute; top: -15px; right: 5px; z-index: 10000;">
-            <div id="btn-game-chat-toggle" class="btn-chat-toggle chat-toggle-btn is-on" style="padding: 4px 10px;">Chat: ON</div>
+        
+        <div style="position: absolute; top: -50px; right: 5px; z-index: 10000; display: flex; flex-direction: column; gap: 5px; align-items: flex-end;">
+            <div id="btn-show-settings-in-game" class="btn-chat-toggle" style="padding: 4px 10px; cursor: pointer; text-align: center; width: 100%; box-sizing: border-box;" onclick="document.getElementById('start-overlay').classList.remove('hidden')">⚙️ 設定</div>
+            <div id="btn-game-chat-toggle" class="btn-chat-toggle chat-toggle-btn is-on" style="padding: 4px 10px; text-align: center; width: 100%; box-sizing: border-box;">Chat: ON</div>
         </div>
         <div id="player-hand" class="hand-display"></div>
     </div>
