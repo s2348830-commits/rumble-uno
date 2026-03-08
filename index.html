@@ -205,7 +205,7 @@
         </div>
         
         <div style="position: absolute; top: -50px; right: 5px; z-index: 10000; display: flex; flex-direction: column; gap: 5px; align-items: flex-end;">
-            <div id="btn-show-settings-in-game" class="btn-chat-toggle" style="padding: 4px 10px; cursor: pointer; text-align: center; width: 100%; box-sizing: border-box;" onclick="document.getElementById('start-overlay').classList.remove('hidden')">⚙️ 設定</div>
+            <div id="btn-show-settings-in-game" class="btn-chat-toggle" style="padding: 4px 10px; cursor: pointer; text-align: center; width: 100%; box-sizing: border-box;" onclick="showReadonlySettings()">⚙️ 設定確認</div>
             <div id="btn-game-chat-toggle" class="btn-chat-toggle chat-toggle-btn is-on" style="padding: 4px 10px; text-align: center; width: 100%; box-sizing: border-box;">Chat: ON</div>
         </div>
         <div id="player-hand" class="hand-display"></div>
@@ -269,6 +269,39 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+</script>
+
+<script>
+window.showReadonlySettings = function() {
+    // 設定画面のIDを取得 (一般的なIDを列挙しています)
+    ['start-overlay', 'setting-overlay'].forEach(id => {
+        const overlay = document.getElementById(id);
+        if (overlay) {
+            overlay.classList.remove('hidden');
+            
+            // 入力要素(セレクトボックスやチェックボックス)を無効化
+            overlay.querySelectorAll('select, input').forEach(el => el.disabled = true);
+            
+            // カスタムカードの ＋ / － ボタンを隠す
+            overlay.querySelectorAll('.count-btn').forEach(btn => btn.style.display = 'none');
+            
+            // カスタムカード画像のクリックを無効化
+            overlay.querySelectorAll('.custom-card-img').forEach(img => img.style.pointerEvents = 'none');
+        }
+    });
+};
+
+window.restoreSettingsUI = function() {
+    // ロビーに戻った時に元の編集可能な状態に戻す処理
+    ['start-overlay', 'setting-overlay'].forEach(id => {
+        const overlay = document.getElementById(id);
+        if (overlay) {
+            overlay.querySelectorAll('select, input').forEach(el => el.disabled = false);
+            overlay.querySelectorAll('.count-btn').forEach(btn => btn.style.display = '');
+            overlay.querySelectorAll('.custom-card-img').forEach(img => img.style.pointerEvents = 'auto');
+        }
+    });
+};
 </script>
 
 <script src="https://unpkg.com/canvas-confetti@1.6.0/dist/confetti.browser.js"></script>

@@ -2469,6 +2469,9 @@ function initMainSocketEvents() {
         window.currentRoomState = roomState;
         window.isGameOver = false; window.isInitialDealing = false;
         window.isDealAnimationStarted = false; // ★追加: 状態をリセット
+        if (typeof window.restoreSettingsUI === 'function') {
+            window.restoreSettingsUI();
+        }
         document.getElementById('winner-banner').classList.remove('show');
         document.getElementById('draw-curtain').classList.remove('show');
         document.getElementById('game-container').classList.add('hidden'); 
