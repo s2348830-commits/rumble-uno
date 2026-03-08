@@ -273,34 +273,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <script>
 window.showReadonlySettings = function() {
-    // 設定画面のIDを取得 (一般的なIDを列挙しています)
+    // 動的に画面が書き換わっても絶対にクリックさせない「専用CSS」をページに追加する
+    let style = document.getElementById('readonly-style-guard');
+    if (!style) {
+        style = document.createElement('style');
+        style.id = 'readonly-style-guard';
+        style.innerHTML = `
+            /* 設定画面内のチェックボックスやセレクトボックスを無効化 */
+            #start-overlay input, #setting-overlay input,
+            #start-overlay select, #setting-overlay select {
+                pointer-events: none !important;
+                opacity: 0.7 !important;
+            }
+            /* カスタムカードの画像クリックを完全に無効化 */
+            #start-overlay img, #setting-overlay img {
+                pointer-events: none !important;
+            }
+            /* 万が一の追加・削除ボタン (+ / -) を非表示にする */
+            #start-overlay .count-btn, #setting-overlay .count-btn {
+                display: none !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
     ['start-overlay', 'setting-overlay'].forEach(id => {
         const overlay = document.getElementById(id);
-        if (overlay) {
-            overlay.classList.remove('hidden');
-            
-            // 入力要素(セレクトボックスやチェックボックス)を無効化
-            overlay.querySelectorAll('select, input').forEach(el => el.disabled = true);
-            
-            // カスタムカードの ＋ / － ボタンを隠す
-            overlay.querySelectorAll('.count-btn').forEach(btn => btn.style.display = 'none');
-            
-            // カスタムカード画像のクリックを無効化
-            overlay.querySelectorAll('.custom-card-img').forEach(img => img.style.pointerEvents = 'none');
-        }
+        if (overlay) overlay.classList.remove('hidden');
     });
 };
 
 window.restoreSettingsUI = function() {
-    // ロビーに戻った時に元の編集可能な状態に戻す処理
-    ['start-overlay', 'setting-overlay'].forEach(id => {
-        const overlay = document.getElementById(id);
-        if (overlay) {
-            overlay.querySelectorAll('select, input').forEach(el => el.disabled = false);
-            overlay.querySelectorAll('.count-btn').forEach(btn => btn.style.display = '');
-            overlay.querySelectorAll('.custom-card-img').forEach(img => img.style.pointerEvents = 'auto');
-        }
-    });
+    // ロビーに戻ったら専用CSSを削除して、再び編集できるようにする
+    const style = document.getElementById('readonly-style-guard');
+    if (style) style.remove();
 };
 </script>
 
