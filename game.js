@@ -128,9 +128,25 @@ class UNOGame {
         // 燃焼ダメージ処理
         if (this.currentPlayer && this.currentPlayer.burnTurns > 0) {
             if (this.currentPlayer.invincibleTurns <= 0 && !this.currentPlayer.frozenBurnImmune) {
-                // 燃焼ドローも「強制ドロー」扱い
-                this.drawCard(this.currentPlayer.id, false, true);
-                if (window.isHost && window.socket) window.socket.emit('request_draw_animation', { playerId: this.currentPlayer.id, count: 1 });
+                // 修正: 燃焼ドロー時に裂傷を持っていたらさらに+1枚
+                let dCount = 1;
+                let lacerationTriggered = false;
+                if (this.currentPlayer.lacerationTurns > 0) {
+                    dCount += 1;
+                    lacerationTriggered = true;
+                }
+                
+                for(let i=0; i<dCount; i++) {
+                    this.drawCard(this.currentPlayer.id, false, true);
+                }
+                
+                if (lacerationTriggered && typeof window !== 'undefined' && window.SE) {
+                    window.SE.play('laceration');
+                }
+
+                if (window.isHost && window.socket) {
+                    window.socket.emit('request_draw_animation', { playerId: this.currentPlayer.id, count: dCount });
+                }
             }
             this.currentPlayer.burnTurns--;
         }

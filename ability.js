@@ -49,22 +49,30 @@ window.AbilityEngine = {
         return Math.random() < rate;
     },
 
-    applyDraw: function(game, targetId, count, blockable = true, isForcedByAbility = true) {
+    applyDraw: function(game, targetId, count, blockable = true, isForcedByAbility = true, isLacerationDraw = false) {
         const t = game.players.find(p => p.id === targetId);
         if (!t) return 0;
         if (t.invincibleTurns > 0) return 0; 
         if (this.checkEvasion(t)) return -1; 
         
         let actualDrawn = count;
-        // 裂傷効果: 山札ドロー、能力、+2/+4によるドロー時に+1
-        if (t.lacerationTurns > 0) {
+        let lacerationTriggered = false;
+
+        //  修正: 自分がドローする時で、裂傷ドロー以外の時に+1枚する
+        if (!isLacerationDraw && t.lacerationTurns > 0 && actualDrawn > 0) {
             actualDrawn += 1;
+            lacerationTriggered = true;
         }
         
         for (let i = 0; i < actualDrawn; i++) {
-            // ★修正: blockable が false(貫通) ならシールド無視(!blockable) を適用
             game.drawCard(targetId, !blockable, isForcedByAbility); 
         }
+
+        // 裂傷で追加ドローしたならSEを鳴らす
+        if (lacerationTriggered && window.SE) {
+            window.SE.play('laceration');
+        }
+
         if (actualDrawn > 0 && window.isHost && window.socket) {
             window.socket.emit('request_draw_animation', { playerId: targetId, count: actualDrawn });
         }

@@ -136,7 +136,7 @@ const Renderer = {
                                  "🔲無敵: 全ての攻撃や状態異常を無効化\\n" +
                                  "🔒🗝️ロック: 対象のカードが使用不可\\n" +
                                  "💢裂傷: 全てのドロー枚数+1\\n" +
-                                 "🌟蘇生待機: 次に引く能力カードが手札に戻る";
+                                 "🌟蘇生待機: 次に引く能力カードが手札に戻る(ただし、1ゲームに付き1回の制限)";
                 statusIcons += `<span style="cursor:pointer; display:inline-block; margin-left:2px; padding:0 5px; background:rgba(255,255,255,0.2); border:1px solid #fff; border-radius:50%; color:white; font-weight:bold; font-size:10px; line-height:14px;" onclick="alert('${helpText}')">i</span>`;
             }
 

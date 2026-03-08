@@ -237,7 +237,7 @@ window.SE = {
 const unlockAudioContext = () => {
     if (window.SE.unlocked) return; window.SE.unlocked = true; window.SE.initContext();
     if (window.SE.audioCtx.state === 'suspended') window.SE.audioCtx.resume();
-['win', 'win2', 'setting', 'draw', 'uno_message', 'buttonclick', 'uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6', 'frieze', 'rock', 'Distribute', 'mvp_1', 'mvp_2', 'hv/id_20(1)', 'hv/id_20(2)', 'hv/id_25', 'hv/id_26', 'hv/id_35'].forEach(name => window.SE.loadSound(name, 'mp3'));    ['fire', 'page'].forEach(name => window.SE.loadSound(name, 'wav'));
+['win', 'win2', 'setting', 'draw', 'uno_message', 'buttonclick', 'uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6', 'frieze', 'rock', 'Distribute', 'mvp_1', 'mvp_2', 'hv/id_20(1)', 'hv/id_20(2)', 'hv/id_25', 'hv/id_26', 'hv/id_35', 'laceration'].forEach(name => window.SE.loadSound(name, 'mp3'));
     document.removeEventListener('click', unlockAudioContext);
     document.removeEventListener('touchstart', unlockAudioContext);
 };
@@ -1923,8 +1923,20 @@ window.executeDraw = function(playerId, isBot = false) {
     const stack = window.game.drawStack; 
     const count = stack > 0 ? stack : 1;
     
+    let lacerationTriggered = false;
+    if (current.lacerationTurns > 0 && count > 0) {
+        count += 1;
+        lacerationTriggered = true;
+    }
+    
+    let actuallyDrawn = false;
     for(let i=0; i<count; i++) { 
         if(!window.game.drawCard(playerId)) { if(window.isGameOver) return; break; } 
+        actuallyDrawn = true;
+    }
+
+    if (actuallyDrawn && lacerationTriggered && window.SE) {
+        window.SE.play('laceration');
     }
     
     if (stack > 0) { 
