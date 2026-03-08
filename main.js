@@ -430,7 +430,8 @@ window.broadcastGameState = function(skipUIUpdate = false, attackGuides = []) {
         attackGuides: attackGuides,
         abilityGraveyard: window.game.abilityGraveyard,
         jankenPhase: window.pendingJanken,
-        customDeck: window.game.customDeck 
+        customDeck: window.game.customDeck,
+        skipUIUpdate: skipUIUpdate 
     };
     if (window.socket) window.socket.emit('sync_game_state', state);
     if (!skipUIUpdate) window.updateUI();
@@ -2488,8 +2489,18 @@ function initMainSocketEvents() {
                 }
             }
         } else if (!window.isInitialDealing) {
+            const myId = window.myId || (window.game && window.game.myId);
+            if (myId && window.game.hands && window.game.hands[myId] && state.hands && state.hands[myId]) {
+                if (window.game.hands[myId].length === state.hands[myId].length) {
+                    state.hands[myId] = window.game.hands[myId]; // ローカルの手札データを維持
+                } else {
+                    window.game.selectedIndices = []; // 枚数が変わった(引いた/出された)場合は選択をリセット
+                }
+            }
             window.game.hands = state.hands;
-            if (typeof window.updateUI === 'function') window.updateUI(); 
+            if (!state.skipUIUpdate) {
+                if (typeof window.updateUI === 'function') window.updateUI(); 
+            }
         }
 
         const current = window.game.currentPlayer;
