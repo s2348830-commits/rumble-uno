@@ -300,12 +300,25 @@ if (typeof window.RuleSettings === 'undefined') {
 
         checkStartError: function(roomState) {
             if (!roomState || !roomState.slots) return null;
+
+            // プレイヤー数（ホスト＋参加者＋Bot）をカウント
+            const playerCount = roomState.slots.filter(s => s.type === 'host' || s.type === 'player' || s.type === 'bot').length;
+            
+            // 👇👇 ★追加: 2人未満ならエラーにする 👇👇
+            if (playerCount < 2) {
+                return `【エラー】参加人数が足りません！\n(最低2人以上のプレイヤーまたはBotが必要です)`;
+            }
+            // 👆👆 追加ここまで 👆👆
+
             if (!this.customCards || this.customCards.length === 0) return null; 
 
-            const playerCount = roomState.slots.filter(s => s.type === 'host' || s.type === 'player' || s.type === 'bot').length;
+            // 必要な能力カードの総数 ＝ 初期手札(能力)枚数 × プレイヤー数
             const requiredCustomCards = (parseInt(this.initialCustomHandSize) || 0) * playerCount;
+            
+            // 用意されている能力カードの総数
             const availableCustomCards = this.customCards.length;
             
+            // 不足している場合、エラーメッセージを返す
             if (availableCustomCards < requiredCustomCards) {
                 return `【エラー】設定された能力カードが足りません！\n(必要総数: ${requiredCustomCards}枚 / 追加枚数: ${availableCustomCards}枚)\n設定からカードを追加するか、初期手札の枚数を減らしてください。`;
             }
@@ -316,3 +329,34 @@ if (typeof window.RuleSettings === 'undefined') {
 window.addEventListener('DOMContentLoaded', () => {
     if(window.RuleSettings && typeof window.RuleSettings.init === 'function') window.RuleSettings.init();
 });
+//  ★追加: 0.5秒ごとにカード枚数を監視し、スタートボタンをリアルタイムで無効化する
+setInterval(() => {
+    if (!window.isHost || !window.RuleSettings) return;
+    
+    // 現在のロビーのプレイヤー情報を取得
+    const roomState = window.currentRoomState;
+    if (!roomState) return;
+
+    // ゲーム開始ボタンを取得（※IDが違う場合は 'btn-start-game' の部分をご自身のHTMLに合わせてください）
+    const startBtn = document.getElementById('btn-start') || document.querySelector('.start-btn');
+    if (!startBtn) return;
+
+    // エラーがあるかチェック
+    const errorMsg = window.RuleSettings.checkStartError(roomState);
+    
+    if (errorMsg) {
+        // エラーがある場合：ボタンを押せなくして、見た目を半透明にする
+        startBtn.disabled = true;
+        startBtn.style.opacity = '0.5';
+        startBtn.style.cursor = 'not-allowed';
+        startBtn.innerText = 'カード不足'; // ぱっと見で分かるように文字も変える
+        startBtn.title = "設定画面から能力カードを追加するか、初期手札の枚数を減らしてください";
+    } else {
+        // エラーがない場合：通常通り押せるように戻す
+        startBtn.disabled = false;
+        startBtn.style.opacity = '1.0';
+        startBtn.style.cursor = 'pointer';
+        startBtn.innerText = 'ゲーム開始'; // 元の文字に戻す
+        startBtn.title = "";
+    }
+}, 500);
