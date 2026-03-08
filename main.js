@@ -1910,7 +1910,7 @@ window.executeColor = function(playerId, color) {
 };
 
 // ★修正: ホスト側の処理を厳格化（「現在ターンか？」をチェック）
-window.executeDraw = function(playerId, isBot = false) {
+window.executeDraw = function(playerId, isBot = false, overrideCount = null) {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
     
     // 【重要】現在のターンのプレイヤーかチェック
@@ -1921,21 +1921,23 @@ window.executeDraw = function(playerId, isBot = false) {
     if(window.playerAfkTimes) window.playerAfkTimes[playerId] = 0;
     
     const stack = window.game.drawStack; 
-    const count = stack > 0 ? stack : 1;
     
-    let lacerationTriggered = false;
-    if (current.lacerationTurns > 0 && count > 0) {
+    // 👇 ★修正: const を let に変更 ＆ overrideCount に対応
+    let count = overrideCount !== null ? overrideCount : (stack > 0 ? stack : 1);
+    
+    // 👇 ★修正: overrideCount が指定されていない時だけここで裂傷を加算
+    if (overrideCount === null && current.lacerationTurns > 0 && count > 0) {
         count += 1;
-        lacerationTriggered = true;
     }
-    
+
     let actuallyDrawn = false;
     for(let i=0; i<count; i++) { 
         if(!window.game.drawCard(playerId)) { if(window.isGameOver) return; break; } 
         actuallyDrawn = true;
     }
 
-    if (actuallyDrawn && lacerationTriggered && window.SE) {
+    // 裂傷状態で引いたなら必ずSEを鳴らす
+    if (actuallyDrawn && current.lacerationTurns > 0 && window.SE) {
         window.SE.play('laceration');
     }
     
@@ -1947,7 +1949,6 @@ window.executeDraw = function(playerId, isBot = false) {
         if (isBot) { 
             window.game.nextTurn(1); window.checkTurn(); 
         } else { 
-            // ドロー後に自動でターンを終了させず、引いた状態（hasDrawnThisTurn）にする
             window.game.hasDrawnThisTurn = true; 
             window.broadcastGameState(); 
         } 
@@ -2248,7 +2249,6 @@ document.getElementById('draw-btn').onclick = function() {
     if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
     if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) return;
     
-    // ★ 物理的にボタンを無効化（disabled）して、2回目のクリックを絶対に防ぐ
     window.isDrawing = true; 
     this.disabled = true;
     this.style.pointerEvents = 'none'; // クリックロック
@@ -2259,11 +2259,19 @@ document.getElementById('draw-btn').onclick = function() {
         window.updateUI();                    
         
         const s = window.game.drawStack; 
-        const count = s > 0 ? s : 1;
+        // 👇 ★修正: const を let に変更
+        let count = s > 0 ? s : 1;
+        
+        // 👇 ★追加: アニメーションの前に裂傷分を計算して枚数を確定させる
+        const me = window.game.players.find(p => p.id === window.game.myId);
+        if (me && me.lacerationTurns > 0 && count > 0) {
+            count += 1;
+        }
         
         if (window.isHost) {
             if (window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: count }); 
-            window.executeDraw(window.game.myId); 
+            // 👇 ★修正: 引数に確定した count を渡す
+            window.executeDraw(window.game.myId, false, count); 
         } else if (window.socket) {
             // アニメーションを待たずに即座に送信！
             window.socket.emit('player_action', { action: 'draw', count: count });
