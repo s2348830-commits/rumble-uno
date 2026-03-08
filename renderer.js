@@ -126,6 +126,20 @@ const Renderer = {
             if (p.resurrectionEveCount === 0 || p.resurrectionMisaCount === 0) {
                 statusIcons += `<span style="margin-right:3px;">🌟</span>`;
             }
+
+            if (statusIcons !== '') {
+                const helpText = "【ステータス詳細】\\n" +
+                                 "❄️凍結: 能力カードのみ使用可能\\n" +
+                                 "🔥燃焼: ターン開始時にドローダメージ\\n" +
+                                 "🛡️シールド: ドロー攻撃を規定回数防ぐ\\n" +
+                                 "💨回避: 一定確率で攻撃を無効化\\n" +
+                                 "🔲無敵: 全ての攻撃や状態異常を無効化\\n" +
+                                 "🔒🗝️ロック: 対象のカードが使用不可\\n" +
+                                 "💢裂傷: 全てのドロー枚数+1\\n" +
+                                 "🌟蘇生待機: 次に引く能力カードが手札に戻る";
+                statusIcons += `<span style="cursor:pointer; display:inline-block; margin-left:2px; padding:0 5px; background:rgba(255,255,255,0.2); border:1px solid #fff; border-radius:50%; color:white; font-weight:bold; font-size:10px; line-height:14px;" onclick="alert('${helpText}')">i</span>`;
+            }
+
             const badge = document.createElement('div');
             badge.className = `circle-player-badge other-player-badge ${isTurn ? 'active-turn' : ''} ${isPredictTurn ? 'predict-turn' : ''} ${isOffline ? 'offline' : ''} ${p.id === game.myId ? 'my-badge' : ''}`;
             badge.dataset.id = p.id; 
