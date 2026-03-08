@@ -272,41 +272,69 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 <script>
+window.readonlyClickHandler = function(e) {
+    // 閉じるボタン系（idやclassにcloseが含まれるもの）は操作を許可
+    const isClose = e.target.closest('button, .close-btn, [id*="close"], [class*="close"]');
+    // カスタムカード画面を開くボタンは操作を許可
+    const isOpenCustomCards = e.target.closest('#btn-open-custom-cards');
+    
+    if (isClose || isOpenCustomCards) return; // 許可されたボタンなら通常通り処理させる
+    
+    // それ以外の場所（能力カード一覧、+ / -ボタン、チェックボックスなど）のクリックはすべて強制無効化！
+    e.stopPropagation();
+    e.preventDefault();
+};
+
 window.showReadonlySettings = function() {
-    // 動的に画面が書き換わっても絶対にクリックさせない「専用CSS」をページに追加する
     let style = document.getElementById('readonly-style-guard');
     if (!style) {
         style = document.createElement('style');
         style.id = 'readonly-style-guard';
         style.innerHTML = `
-            /* 設定画面内のチェックボックスやセレクトボックスを無効化 */
-            #start-overlay input, #setting-overlay input,
-            #start-overlay select, #setting-overlay select {
+            /* フォーム要素をグレーアウトして視覚的に触れないことをアピール */
+            #start-overlay input, #setting-overlay input, #custom-card-overlay input,
+            #start-overlay select, #setting-overlay select, #custom-card-overlay select {
                 pointer-events: none !important;
-                opacity: 0.7 !important;
+                opacity: 0.6 !important;
             }
-            /* カスタムカードの画像クリックを完全に無効化 */
-            #start-overlay img, #setting-overlay img {
-                pointer-events: none !important;
-            }
-            /* 万が一の追加・削除ボタン (+ / -) を非表示にする */
-            #start-overlay .count-btn, #setting-overlay .count-btn {
+            /* 能力カードの+ / -ボタンや追加ボタンなどを完全に非表示にする */
+            #start-overlay .count-btn, #setting-overlay .count-btn, #custom-card-overlay .count-btn,
+            #start-overlay .add-btn, #setting-overlay .add-btn, #custom-card-overlay .add-btn {
                 display: none !important;
+            }
+            /* カード画像のクリック判定を消す */
+            #start-overlay img, #setting-overlay img, #custom-card-overlay img {
+                pointer-events: none !important;
             }
         `;
         document.head.appendChild(style);
     }
 
-    ['start-overlay', 'setting-overlay'].forEach(id => {
+    // 関連するすべての設定画面に「クリック強制無効化」の監視をつける
+    ['start-overlay', 'setting-overlay', 'custom-card-overlay'].forEach(id => {
         const overlay = document.getElementById(id);
-        if (overlay) overlay.classList.remove('hidden');
+        if (overlay) {
+            // 画面内でのクリックイベントを最優先(キャプチャフェーズ)で横取りしてブロック！
+            overlay.addEventListener('click', window.readonlyClickHandler, true);
+        }
     });
+
+    // メインのルール設定画面を開く
+    const startOverlay = document.getElementById('start-overlay');
+    if (startOverlay) startOverlay.classList.remove('hidden');
 };
 
 window.restoreSettingsUI = function() {
-    // ロビーに戻ったら専用CSSを削除して、再び編集できるようにする
     const style = document.getElementById('readonly-style-guard');
     if (style) style.remove();
+
+    ['start-overlay', 'setting-overlay', 'custom-card-overlay'].forEach(id => {
+        const overlay = document.getElementById(id);
+        if (overlay) {
+            // ロビーに戻ったらブロック機能を解除して編集可能に戻す
+            overlay.removeEventListener('click', window.readonlyClickHandler, true);
+        }
+    });
 };
 </script>
 
