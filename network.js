@@ -245,7 +245,7 @@ function renderSlots(roomState) {
             if (window.isHost) {
                 difficultySpan.onclick = (e) => {
                     e.stopPropagation();
-                    const diffs = ['優しい', '普通', '強い'];
+                    const diffs = ['優しい', '普通', '強い', '最強'];
                     const currentIdx = diffs.indexOf(slot.difficulty || '普通');
                     window.socket.emit('change_bot_difficulty', { index: index, difficulty: diffs[(currentIdx + 1) % diffs.length] });
                 };
