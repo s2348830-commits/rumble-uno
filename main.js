@@ -1758,8 +1758,7 @@ window.checkTurn = function() {
                 let botDiscardIdx = null;
 
                 if (isAbility && def) {
-                    if (def.needsColor) botSelectedColor = ['red', 'blue', 'green', 'yellow'][Math.floor(Math.random() * 4)];
-                    if (def.needsAbilityDiscard) {
+                    if (def.needsColor) botSelectedColor = UNOBot.chooseColor(window.game, current.id);                    if (def.needsAbilityDiscard) {
                         const bHand = window.game.hands[current.id];
                         const discIdx = bHand.findIndex((c, i) => !result.indices.includes(i) && (c.value && String(c.value).startsWith('id_')));
                         botDiscardIdx = discIdx > -1 ? discIdx : null;
@@ -1927,7 +1926,7 @@ window.executePlay = function(playerId, indices, isBot = false) {
                 }
             }
             if (isBot) { 
-                window.game.currentColor = ['red', 'blue', 'green', 'yellow'][Math.floor(Math.random() * 4)]; 
+                window.game.currentColor = UNOBot.chooseColor(window.game, playerId); 
                 window.executeColor(playerId, window.game.currentColor); 
             } 
             else if (playerId === window.game.myId) { 
