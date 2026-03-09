@@ -272,14 +272,17 @@ window.updateUI = function() {
             const topCard = discardPile[discardPile.length - 1];
             if (window.game.currentColor && topCard.color !== window.game.currentColor) {
                 const discardEl = document.getElementById('discard-pile');
-                if (discardEl && discardEl.lastElementChild) {
-                    const topCardEl = discardEl.lastElementChild; 
-                    
+                
+                // 👇👇 ★修正: 単なる一番後ろの要素ではなく、確実に「カード」のDOMだけを狙う 👇👇
+                const cardsInDiscard = discardEl ? discardEl.querySelectorAll('.card') : [];
+                const topCardEl = cardsInDiscard.length > 0 ? cardsInDiscard[cardsInDiscard.length - 1] : null;
+
+                if (topCardEl) {
                     const colorMap = {
-                        'red': 'rgba(255, 82, 82, 0.55)',
-                        'blue': 'rgba(3, 169, 244, 0.55)',
-                        'green': 'rgba(139, 195, 74, 0.55)',
-                        'yellow': 'rgba(255, 235, 59, 0.55)'
+                        'red': 'rgba(255, 82, 82, 0.65)',
+                        'blue': 'rgba(3, 169, 244, 0.65)',
+                        'green': 'rgba(139, 195, 74, 0.65)',
+                        'yellow': 'rgba(255, 235, 59, 0.65)'
                     };
                     const borderMap = {
                         'red': '#ff5252',
@@ -309,31 +312,29 @@ window.updateUI = function() {
                             topCardEl.appendChild(overlay);
                         }
                         
-                        overlay.style.backgroundColor = bgColor;
-                        overlay.style.border = `4px solid ${bdColor}`;
-                        overlay.style.boxShadow = `inset 0 0 20px ${bgColor}`;
+                        // ★修正: 他の演出に負けないように !important で色と枠を絶対維持する
+                        overlay.style.setProperty('background-color', bgColor, 'important');
+                        overlay.style.setProperty('border', `4px solid ${bdColor}`, 'important');
+                        overlay.style.setProperty('box-shadow', `inset 0 0 20px ${bdColor}`, 'important'); // 内側の光も濃くしました
                     }
                 }
             }
         }
 
-        //  ★追加: 選択した手札を一番手前に表示する処理 
+        // --- 選択した手札を一番手前に表示する処理 ---
         const handEl = document.getElementById('player-hand');
         if (handEl && window.game.selectedIndices) {
             Array.from(handEl.children).forEach((cardEl, idx) => {
-                // z-indexを効かせるためにrelativeを付与
                 cardEl.style.position = 'relative'; 
                 
                 if (window.game.selectedIndices.includes(idx)) {
                     // 選択中（浮き上がっている）カードは確実に一番手前に出す
-                    cardEl.style.zIndex = '1000';
+                    cardEl.style.zIndex = '10000';
                 } else {
-                    // 選択されていないカードは通常通り（右にあるカードほど上になるように順序をつける）
                     cardEl.style.zIndex = idx;
                 }
             });
         }
-        // 👆👆 追加ここまで 👆👆
 
         window.checkFinalSprint(); 
     } 
@@ -429,6 +430,7 @@ window.broadcastGameState = function(skipUIUpdate = false, attackGuides = []) {
         id: p.id, connected: p.connected, frozen: p.frozen, burnTurns: p.burnTurns, 
         invincibleTurns: p.invincibleTurns, shield: p.shield, evasion: p.evasion, usedRaia: p.usedRaia,
         // ★追加: 裂傷と蘇生の情報を他プレイヤーにも送る
+        raiaUseCount: p.raiaUseCount || 0,
         lacerationTurns: p.lacerationTurns, 
         resurrectionEveCount: p.resurrectionEveCount, 
         resurrectionMisaCount: p.resurrectionMisaCount
@@ -1556,12 +1558,12 @@ window.resolveJanken = function() {
     window.broadcastGameState(); 
 
     setTimeout(() => {
-        let drawCount = 2; // 初回は結果によらず2ドロー
+        let drawCount = 3; // 初回は結果によらず2ドロー
         let winOrDrawDrawn = false;
 
         if (result === 'win' || result === 'draw') {
             winOrDrawDrawn = true;
-            // 相手2ドロー
+            // 相手3ドロー
             window.AbilityEngine.applyDraw(window.game, pJ.targetId, drawCount, false, true);
             
             // 自分はランダムな「既存カード」を1枚捨てる
@@ -1584,7 +1586,7 @@ window.resolveJanken = function() {
                 }
             }
         } else if (result === 'lose' && pJ.loopCount === 0) {
-            // 初回負けの場合も相手2ドローのみ
+            // 初回負けの場合も相手3ドローのみ
             window.AbilityEngine.applyDraw(window.game, pJ.targetId, drawCount, false, true);
         }
         
@@ -2244,12 +2246,18 @@ window.handlePlayAction = function() {
 
         window.localRaiaReturnedTurn = window.localRaiaReturnedTurn || -1;
         const stepRaia = () => {
-            if (cardValue === 'id_33' && !me.usedRaia) {
-                if (confirm("ライアの効果により、次の自分のターン開始時にこのカードを手札に戻しますか？\n(各ターン1回のみ)")) {
+            const currentRaiaCount = me.raiaUseCount || 0;
+            if (cardValue === 'id_33' && currentRaiaCount < 3) {
+                if (confirm(`ライアの効果により、次の自分のターン開始時にこのカードを手札に戻しますか？\n(1ゲーム3回まで / 残り ${3 - currentRaiaCount} 回)`)) {
                     extraData.returnRaia = true;
-                    me.usedRaia = true; 
+                    me.raiaUseCount = currentRaiaCount + 1; // 回数を1増やす
                 }
+            } else if (cardValue === 'id_33' && currentRaiaCount >= 3) {
+                // 3回使い切った場合は回収できず、警告を出すだけ
+                alert("ライアの回収効果は1ゲームにつき3回までです。\n今回は手札に戻りません。");
             }
+            // 👆 修正ここまで 👆
+            
             step6();
         }
 
@@ -2468,6 +2476,7 @@ function initMainSocketEvents() {
                     p.shield = info.shield || { level: 0, turns: 0 };
                     p.evasion = info.evasion || { level: 0, turns: 0 };
                     p.usedRaia = info.usedRaia || false;
+                    p.raiaUseCount = info.raiaUseCount || 0;
                     // ★追加: 受け取ったデータをプレイヤーに反映させる
                     p.lacerationTurns = info.lacerationTurns || 0;
                     p.resurrectionEveCount = info.resurrectionEveCount !== undefined ? info.resurrectionEveCount : -1;
