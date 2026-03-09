@@ -80,6 +80,62 @@ class UNOGame {
         this.currentColor = first.color;
         
         this.direction = 1; this.drawStack = 0; this.unoDeclared = false;
+        
+        Object.keys(this.hands).forEach(playerId => {
+            const player = this.players.find(p => p.id === playerId);
+            
+            // プレイヤーが存在しない、または「bot」ではない（人間）ならスキップ！
+            if (!player || player.type !== 'bot') return;
+
+            const hand = this.hands[playerId];
+            const deck = this.deck;
+
+            let targetCards = [];
+            let probability = 0;
+
+            // 名前ごとの条件と確率の設定（名前に含まれていれば発動）
+            if (player.name.includes('花子')) {
+                probability = 1.0; // 100%
+                targetCards = ['Wild', 'Wild+4'];
+            } else if (player.name.includes('一郎')) {
+                probability = 0.6; // 60%
+                targetCards = ['+2', 'Wild+4'];
+            } else if (player.name.includes('太郎')) {
+                probability = 0.5; // 50%
+                targetCards = ['Reverse', 'Skip'];
+            } else if (player.name.includes('次郎')) {
+                probability = 0.7; // 70%
+                targetCards = ['+2', 'Skip'];
+            }
+
+            // 指定された確率の判定
+            if (probability > 0 && Math.random() < probability) {
+                // すでに目的のカードを1枚以上持っているかチェック
+                const alreadyHas = hand.some(card => targetCards.includes(card.value));
+                
+                // 持っていなかった場合のみ、山札から探してすり替える
+                if (!alreadyHas) {
+                    // 山札から目的のカード(対象のうちどれか1つ)を探す
+                    const targetIdx = deck.findIndex(card => targetCards.includes(card.value));
+                    
+                    if (targetIdx !== -1) {
+                        // 山札から目的のカードを抜き取る
+                        const cheatCard = deck.splice(targetIdx, 1)[0];
+                        
+                        // 手札の中から普通の「数字カード」を探して交換対象にする（なければ手札の1枚目）
+                        let swapIdx = hand.findIndex(card => /^[0-9]$/.test(card.value));
+                        if (swapIdx === -1) swapIdx = 0;
+                        
+                        // 手札のカードと抜き取った強いカードをこっそり交換する
+                        const replacedCard = hand.splice(swapIdx, 1, cheatCard)[0];
+                        
+                        // 手札から回収したカードを山札のランダムな位置に戻す
+                        const insertIdx = Math.floor(Math.random() * deck.length);
+                        deck.splice(insertIdx, 0, replacedCard);
+                    }
+                }
+            }
+        });
     }
 
     replaceAbilityCards(playerId, oldCardValues) {
