@@ -281,14 +281,14 @@ window.updateUI = function() {
                     const colorMap = {
                         'red': 'rgba(255, 82, 82, 0.65)',
                         'blue': 'rgba(3, 169, 244, 0.65)',
-                        'green': 'rgba(139, 195, 74, 0.65)',
-                        'yellow': 'rgba(255, 235, 59, 0.65)'
+                        'green': 'rgba(51, 255, 0, 0.65)',
+                        'yellow': 'rgba(255, 230, 0, 0.96)'
                     };
                     const borderMap = {
                         'red': '#ff5252',
                         'blue': '#03a9f4',
-                        'green': '#8bc34a',
-                        'yellow': '#fbc02d'
+                        'green': '#00ff0da1',
+                        'yellow': '#fffb00'
                     };
                     
                     const bgColor = colorMap[window.game.currentColor];
