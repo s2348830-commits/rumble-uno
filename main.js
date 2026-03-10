@@ -295,6 +295,7 @@ window.updateUI = function() {
         if (unoBtn) {
             let canGoOut = false;
             const myHand = window.game.myHand;
+            const isMyTurn = current && current.id === window.game.myId;
             
             if (myHand && myHand.length > 0) {
                 if (myHand.length === 1) {
@@ -312,7 +313,7 @@ window.updateUI = function() {
                                                : (window.RuleSettings ? parseInt(window.RuleSettings.maxMultiPlay) : 1);
                             if (isNaN(limit) || limit === 0) limit = 1;
                             
-                            if (limit === -1 || myHand.length <= limit) {
+                            if ((limit === -1 || myHand.length <= limit) && isMyTurn) {
                                 canGoOut = true;
                             }
                         }
@@ -2193,34 +2194,67 @@ window.declareUno = function() {
     if(me && window.socket) window.socket.emit('declare_uno', { id: me.id, name: me.name });
 };
 
+window.showPenaltyAlert = function(msg, callback) {
+    let pOverlay = document.getElementById('penalty-overlay');
+    if (!pOverlay) {
+        pOverlay = document.createElement('div');
+        pOverlay.id = 'penalty-overlay';
+        pOverlay.className = 'hidden';
+        
+        pOverlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(50,0,0,0.6); z-index:150000; display:flex; flex-direction:column; justify-content:center; align-items:center; backdrop-filter:blur(3px);";
+        pOverlay.innerHTML = `
+            <div style="background:#222; border:3px solid #ff5252; border-radius:15px; padding:20px 30px; text-align:center; box-shadow:0 10px 30px rgba(255,82,82,0.5); max-width:80%;">
+                <h2 style="color:#ff5252; margin-top:0; font-size:24px; text-shadow:2px 2px 4px rgba(0,0,0,0.5);">⚠️ ペナルティ ⚠️</h2>
+                <div id="penalty-message" style="color:white; font-size:16px; font-weight:bold; margin-bottom:20px; white-space:pre-wrap; line-height:1.5;"></div>
+                <button id="btn-penalty-ok" style="padding:10px 40px; background:#ff5252; color:white; border:none; border-radius:8px; font-size:18px; font-weight:bold; cursor:pointer; box-shadow:0 4px 6px rgba(0,0,0,0.3);">確認</button>
+            </div>
+        `;
+        document.body.appendChild(pOverlay);
+    }
+    
+    document.getElementById('penalty-message').innerText = msg;
+    if (window.SE) window.SE.play('Impossible'); 
+    
+    pOverlay.classList.remove('hidden');
+    
+    document.getElementById('btn-penalty-ok').onclick = () => {
+        if (window.SE) window.SE.play('buttonclick');
+        pOverlay.classList.add('hidden');
+        if (callback) callback(); 
+    };
+};
+
 window.applyAutoUnoPenalty = function() {
     let penaltyCount = window.RuleSettings ? (window.RuleSettings.unoPenalty || 2) : 2;
-    alert(`UNO宣言忘れ！ 次のターンが開始されたため、ペナルティとして ${penaltyCount}枚ドローします！`);
-    window.isDrawing = true;
     
-    if (window.SE) window.SE.playMultiple('Distribute', penaltyCount, 500);
     
-    let finished = false;
-    const finishAutoPenalty = () => {
-        if (finished) return;
-        finished = true;
-        window.isDrawing = false;
-        if (window.isHost) {
-            if(window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: penaltyCount });
-            for(let i=0; i<penaltyCount; i++) window.game.drawCard(window.game.myId);
-            window.updateUI();
-            window.broadcastGameState(); 
-        } else if(window.socket) {
-            window.socket.emit('player_action', { action: 'draw_penalty_keep_turn', count: penaltyCount });
-        }
-    };
+    window.showPenaltyAlert(`UNO宣言忘れ！\n次のターンが開始されたため、\nペナルティとして ${penaltyCount}枚ドローします！`, () => {
+        window.isDrawing = true;
+        
+        if (window.SE) window.SE.playMultiple('Distribute', penaltyCount, 500);
+        
+        let finished = false;
+        const finishAutoPenalty = () => {
+            if (finished) return;
+            finished = true;
+            window.isDrawing = false;
+            if (window.isHost) {
+                if(window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: penaltyCount });
+                for(let i=0; i<penaltyCount; i++) window.game.drawCard(window.game.myId);
+                window.updateUI();
+                window.broadcastGameState(); 
+            } else if(window.socket) {
+                window.socket.emit('player_action', { action: 'draw_penalty_keep_turn', count: penaltyCount });
+            }
+        };
 
-    if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
-        CardAnimation.animateMultiDraw(penaltyCount, 'player-hand', finishAutoPenalty);
-        setTimeout(finishAutoPenalty, 3000); 
-    } else {
-        setTimeout(finishAutoPenalty, 500);
-    }
+        if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
+            CardAnimation.animateMultiDraw(penaltyCount, 'player-hand', finishAutoPenalty);
+            setTimeout(finishAutoPenalty, 3000); 
+        } else {
+            setTimeout(finishAutoPenalty, 500);
+        }
+    });
 };
 
 window.tryDrawWithAbility = function(callback) {
