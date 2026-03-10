@@ -855,6 +855,7 @@ window.showAbilityResetUI = function(maxCount) {
             const vals = selectedCards.map(c => c.value);
             if (window.isHost) {
                 window.game.replaceAbilityCards(window.game.myId, vals);
+                if (window.isHandSortEnabled && typeof window.sortPlayerHand === 'function') window.sortPlayerHand();
                 window.updateUI();
             } else {
                 if(window.socket) window.socket.emit('player_action', { action: 'ability_reset', cards: vals });
@@ -893,6 +894,9 @@ window.animateInitialDeal = function(targetHands, callback) {
         completedDeals++;
         if (completedDeals >= totalDeals) {
             window.game.hands = JSON.parse(JSON.stringify(targetHands));
+            if (window.isHandSortEnabled && typeof window.sortPlayerHand === 'function') {
+                window.sortPlayerHand();
+            }
             window.updateUI();
             window.isInitialDealing = false;
             
@@ -2967,20 +2971,21 @@ function initMainSocketEvents() {
                 }
             }
         } else if (!window.isInitialDealing) {
+            const abOverlay = document.getElementById('ability-reset-overlay');
+            if (abOverlay) abOverlay.classList.add('hidden');
             const myId = window.myId || (window.game && window.game.myId);
-            let handChanged = false;
+            
             if (myId && window.game.hands && window.game.hands[myId] && state.hands && state.hands[myId]) {
                 if (window.game.hands[myId].length === state.hands[myId].length) {
                     state.hands[myId] = window.game.hands[myId]; 
                 } else {
                     window.game.selectedIndices = []; 
-                    handChanged = true;
                 }
             }
             window.game.hands = state.hands;
             
-            // ★追加: 手札が変動し、かつソートONなら自動で並び替える
-            if (handChanged && window.isHandSortEnabled && typeof window.sortPlayerHand === 'function') {
+            // 👇👇 ★修正: 手札が更新された時は常にソートチェックを行う 👇👇
+            if (window.isHandSortEnabled && typeof window.sortPlayerHand === 'function') {
                 window.sortPlayerHand();
             }
 
@@ -3046,16 +3051,17 @@ function initMainSocketEvents() {
             setTimeout(() => document.getElementById('draw-curtain').classList.add('show'), 100);
             setTimeout(() => { const b = document.getElementById('winner-banner'); b.innerText = "DRAW"; b.classList.add('show'); }, 3000);
         } else {
-            //win2が選ばれた時は1秒遅らせる 👇👇
             if (window.SE) {
                 if (Math.random() < 0.5) {
                     window.SE.play('win');
                 } else {
                     setTimeout(() => {
                         window.SE.play('win2');
-                    }, 1000); // 1000ミリ秒(1秒)後に再生
+                    }, 1000); 
                 }
             }
+            const winnerId = data.winnerId;
+            const winnerName = data.winnerName;
             const target = (winnerId === window.myId) ? document.getElementById('my-player-info') : document.querySelector(`.circle-player-badge[data-id="${winnerId}"]`);
             if(target) target.classList.add('winner-crown');
             setTimeout(() => {
@@ -3127,12 +3133,10 @@ function initMainSocketEvents() {
         } else if (data.action === 'draw') {
             if (!current || current.id !== playerId) return;
             if (window.isProcessingPlay) return; 
-            
             if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) return;
 
             window.isProcessingPlay = true;
             window.game.hasDrawnThisTurn = true;
-
             window.socket.emit('request_draw_animation', { playerId: playerId, count: data.count });
             
             const safeCount = (typeof data.count === 'number' && data.count > 0) ? data.count : 1;
@@ -3172,15 +3176,13 @@ function initMainSocketEvents() {
                 window.game.replaceAbilityCards(playerId, data.cards);
                 if (typeof window.broadcastGameState === 'function') window.broadcastGameState(true);
             }
-        } 
-        else if (data.action === 'janken_choice') {
+        } else if (data.action === 'janken_choice') {
             if (window.pendingJanken && !window.pendingJanken.result) {
                 if (playerId === window.pendingJanken.attackerId) window.pendingJanken.attackerHand = data.choice;
                 if (playerId === window.pendingJanken.targetId) window.pendingJanken.targetHand = data.choice;
                 if (typeof window.checkJankenReady === 'function') window.checkJankenReady();
             }
-        }
-        else if (data.action === 'sort_hand') {
+        } else if (data.action === 'sort_hand') {
             if (window.game && window.game.hands && window.game.hands[playerId]) {
                 window.game.hands[playerId] = data.sortedHand;
                 if (typeof window.broadcastGameState === 'function') window.broadcastGameState(true);
