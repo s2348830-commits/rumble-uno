@@ -675,6 +675,7 @@ window.showAbilityResetUI = function(maxCount) {
         myAbilities.forEach((c, idx) => {
             const el = Renderer.createCardElement(c);
             el.style.transform = 'none'; el.style.position = 'static'; el.style.margin = '0';
+            appendInfoBtn(el, c.value);
             el.onclick = () => {
                 if (selectedCards.length < maxCount) {
                     myAbilities.splice(idx, 1);
