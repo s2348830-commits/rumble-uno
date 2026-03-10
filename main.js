@@ -770,15 +770,13 @@ window.showAbilityResetUI = function(maxCount) {
     
     if(!overlay) return;
 
+    // UIを初期状態に戻す
     const tTitle = overlay.querySelector('h2');
     const pSub = overlay.querySelector('p');
     if (resetArea) resetArea.style.display = 'flex';
     if (handArea) handArea.style.display = 'flex';
     if (btnConfirm) btnConfirm.style.display = 'block';
     if (pSub) pSub.style.display = 'block';
-
-    const timerSpan = document.getElementById('reset-timer');
-    const maxSpan = document.getElementById('reset-max');
 
     let descArea = document.getElementById('reset-desc-area');
     if (!descArea) {
@@ -797,11 +795,14 @@ window.showAbilityResetUI = function(maxCount) {
     descArea.innerText = 'カードの「？」を押すとここに効果が表示されます';
     if (descArea) descArea.style.display = 'block';
 
-    // 👇👇 ★修正: タイマーを「枚数 × 5秒」に設定 👇👇
+    // 👇★修正箇所: タイマーのHTMLをセットしてから要素を取得する（重複エラー解消）
     let timeLeft = maxCount * 5;
     if (tTitle) tTitle.innerHTML = `能力カード入れ替え (<span id="reset-timer" style="color:#fbc02d;">${timeLeft}</span>秒)`;
-    if (timerSpan) timerSpan.innerText = timeLeft;
+    
+    const timerSpan = document.getElementById('reset-timer');
+    const maxSpan = document.getElementById('reset-max');
     if (maxSpan) maxSpan.innerText = maxCount;
+    // 👆★修正ここまで
     
     resetArea.innerHTML = '';
     handArea.innerHTML = '';
@@ -889,7 +890,8 @@ window.showAbilityResetUI = function(maxCount) {
             const vals = selectedCards.map(c => c.value);
             if (window.isHost) {
                 window.game.replaceAbilityCards(window.game.myId, vals);
-                if (window.isHandSortEnabled && typeof window.sortPlayerHand === 'function') window.sortPlayerHand(true);                window.updateUI();
+                if (window.isHandSortEnabled && typeof window.sortPlayerHand === 'function') window.sortPlayerHand(true);
+                window.updateUI();
             } else {
                 if(window.socket) window.socket.emit('player_action', { action: 'ability_reset', cards: vals });
             }
