@@ -1415,11 +1415,20 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
             let guides = [];
             if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, responses, multiplier, selectedColor, multiCards, extraData);
             guides.forEach(g => { if(g.delay === undefined) g.delay = 2500; });
-            window.broadcastGameState(false, guides);
-
+            
             let someoneWon = false;
+            if (window.game.hands[playerId] && window.game.hands[playerId].length === 0) {
+                if (window.RuleSettings && !window.RuleSettings.allowAbilityFinish) {
+                    const penaltyCount = parseInt(window.RuleSettings.abilityFinishPenalty) || 3;
+                    for (let i = 0; i < penaltyCount; i++) window.game.drawCard(playerId);
+                    if (window.socket) window.socket.emit('request_draw_animation', { playerId: playerId, count: penaltyCount });
+                    guides.push({ from: playerId, to: playerId, text: '能力上がり禁止!', delay: 2500 });
+                } else {
+                    window.checkWin(playerId); someoneWon = true;
+                }
+            }
             window.game.players.forEach(p => {
-                if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) {
+                if (p.id !== playerId && window.game.hands[p.id] && window.game.hands[p.id].length === 0) {
                     window.checkWin(p.id); someoneWon = true;
                 }
             });
