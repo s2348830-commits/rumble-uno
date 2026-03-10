@@ -2895,7 +2895,7 @@ function initMainSocketEvents() {
             if (!current || current.id !== playerId) return;
             if (window.isProcessingPlay) return; 
             
-            if (window.game.hasDrawnThisTurn) return;
+            if (window.game.hasDrawnThisTurn && window.RuleSettings && !window.RuleSettings.optionalDraw) return;
 
             window.isProcessingPlay = true;
             window.game.hasDrawnThisTurn = true;
