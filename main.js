@@ -291,9 +291,36 @@ window.updateUI = function() {
 
         const unoBtn = document.getElementById('uno-btn');
         const unoArea = document.getElementById('uno-area');
+        
         if (unoBtn) {
-            if (window.game.unoDeclared) {
+            let canGoOut = false;
+            const myHand = window.game.myHand;
+            
+            if (myHand && myHand.length > 0) {
+                if (myHand.length === 1) {
+                    canGoOut = true;
+                } else {
+                    const firstCardValue = myHand[0].value;
+                    const allSame = myHand.every(c => c.value === firstCardValue);
+                    
+                    if (allSame) {
+                        const isDraw = firstCardValue === '+2' || firstCardValue === 'Wild+4';
+                        const isAbility = firstCardValue && String(firstCardValue).startsWith('id_');
+                        
+                        if (!isAbility) {
+                            let limit = isDraw ? (window.RuleSettings ? parseInt(window.RuleSettings.maxDrawMultiPlay) : 1) 
+                                               : (window.RuleSettings ? parseInt(window.RuleSettings.maxMultiPlay) : 1);
+                            if (isNaN(limit) || limit === 0) limit = 1;
+                            
+                            if (limit === -1 || myHand.length <= limit) {
+                                canGoOut = true;
+                            }
+                        }
+                    }
+                }
+            }
 
+            if (window.game.unoDeclared || !canGoOut) {
                 unoBtn.classList.add('hidden');
                 unoBtn.style.display = 'none';
                 if (unoArea) {
@@ -301,7 +328,6 @@ window.updateUI = function() {
                     unoArea.style.display = 'none';
                 }
             } else {
-
                 unoBtn.classList.remove('hidden');
                 unoBtn.style.display = 'block';
                 unoBtn.disabled = false; 
