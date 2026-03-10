@@ -55,10 +55,10 @@ window.sortPlayerHand = function(suppressUpdate = false) {
     if (JSON.stringify(hand) !== originalHand) {
         window.game.selectedIndices = [];
         if (window.isHost) {
-            window.broadcastGameState(true);
+            if (!window.isInitialDealing) window.broadcastGameState(true);
             if (!suppressUpdate && typeof window.updateUI === 'function') window.updateUI();
         } else if (window.socket) {
-            window.socket.emit('player_action', { action: 'sort_hand', sortedHand: hand });
+            if (!window.isInitialDealing) window.socket.emit('player_action', { action: 'sort_hand', sortedHand: hand });
             if (!suppressUpdate && typeof window.updateUI === 'function') window.updateUI();
         }
     }
@@ -310,7 +310,7 @@ const ColorUI = {
 };
 
 window.updateUI = function() { 
-    if (window.isHandSortEnabled && typeof window.sortPlayerHand === 'function') {
+    if (!window.isInitialDealing && window.isHandSortEnabled && typeof window.sortPlayerHand === 'function') {
         window.sortPlayerHand(true); 
     }
     if(window.game && window.game.players && window.game.players.length > 0) { 
@@ -926,8 +926,12 @@ window.animateInitialDeal = function(targetHands, callback) {
             if (window.isHandSortEnabled && typeof window.sortPlayerHand === 'function') {
                 window.sortPlayerHand();
             }
-            window.updateUI();
             window.isInitialDealing = false;
+            
+            if (window.isHandSortEnabled && typeof window.sortPlayerHand === 'function') {
+                window.sortPlayerHand();
+            }
+            window.updateUI();
             
             if (window.RuleSettings && window.RuleSettings.abilityResetCount > 0) {
                 if (typeof window.showAbilityResetUI === 'function') {
