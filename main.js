@@ -271,13 +271,20 @@ window.updateUI = function() {
         const discardPile = window.game.discardPile;
         if (discardPile && discardPile.length > 0) {
             const topCard = discardPile[discardPile.length - 1];
-            if (window.game.currentColor && topCard.color !== window.game.currentColor) {
-                const discardEl = document.getElementById('discard-pile');
-                
-                const cardsInDiscard = discardEl ? discardEl.querySelectorAll('.card') : [];
-                const topCardEl = cardsInDiscard.length > 0 ? cardsInDiscard[cardsInDiscard.length - 1] : null;
+            const discardEl = document.getElementById('discard-pile');
+            
+            const cardsInDiscard = discardEl ? discardEl.querySelectorAll('.card') : [];
+            const topCardEl = cardsInDiscard.length > 0 ? cardsInDiscard[cardsInDiscard.length - 1] : null;
 
-                if (topCardEl) {
+            if (topCardEl) {
+                // 👇👇 ★修正1: 能力カードかどうか、かつ「色指定が必要な能力(レベッカ等)」かどうかを判定
+                const isAbility = topCard.value && String(topCard.value).startsWith('id_');
+                const def = isAbility && window.AbilityDef ? window.AbilityDef[topCard.value] : null;
+                
+                // 色フィルターをかけるべきか（通常のワイルドカード、または色指定が必要な能力カードのみ許可）
+                const shouldApplyOverlay = (topCard.color === 'black' && !isAbility) || (isAbility && def && def.needsColor);
+
+                if (window.game.currentColor && topCard.color !== window.game.currentColor && shouldApplyOverlay) {
                     const colorMap = {
                         'red': 'rgba(255, 82, 82, 0.65)',
                         'blue': 'rgba(3, 169, 244, 0.65)',
@@ -314,7 +321,12 @@ window.updateUI = function() {
                         
                         overlay.style.setProperty('background-color', bgColor, 'important');
                         overlay.style.setProperty('border', `4px solid ${bdColor}`, 'important');
-                        overlay.style.setProperty('box-shadow', `inset 0 0 20px ${bdColor}`, 'important'); 
+                        overlay.style.setProperty('box-shadow', `inset 0 0 20px ${bdColor}`, 'important');
+                    }
+                } else {
+                    const existingOverlay = topCardEl.querySelector('.wild-color-overlay');
+                    if (existingOverlay) {
+                        existingOverlay.remove();
                     }
                 }
             }
