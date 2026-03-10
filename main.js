@@ -2629,31 +2629,6 @@ function initMainSocketEvents() {
             msgEl.innerText = current.id === window.myId ? `あなたの番です${roomStr}` : `${current.name} のターン${roomStr}`;
         }
 
-        // 👇👇 ★修正: ターン開始時のUNOオートペナルティと、ズル防止の解除処理 👇👇
-        if (!window.isInitialDealing && !window.isGameOver && current) {
-            if (window.lastTurnTracker !== state.turnIndex || window.lastPlayerTracker !== current.id) {
-                
-                // 前回のターンが自分で、手札が2枚以上残ったままターンを終えたならUNO宣言をリセット（ズル防止）
-                if (window.lastPlayerTracker === window.myId && current.id !== window.myId) {
-                    if (window.game.myHand && window.game.myHand.length > 1) {
-                        window.game.unoDeclared = false;
-                        if (typeof window.updateUI === 'function') window.updateUI();
-                    }
-                }
-
-                // 今回のターンが自分になった時の処理（オートペナルティ判定）
-                if (current.id === window.myId) {
-                    if (window.game.myHand && window.game.myHand.length === 1 && !window.game.unoDeclared && window.RuleSettings && !window.RuleSettings.unoAuto) {
-                        window.applyAutoUnoPenalty();
-                    }
-                }
-
-                window.lastTurnTracker = state.turnIndex;
-                window.lastPlayerTracker = current.id;
-            }
-        }
-        // 👆👆 修正ここまで 👆👆
-
         if (state.attackGuides && state.attackGuides.length > 0) {
             state.attackGuides.forEach(g => {
                 const delay = g.delay || 0;
