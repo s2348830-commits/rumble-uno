@@ -731,16 +731,18 @@ window.showAttackGuide = function(fromId, toId, labelText, seName) {
 window.tryEarlyStartReset = function() {
     if (!window.isHost || !window.abilityResetConfirmedPlayers) return;
     
-    const humanPlayers = window.game.players.filter(p => p.type !== 'bot');
+    // Botではなく、かつ接続中の人間プレイヤー全員の数を数える
+    const humanPlayers = window.game.players.filter(p => p.type !== 'bot' && p.connected);
     
     if (window.abilityResetConfirmedPlayers.size >= humanPlayers.length) {
         if (window.abilityResetTimeoutId) {
             clearTimeout(window.abilityResetTimeoutId);
             window.abilityResetTimeoutId = null;
             
+            // 全員揃ったので即時開始
             const resetOverlay = document.getElementById('ability-reset-overlay');
             if (resetOverlay) resetOverlay.classList.add('hidden');
-            window.broadcastGameState();
+            window.broadcastGameState(true);
             window.checkTurn();
         }
     }
@@ -941,23 +943,24 @@ window.animateInitialDeal = function(targetHands, callback) {
                 }
                 
                 //  ★修正: 確定状況を追跡するための変数を初期化 
-                const waitTime = (window.RuleSettings.abilityResetCount * 5000) + 3000;
+                const waitTime = (window.RuleSettings.abilityResetCount * 5000) + 1000;
+                
                 if (window.isHost) {
                     window.abilityResetConfirmedPlayers = new Set(); 
                     window.abilityResetTimeoutId = setTimeout(() => {
                         window.abilityResetTimeoutId = null;
                         const resetOverlay = document.getElementById('ability-reset-overlay');
                         if (resetOverlay) resetOverlay.classList.add('hidden');
-                        window.broadcastGameState();
+                        window.broadcastGameState(true);
                         window.checkTurn();
                     }, waitTime);
                 } else {
-                    // ★追加: 参加者側もホストと同じく13秒後に待機画面を閉じる 
+                    // 参加者側も13秒固定ではなく、枚数に合わせた waitTime で強制的に閉じる
                     setTimeout(() => {
                         const resetOverlay = document.getElementById('ability-reset-overlay');
                         if (resetOverlay) resetOverlay.classList.add('hidden');
                         if (typeof window.updateUI === 'function') window.updateUI();
-                    }, 13000);
+                    }, waitTime);
                 }
             } else {
                 window.updateUI();
