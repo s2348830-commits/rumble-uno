@@ -415,6 +415,8 @@ window.updatePhaseUI = function(state) {
     } else {
         window.isJankenShowing = false;
         window.jankenResultPlayed = false;
+        window.lastTurnTracker = -1;
+        window.lastPlayerTracker = null;
         window.currentJankenLoopId = null; 
         const jOverlay = document.getElementById('janken-overlay');
         if (jOverlay) {
@@ -621,7 +623,8 @@ window.showAbilityResetUI = function(maxCount) {
     descArea.innerText = 'カードの「？」を押すとここに効果が表示されます';
     // 👆👆 追加ここまで 👆👆
     
-    let timeLeft = 10;
+    let timeLeft = maxCount * 5;
+    if (timerSpan) timerSpan.innerText = timeLeft;
     maxSpan.innerText = maxCount;
     resetArea.innerHTML = '';
     handArea.innerHTML = '';
@@ -2125,10 +2128,40 @@ window.animateSequentialPlay = function(indices, gameInstance, callback) {
 };
 
 window.declareUno = function() {
-    if (window.isInitialDealing) return; 
+    if (window.isInitialDealing || window.isGameOver) return; 
     window.game.unoDeclared = true; window.updateUI();
     const me = window.game.players.find(p => p.id === window.game.myId);
     if(me && window.socket) window.socket.emit('declare_uno', { id: me.id, name: me.name });
+};
+
+window.applyAutoUnoPenalty = function() {
+    let penaltyCount = window.RuleSettings ? (window.RuleSettings.unoPenalty || 2) : 2;
+    alert(`UNO宣言忘れ！ 次のターンが開始されたため、ペナルティとして ${penaltyCount}枚ドローします！`);
+    window.isDrawing = true;
+    
+    if (window.SE) window.SE.playMultiple('Distribute', penaltyCount, 500);
+    
+    let finished = false;
+    const finishAutoPenalty = () => {
+        if (finished) return;
+        finished = true;
+        window.isDrawing = false;
+        if (window.isHost) {
+            if(window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: penaltyCount });
+            for(let i=0; i<penaltyCount; i++) window.game.drawCard(window.game.myId);
+            window.updateUI();
+            window.broadcastGameState(); // ターンは終了させず同期のみ
+        } else if(window.socket) {
+            window.socket.emit('player_action', { action: 'draw_penalty_keep_turn', count: penaltyCount });
+        }
+    };
+
+    if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
+        CardAnimation.animateMultiDraw(penaltyCount, 'player-hand', finishAutoPenalty);
+        setTimeout(finishAutoPenalty, 3000); // 異常時の安全装置
+    } else {
+        setTimeout(finishAutoPenalty, 500);
+    }
 };
 
 window.tryDrawWithAbility = function(callback) {
@@ -2586,6 +2619,18 @@ function initMainSocketEvents() {
             msgEl.innerText = current.id === window.myId ? `あなたの番です${roomStr}` : `${current.name} のターン${roomStr}`;
         }
 
+        if (current.id === window.myId && !window.isInitialDealing && !window.isGameOver) {
+                if (window.lastTurnTracker !== state.turnIndex || window.lastPlayerTracker !== current.id) {
+                    window.lastTurnTracker = state.turnIndex;
+                    window.lastPlayerTracker = current.id;
+
+                    // 自分のターンが回ってきた時点で手札が1枚、かつUNO宣言していない場合
+                    if (window.game.myHand && window.game.myHand.length === 1 && !window.game.unoDeclared && window.RuleSettings && !window.RuleSettings.unoAuto) {
+                        window.applyAutoUnoPenalty();
+                    }
+                }
+            }
+
         if (state.attackGuides && state.attackGuides.length > 0) {
             state.attackGuides.forEach(g => {
                 const delay = g.delay || 0;
@@ -2725,6 +2770,15 @@ function initMainSocketEvents() {
                 if (typeof window.game !== 'undefined' && typeof window.game.drawCard === 'function') {
                     for(let i=0; i<data.count; i++) window.game.drawCard(playerId);
                     if (typeof window.executeEndTurn === 'function') window.executeEndTurn(playerId);
+                }
+            }, delay);
+        } else if (data.action === 'draw_penalty_keep_turn') {
+            window.socket.emit('request_draw_animation', { playerId: playerId, count: data.count });
+            const delay = data.count * 100 + 400;
+            setTimeout(() => {
+                if (typeof window.game !== 'undefined' && typeof window.game.drawCard === 'function') {
+                    for(let i=0; i<data.count; i++) window.game.drawCard(playerId);
+                    if (typeof window.broadcastGameState === 'function') window.broadcastGameState(true);
                 }
             }, delay);
         } else if (data.action === 'ability_reset') {
