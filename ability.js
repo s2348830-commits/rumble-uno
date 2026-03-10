@@ -38,7 +38,7 @@ window.AbilityDef = {
     'id_34': { rarity: 'SR', type: 'HE', name: 'オリヴィア', desc: '【HE】自分に回避I(20%の確率で攻撃を防ぐ)を1ターン付与する。' },
     'id_35': { rarity: 'UR', type: 'HV', name: 'イヴ', desc: '【HV】ランダム燃焼＋全員裂傷付与。さらに蘇生(次に引く時手札に戻る)を付与。' },
     'id_36': { rarity: 'UR', type: 'HV', name: 'アミリー', desc: '【HV】使用後、赤バラ、桃バラ、白バラの3つのうち好きなカードを手札に加える。', needsAmilySelect: true },
-    'id_37': { rarity: 'SSR', type: 'AT', name: '赤バラ', desc: '【AT】自分以外のランダムなプレイヤーに固定で3枚ドローさせる。(防御不可)', fixedDraw: true, unblockable: true },
+    'id_37': { rarity: 'SSR', type: 'AT', name: '赤バラ', desc: '【AT】自分以外のランダムなプレイヤーに固定で3枚ドローさせる。(防御不可)その後に、自分の状態異常を1つ解除する。', fixedDraw: true, unblockable: true },
     'id_38': { rarity: 'SSR', type: 'HE', name: '桃バラ', desc: '【HE】使用後自分にシールドIIIを3ターン付与する。' },
     'id_39': { rarity: 'SSR', type: 'HE', name: '白バラ', desc: '【HE】70%の確率で赤バラと桃バラのカード両方を手札に加える。外れた場合カードを1枚引く。' }
 };
@@ -322,6 +322,19 @@ window.AbilityEngine = {
                     if(self) self.shield = { level: 2, turns: this.getAdjustedTurns(game, attackerId, turns) };
                 } else if (abilityId === 'id_18') {
                     if(self) self.shield = { level: 1, turns: this.getAdjustedTurns(game, attackerId, 2) };
+                }
+                else if (abilityId === 'id_37') {
+                    if(self) {
+                        let dbfs = [];
+                        if (self.frozen) dbfs.push('frozen');
+                        if (self.burnTurns > 0) dbfs.push('burn');
+                        if (dbfs.length > 0) {
+                            const r = dbfs[Math.floor(Math.random()*dbfs.length)];
+                            if (r === 'frozen') self.frozen = false;
+                            else self.burnTurns = 0;
+                            guides.push({ from: attackerId, to: attackerId, text: 'デバフ解除' });
+                        }
+                    }
                 }
             }
 

@@ -1005,16 +1005,12 @@ window.animateInitialDeal = function(targetHands, callback) {
         completedDeals++;
         if (completedDeals >= totalDeals) {
             window.game.hands = JSON.parse(JSON.stringify(targetHands));
-            if (window.isHandSortEnabled && typeof window.sortPlayerHand === 'function') {
-                window.sortPlayerHand();
-            }
             window.isInitialDealing = false;
             
             if (window.isHandSortEnabled && typeof window.sortPlayerHand === 'function') {
                 window.sortPlayerHand();
             }
             window.updateUI();
-            
             if (window.RuleSettings && window.RuleSettings.abilityResetCount > 0) {
                 if (typeof window.showAbilityResetUI === 'function') {
                     window.showAbilityResetUI(window.RuleSettings.abilityResetCount);
@@ -3383,6 +3379,8 @@ function initMainSocketEvents() {
     });
 
     window.socket.on('play_animation', (data) => {
+        if (window.isInitialDealing || window.isDealAnimationStarted) return; 
+
         if (data.playerId !== window.myId) {
             if (typeof window.playOpponentAnimation === 'function') window.playOpponentAnimation(data.playerId, data.cards);
             if (data.cards && data.cards.length > 0 && data.cards[0].value && String(data.cards[0].value).startsWith('id_')) {
@@ -3392,6 +3390,8 @@ function initMainSocketEvents() {
     });
 
     window.socket.on('draw_animation', (data) => {
+        if (window.isInitialDealing || window.isDealAnimationStarted) return;
+
         if (data.playerId !== window.myId) {
             if (typeof window.drawOpponentAnimation === 'function') window.drawOpponentAnimation(data.playerId, data.count);
         }
