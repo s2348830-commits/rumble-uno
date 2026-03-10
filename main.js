@@ -14,6 +14,8 @@ window.isProcessingPlay = false;
 window.currentDefensePhaseId = null;
 window.hasRespondedDefense = false;
 window.currentJankenLoopId = null; 
+window.lastTurnTracker = -1; // ★追加: ターン監視用
+window.lastPlayerTracker = null; // ★追加: ターン監視用
 
 window.JANKEN_BACK_IMG = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 60'%3E%3Crect width='40' height='60' rx='6' fill='%23222' stroke='%23444' stroke-width='2'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23fff' font-size='24' font-family='sans-serif' font-weight='bold'%3E?%3C/text%3E%3C/svg%3E";
 
@@ -239,7 +241,7 @@ const unlockAudioContext = () => {
     if (window.SE.audioCtx.state === 'suspended') window.SE.audioCtx.resume();
 ['win', 'win2', 'setting', 'draw', 'uno_message', 'buttonclick', 'uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6', 'frieze', 'rock', 'Distribute', 'mvp_1', 'mvp_2', 'hv/id_20(1)', 'hv/id_20(2)', 'hv/id_25', 'hv/id_26', 'hv/id_35', 'laceration'].forEach(name => window.SE.loadSound(name, 'mp3'));
     document.removeEventListener('click', unlockAudioContext);
-    document.removeEventListener('touchstart', unlockAudioContext);
+    document.removeEventListener('touchstart', unlockAudioContext, { passive: true });
 };
 document.addEventListener('click', unlockAudioContext);
 document.addEventListener('touchstart', unlockAudioContext, { passive: true });
@@ -266,14 +268,12 @@ window.updateUI = function() {
     if(window.game && window.game.players && window.game.players.length > 0) { 
         Renderer.updateAll(window.game); 
         
-        // --- 場のワイルドカードを指定色に染める処理 ---
         const discardPile = window.game.discardPile;
         if (discardPile && discardPile.length > 0) {
             const topCard = discardPile[discardPile.length - 1];
             if (window.game.currentColor && topCard.color !== window.game.currentColor) {
                 const discardEl = document.getElementById('discard-pile');
                 
-                // 👇👇 ★修正: 単なる一番後ろの要素ではなく、確実に「カード」のDOMだけを狙う 👇👇
                 const cardsInDiscard = discardEl ? discardEl.querySelectorAll('.card') : [];
                 const topCardEl = cardsInDiscard.length > 0 ? cardsInDiscard[cardsInDiscard.length - 1] : null;
 
@@ -312,23 +312,20 @@ window.updateUI = function() {
                             topCardEl.appendChild(overlay);
                         }
                         
-                        // ★修正: 他の演出に負けないように !important で色と枠を絶対維持する
                         overlay.style.setProperty('background-color', bgColor, 'important');
                         overlay.style.setProperty('border', `4px solid ${bdColor}`, 'important');
-                        overlay.style.setProperty('box-shadow', `inset 0 0 20px ${bdColor}`, 'important'); // 内側の光も濃くしました
+                        overlay.style.setProperty('box-shadow', `inset 0 0 20px ${bdColor}`, 'important'); 
                     }
                 }
             }
         }
 
-        // --- 選択した手札を一番手前に表示する処理 ---
         const handEl = document.getElementById('player-hand');
         if (handEl && window.game.selectedIndices) {
             Array.from(handEl.children).forEach((cardEl, idx) => {
                 cardEl.style.position = 'relative'; 
                 
                 if (window.game.selectedIndices.includes(idx)) {
-                    // 選択中（浮き上がっている）カードは確実に一番手前に出す
                     cardEl.style.zIndex = '10000';
                 } else {
                     cardEl.style.zIndex = idx;
@@ -378,16 +375,14 @@ window.updatePhaseUI = function(state) {
     }
 
     if (state.jankenPhase) {
-        // 現在のじゃんけんの組み合わせと回数を元にIDを作成
         const newLoopId = `${state.jankenPhase.attackerId}-${state.jankenPhase.targetId}-${state.jankenPhase.loopCount}`;
         
-        // ★修正: UIが表示されていない、または「新しい回（再戦）」に入った時にUIを再セットしてボタンを出す
         if (!window.isJankenShowing || window.currentJankenLoopId !== newLoopId) {
             if (typeof window.showJankenUI === 'function') {
                 window.showJankenUI(state.jankenPhase.attackerId, state.jankenPhase.targetId, state.jankenPhase.loopCount);
             }
             window.isJankenShowing = true;
-            window.jankenResultPlayed = false; // ★ここで結果再生フラグも確実にリセットする
+            window.jankenResultPlayed = false; 
         }
 
         const jTimer = document.getElementById('janken-timer');
@@ -415,8 +410,6 @@ window.updatePhaseUI = function(state) {
     } else {
         window.isJankenShowing = false;
         window.jankenResultPlayed = false;
-        window.lastTurnTracker = -1;
-        window.lastPlayerTracker = null;
         window.currentJankenLoopId = null; 
         const jOverlay = document.getElementById('janken-overlay');
         if (jOverlay) {
@@ -431,7 +424,6 @@ window.broadcastGameState = function(skipUIUpdate = false, attackGuides = []) {
     const playersInfo = window.game.players.map(p => ({ 
         id: p.id, connected: p.connected, frozen: p.frozen, burnTurns: p.burnTurns, 
         invincibleTurns: p.invincibleTurns, shield: p.shield, evasion: p.evasion, usedRaia: p.usedRaia,
-        // ★追加: 裂傷と蘇生の情報を他プレイヤーにも送る
         raiaUseCount: p.raiaUseCount || 0,
         lacerationTurns: p.lacerationTurns, 
         resurrectionEveCount: p.resurrectionEveCount, 
@@ -605,7 +597,6 @@ window.showAbilityResetUI = function(maxCount) {
     
     if(!overlay) return;
 
-    // 👇👇 説明文を表示するエリアを動的に作成 👇👇
     let descArea = document.getElementById('reset-desc-area');
     if (!descArea) {
         descArea = document.createElement('div');
@@ -621,7 +612,6 @@ window.showAbilityResetUI = function(maxCount) {
         if (btnConfirm) btnConfirm.parentNode.insertBefore(descArea, btnConfirm);
     }
     descArea.innerText = 'カードの「？」を押すとここに効果が表示されます';
-    // 👆👆 追加ここまで 👆👆
     
     let timeLeft = maxCount * 5;
     if (timerSpan) timerSpan.innerText = timeLeft;
@@ -631,7 +621,6 @@ window.showAbilityResetUI = function(maxCount) {
     let selectedCards = [];
     let myAbilities = window.game.myHand.filter(c => c.value && String(c.value).startsWith('id_'));
 
-    // 👇👇 情報(？)ボタンを作成してカードにくっつける関数 👇👇
     const appendInfoBtn = (el, cardValue) => {
         const infoBtn = document.createElement('div');
         infoBtn.innerText = '?';
@@ -652,7 +641,7 @@ window.showAbilityResetUI = function(maxCount) {
         infoBtn.style.border = '1.5px solid white';
         infoBtn.style.boxShadow = '0 0 5px rgba(0,0,0,0.5)';
         infoBtn.onclick = (e) => {
-            e.stopPropagation(); // ★重要: これで「カードの入れ替え」が誤爆するのを防ぐ
+            e.stopPropagation(); 
             if (window.SE) window.SE.play('buttonclick');
             const def = window.AbilityDef ? window.AbilityDef[cardValue] : null;
             if (def) {
@@ -661,14 +650,13 @@ window.showAbilityResetUI = function(maxCount) {
         };
         el.appendChild(infoBtn);
     };
-    // 👆👆 追加ここまで 👆👆
 
     const renderCards = () => {
         resetArea.innerHTML = '';
         selectedCards.forEach((c, idx) => {
             const el = Renderer.createCardElement(c);
             el.style.transform = 'none'; el.style.position = 'relative'; el.style.margin = '0';
-            appendInfoBtn(el, c.value); // ★ボタンを追加
+            appendInfoBtn(el, c.value); 
             el.onclick = () => {
                 selectedCards.splice(idx, 1);
                 myAbilities.push(c);
@@ -681,7 +669,7 @@ window.showAbilityResetUI = function(maxCount) {
         myAbilities.forEach((c, idx) => {
             const el = Renderer.createCardElement(c);
             el.style.transform = 'none'; el.style.position = 'relative'; el.style.margin = '0';
-            appendInfoBtn(el, c.value); // ★ボタンを追加
+            appendInfoBtn(el, c.value); 
             el.onclick = () => {
                 if (selectedCards.length < maxCount) {
                     myAbilities.splice(idx, 1);
@@ -840,13 +828,10 @@ window.showAbilityCutin = function(cardValue, isHVActivated = false) {
         const rand = Math.random() < 0.5 ? 1 : 2;
         if (window.SE) window.SE.play(`hv/id_20(${rand})`);
     } else if (cardValue === 'id_25') {
-        // 修正: id_25（ミサ）は id_25 を再生する
         if (window.SE) window.SE.play(`hv/id_25`);
     } else if (cardValue === 'id_26') {
-        // 修正: id_26（運命の三姉妹）は id_26 を再生する
         if (window.SE) window.SE.play(`hv/id_26`);
     } else if (cardValue === 'id_35') {
-        // イヴ(id_35)の専用SEを再生
         if (window.SE) window.SE.play(`hv/id_35`);
     } else {
         const randMvp = Math.random() < 0.5 ? 1 : 2;
@@ -1067,9 +1052,6 @@ window.showDefenseModal = function(attackCardValue) {
             return;
         }
         
-        // ❌ 削除: ここで true にしてしまうと、カードを選ぶ前に1秒ごとの更新で画面が閉じてしまう！
-        // window.hasRespondedDefense = true; 
-        
         qArea.classList.add('hidden');
         sArea.classList.remove('hidden');
         
@@ -1087,13 +1069,13 @@ window.showDefenseModal = function(attackCardValue) {
                 if (def && (def.needsDiscard || def.needsAbilityDiscard)) {
                     modal.classList.add('hidden'); 
                     window.openDiscardSelection(myHand, [item.idx], def, (discIdx) => {
-                        window.hasRespondedDefense = true; // ✅ 実際にカードと捨てるカードを確定した「ここ」でフラグを立てる！
+                        window.hasRespondedDefense = true; 
                         window.socket.emit('player_action', { action: 'defense_response', targetId: window.game.myId, cardValue: item.card.value, discardIdx: discIdx });
                         window.isDefending = false;
                     });
                 } else {
                     modal.classList.add('hidden'); 
-                    window.hasRespondedDefense = true; // ✅ 捨てる必要がないカードの場合も、「ここ」でフラグを立てる！
+                    window.hasRespondedDefense = true; 
                     window.socket.emit('player_action', { action: 'defense_response', targetId: window.game.myId, cardValue: item.card.value, discardIdx: null });
                     window.isDefending = false;
                 }
@@ -1614,15 +1596,13 @@ window.resolveJanken = function() {
     window.broadcastGameState(); 
 
     setTimeout(() => {
-        let drawCount = 3; // 初回は結果によらず2ドロー
+        let drawCount = 3; 
         let winOrDrawDrawn = false;
 
         if (result === 'win' || result === 'draw') {
             winOrDrawDrawn = true;
-            // 相手3ドロー
             window.AbilityEngine.applyDraw(window.game, pJ.targetId, drawCount, false, true);
             
-            // 自分はランダムな「既存カード」を1枚捨てる
             const aHand = window.game.hands[pJ.attackerId];
             if (aHand) {
                 const normalCardIndices = [];
@@ -1637,12 +1617,10 @@ window.resolveJanken = function() {
                     window.game.discardPile.push(discCard);
                     window.game.discardRotations.push(0);
                 } else {
-                    // 捨てれるカードがない場合は相手に+1ドロー
                     window.AbilityEngine.applyDraw(window.game, pJ.targetId, 1, false, true);
                 }
             }
         } else if (result === 'lose' && pJ.loopCount === 0) {
-            // 初回負けの場合も相手3ドローのみ
             window.AbilityEngine.applyDraw(window.game, pJ.targetId, drawCount, false, true);
         }
         
@@ -1660,13 +1638,11 @@ window.resolveJanken = function() {
             const nextLoop = pJ.loopCount + 1;
             const aId = pJ.attackerId;
 
-            // ★修正: 勝つもしくはあいこだった場合、最大4回まで「UIを閉じずに」再戦へ移行する
             if ((result === 'win' || result === 'draw') && nextLoop < 4) {
                 setTimeout(() => {
                     window.startJankenPhase(aId, nextLoop);
                 }, 1000);
             } else {
-                // ★修正: 負けた時、または上限(4回)に達した時のみデータを消してUIを閉じる
                 window.pendingJanken = null;
                 window.broadcastGameState();
                 
@@ -1754,7 +1730,6 @@ window.playJankenResult = function(attackerId, targetId, aH, tH, result) {
         if (window.myId === attackerId) { if(window.SE) window.SE.play('win'); }
         else if (window.myId === targetId) { if(window.SE) window.SE.play('win2'); }
 
-        // ★追加: 勝った時に1秒待機して id_26.mp3 を再生
         setTimeout(() => {
             if (window.SE) window.SE.play('hv/id_26');
         }, 1000);
@@ -2040,11 +2015,9 @@ window.executeColor = function(playerId, color) {
     }
 };
 
-// ★修正: ホスト側の処理を厳格化（「現在ターンか？」をチェック）
 window.executeDraw = function(playerId, isBot = false, overrideCount = null) {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
     
-    // 【重要】現在のターンのプレイヤーかチェック
     const current = window.game.currentPlayer;
     if (!current || current.id !== playerId) return;
 
@@ -2052,11 +2025,8 @@ window.executeDraw = function(playerId, isBot = false, overrideCount = null) {
     if(window.playerAfkTimes) window.playerAfkTimes[playerId] = 0;
     
     const stack = window.game.drawStack; 
-    
-    // 👇 ★修正: const を let に変更 ＆ overrideCount に対応
     let count = overrideCount !== null ? overrideCount : (stack > 0 ? stack : 1);
     
-    // 👇 ★修正: overrideCount が指定されていない時だけここで裂傷を加算
     if (overrideCount === null && current.lacerationTurns > 0 && count > 0) {
         count += 1;
     }
@@ -2067,7 +2037,6 @@ window.executeDraw = function(playerId, isBot = false, overrideCount = null) {
         actuallyDrawn = true;
     }
 
-    // 裂傷状態で引いたなら必ずSEを鳴らす
     if (actuallyDrawn && current.lacerationTurns > 0 && window.SE) {
         window.SE.play('laceration');
     }
@@ -2086,11 +2055,9 @@ window.executeDraw = function(playerId, isBot = false, overrideCount = null) {
     }
 };
 
-// ★修正: 終了時も厳格化
 window.executeEndTurn = function(playerId) {
     if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
     
-    // 【重要】現在のターンのプレイヤーかチェック
     const current = window.game.currentPlayer;
     if (!current || current.id !== playerId) return;
 
@@ -2150,7 +2117,7 @@ window.applyAutoUnoPenalty = function() {
             if(window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: penaltyCount });
             for(let i=0; i<penaltyCount; i++) window.game.drawCard(window.game.myId);
             window.updateUI();
-            window.broadcastGameState(); // ターンは終了させず同期のみ
+            window.broadcastGameState(); 
         } else if(window.socket) {
             window.socket.emit('player_action', { action: 'draw_penalty_keep_turn', count: penaltyCount });
         }
@@ -2158,7 +2125,7 @@ window.applyAutoUnoPenalty = function() {
 
     if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
         CardAnimation.animateMultiDraw(penaltyCount, 'player-hand', finishAutoPenalty);
-        setTimeout(finishAutoPenalty, 3000); // 異常時の安全装置
+        setTimeout(finishAutoPenalty, 3000); 
     } else {
         setTimeout(finishAutoPenalty, 500);
     }
@@ -2335,13 +2302,11 @@ window.handlePlayAction = function() {
             if (cardValue === 'id_33' && currentRaiaCount < 3) {
                 if (confirm(`ライアの効果により、次の自分のターン開始時にこのカードを手札に戻しますか？\n(1ゲーム3回まで / 残り ${3 - currentRaiaCount} 回)`)) {
                     extraData.returnRaia = true;
-                    me.raiaUseCount = currentRaiaCount + 1; // 回数を1増やす
+                    me.raiaUseCount = currentRaiaCount + 1; 
                 }
             } else if (cardValue === 'id_33' && currentRaiaCount >= 3) {
-                // 3回使い切った場合は回収できず、警告を出すだけ
                 alert("ライアの回収効果は1ゲームにつき3回までです。\n今回は手札に戻りません。");
             }
-            // 👆 修正ここまで 👆
             
             step6();
         }
@@ -2361,9 +2326,8 @@ window.handlePlayAction = function() {
             }
         };
 
-        // ▼ 修正後（これだけに書き換える）
         const step4 = () => {
-            step5(); // レベッカのカード選択は自動化されたためスキップ
+            step5(); 
         };
 
         const step3 = () => {
@@ -2410,7 +2374,6 @@ window.onColorChosen = function(color) {
     }
 };
 
-// ★修正: 参加者側のボタン連打・重複送信防止
 document.getElementById('draw-btn').onclick = function() {
     if (window.pendingJanken || window.isDrawing || window.isProcessingPlay) return; 
     if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
@@ -2418,18 +2381,16 @@ document.getElementById('draw-btn').onclick = function() {
     
     window.isDrawing = true; 
     this.disabled = true;
-    this.style.pointerEvents = 'none'; // クリックロック
-    this.style.opacity = '0.5'; // 見た目もグレーアウトさせる
+    this.style.pointerEvents = 'none'; 
+    this.style.opacity = '0.5'; 
     
     window.tryDrawWithAbility(() => {
         window.game.hasDrawnThisTurn = true; 
         window.updateUI();                    
         
         const s = window.game.drawStack; 
-        // 👇 ★修正: const を let に変更
         let count = s > 0 ? s : 1;
         
-        // 👇 ★追加: アニメーションの前に裂傷分を計算して枚数を確定させる
         const me = window.game.players.find(p => p.id === window.game.myId);
         if (me && me.lacerationTurns > 0 && count > 0) {
             count += 1;
@@ -2437,10 +2398,8 @@ document.getElementById('draw-btn').onclick = function() {
         
         if (window.isHost) {
             if (window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: count }); 
-            // 👇 ★修正: 引数に確定した count を渡す
             window.executeDraw(window.game.myId, false, count); 
         } else if (window.socket) {
-            // アニメーションを待たずに即座に送信！
             window.socket.emit('player_action', { action: 'draw', count: count });
         }
 
@@ -2450,7 +2409,7 @@ document.getElementById('draw-btn').onclick = function() {
             window.isDrawing = false; 
             const btn = document.getElementById('draw-btn');
             if (btn) {
-                btn.style.pointerEvents = 'auto'; // ロック解除
+                btn.style.pointerEvents = 'auto'; 
                 btn.disabled = false;
                 btn.style.opacity = '1';
             }
@@ -2458,20 +2417,19 @@ document.getElementById('draw-btn').onclick = function() {
 
         if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
             CardAnimation.animateMultiDraw(count, 'player-hand', finishDraw);
-            setTimeout(finishDraw, 3000); // 異常時の安全装置
+            setTimeout(finishDraw, 3000); 
         } else {
             setTimeout(finishDraw, 500);
         }
     });
 };
 
-// ★修正: 終了ボタンのロック
 document.getElementById('end-turn-btn').onclick = () => {
     if (window.pendingJanken || window.isDrawing || window.isProcessingPlay) return; 
     if (!window.game.isMyTurn || window.isGameOver || window.isInitialDealing) return;
     
     window.isDrawing = true; 
-    document.getElementById('end-turn-btn').style.pointerEvents = 'none'; // ロック
+    document.getElementById('end-turn-btn').style.pointerEvents = 'none'; 
 
     if (window.isHost) {
         window.executeEndTurn(window.game.myId); 
@@ -2482,7 +2440,7 @@ document.getElementById('end-turn-btn').onclick = () => {
     setTimeout(() => { 
         window.isDrawing = false; 
         const btn = document.getElementById('end-turn-btn');
-        if (btn) btn.style.pointerEvents = 'auto'; // ロック解除
+        if (btn) btn.style.pointerEvents = 'auto'; 
     }, 1000); 
 };
 
@@ -2562,7 +2520,6 @@ function initMainSocketEvents() {
                     p.evasion = info.evasion || { level: 0, turns: 0 };
                     p.usedRaia = info.usedRaia || false;
                     p.raiaUseCount = info.raiaUseCount || 0;
-                    // ★追加: 受け取ったデータをプレイヤーに反映させる
                     p.lacerationTurns = info.lacerationTurns || 0;
                     p.resurrectionEveCount = info.resurrectionEveCount !== undefined ? info.resurrectionEveCount : -1;
                     p.resurrectionMisaCount = info.resurrectionMisaCount !== undefined ? info.resurrectionMisaCount : -1;
@@ -2573,20 +2530,16 @@ function initMainSocketEvents() {
         }
 
         if (window.isInitialDealing && !window.isHost) {
-            
-            // ★追加: ゲーム開始時に設定画面や説明書が開いていたら強制的に閉じる
-            // (お使いのID名に合わせて複数の可能性を列挙しています)
             ['rule-overlay', 'setting-overlay', 'settings-overlay', 'manual-overlay'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.classList.add('hidden');
             });
 
-            // ★前回の修正で追加したアニメーションロック処理
             if (!window.isDealAnimationStarted) {
                 window.isDealAnimationStarted = true;
                 if (typeof window.animateInitialDeal === 'function') {
                     window.animateInitialDeal(state.hands, () => {
-                        window.isDealAnimationStarted = false; // 終わったらロック解除
+                        window.isDealAnimationStarted = false; 
                     });
                 } else {
                     window.isInitialDealing = false;
@@ -2599,9 +2552,9 @@ function initMainSocketEvents() {
             const myId = window.myId || (window.game && window.game.myId);
             if (myId && window.game.hands && window.game.hands[myId] && state.hands && state.hands[myId]) {
                 if (window.game.hands[myId].length === state.hands[myId].length) {
-                    state.hands[myId] = window.game.hands[myId]; // ローカルの手札データを維持
+                    state.hands[myId] = window.game.hands[myId]; 
                 } else {
-                    window.game.selectedIndices = []; // 枚数が変わった(引いた/出された)場合は選択をリセット
+                    window.game.selectedIndices = []; 
                 }
             }
             window.game.hands = state.hands;
@@ -2619,17 +2572,30 @@ function initMainSocketEvents() {
             msgEl.innerText = current.id === window.myId ? `あなたの番です${roomStr}` : `${current.name} のターン${roomStr}`;
         }
 
-        if (current.id === window.myId && !window.isInitialDealing && !window.isGameOver) {
-                if (window.lastTurnTracker !== state.turnIndex || window.lastPlayerTracker !== current.id) {
-                    window.lastTurnTracker = state.turnIndex;
-                    window.lastPlayerTracker = current.id;
+        // 👇👇 ★修正: ターン開始時のUNOオートペナルティと、ズル防止の解除処理 👇👇
+        if (!window.isInitialDealing && !window.isGameOver && current) {
+            if (window.lastTurnTracker !== state.turnIndex || window.lastPlayerTracker !== current.id) {
+                
+                // 前回のターンが自分で、手札が2枚以上残ったままターンを終えたならUNO宣言をリセット（ズル防止）
+                if (window.lastPlayerTracker === window.myId && current.id !== window.myId) {
+                    if (window.game.myHand && window.game.myHand.length > 1) {
+                        window.game.unoDeclared = false;
+                        if (typeof window.updateUI === 'function') window.updateUI();
+                    }
+                }
 
-                    // 自分のターンが回ってきた時点で手札が1枚、かつUNO宣言していない場合
+                // 今回のターンが自分になった時の処理（オートペナルティ判定）
+                if (current.id === window.myId) {
                     if (window.game.myHand && window.game.myHand.length === 1 && !window.game.unoDeclared && window.RuleSettings && !window.RuleSettings.unoAuto) {
                         window.applyAutoUnoPenalty();
                     }
                 }
+
+                window.lastTurnTracker = state.turnIndex;
+                window.lastPlayerTracker = current.id;
             }
+        }
+        // 👆👆 修正ここまで 👆👆
 
         if (state.attackGuides && state.attackGuides.length > 0) {
             state.attackGuides.forEach(g => {
@@ -2678,7 +2644,7 @@ function initMainSocketEvents() {
     window.socket.on('back_to_lobby', (roomState) => {
         window.currentRoomState = roomState;
         window.isGameOver = false; window.isInitialDealing = false;
-        window.isDealAnimationStarted = false; // ★追加: 状態をリセット
+        window.isDealAnimationStarted = false; 
         if (typeof window.restoreSettingsUI === 'function') {
             window.restoreSettingsUI();
         }
@@ -2702,7 +2668,6 @@ function initMainSocketEvents() {
         if (typeof renderSlots === 'function') renderSlots(roomState);
     });
 
-    // ★修正: ホスト側のガードを強化
     window.socket.on('receive_player_action', (data) => {
         if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
         const playerId = data.playerId;
@@ -2734,20 +2699,16 @@ function initMainSocketEvents() {
                 }
             }
         } else if (data.action === 'draw') {
-            // 【完全ガード】 その人のターンじゃなければ無視！
             if (!current || current.id !== playerId) return;
             if (window.isProcessingPlay) return; 
             
-            // ★超重要修正：スタックの有無や状況に関わらず、ドロー要求は「1ターンに絶対に1回だけ」受け付ける！
             if (window.game.hasDrawnThisTurn) return;
 
-            // ★命令を受信した「瞬間」にフラグを立てて心のシャッターを閉じ、2回目の通信を完全ブロック！
             window.isProcessingPlay = true;
             window.game.hasDrawnThisTurn = true;
 
             window.socket.emit('request_draw_animation', { playerId: playerId, count: data.count });
             
-            // 安全対策：もし不正な通信が来ても最低1枚として扱う
             const safeCount = (typeof data.count === 'number' && data.count > 0) ? data.count : 1;
             const delay = safeCount * 100 + 400;
             
@@ -2757,7 +2718,6 @@ function initMainSocketEvents() {
             }, delay);
 
         } else if (data.action === 'end_turn') {
-            // 【重要追加ガード】 その人のターンじゃなければ無視！
             if (!current || current.id !== playerId) return;
             if (typeof window.executeEndTurn === 'function') window.executeEndTurn(playerId);
 
@@ -2821,7 +2781,6 @@ function initMainSocketEvents() {
         }
     });
 
-    // ★修正: 再接続時にIDがズレて終了ボタンが効かなくなるバグを防止
     window.socket.on('player_reconnected', (data) => {
         if (window.isHost && window.game && window.game.players) {
             const p = window.game.players.find(x => x.id === data.oldId);
