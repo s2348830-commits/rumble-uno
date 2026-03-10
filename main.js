@@ -2344,38 +2344,39 @@ window.handlePlayAction = function() {
         }
 
         window.game.selectedIndices = []; window.updateUI(); 
-        alert(`${penaltyMsg} ペナルティとして ${penaltyCount}枚ドローします！`); 
         
-        window.isDrawing = true; 
-        window.tryDrawWithAbility(() => {
-            if (window.SE) window.SE.playMultiple('Distribute', penaltyCount, 500);
-            if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
-                CardAnimation.animateMultiDraw(penaltyCount, 'player-hand', () => {
+        window.showPenaltyAlert(`${penaltyMsg}\nペナルティとして ${penaltyCount}枚ドローします！`, () => {
+            window.isDrawing = true; 
+            window.tryDrawWithAbility(() => {
+                if (window.SE) window.SE.playMultiple('Distribute', penaltyCount, 500);
+                if (typeof CardAnimation !== 'undefined' && CardAnimation.animateMultiDraw) {
+                    CardAnimation.animateMultiDraw(penaltyCount, 'player-hand', () => {
+                        window.isDrawing = false;
+                        window.isProcessingPlay = false; 
+                        window.game.selectedIndices = []; window.updateUI();
+                        if (window.isHost) {
+                            if(window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: penaltyCount });
+                            for(let i=0; i<penaltyCount; i++) window.game.drawCard(window.game.myId);
+                            window.executeEndTurn(window.game.myId); 
+                        } else if(window.socket) {
+                            window.socket.emit('player_action', { action: 'draw_penalty', count: penaltyCount });
+                            setTimeout(() => window.socket.emit('player_action', { action: 'end_turn' }), 500); 
+                        }
+                    });
+                } else {
                     window.isDrawing = false;
                     window.isProcessingPlay = false; 
                     window.game.selectedIndices = []; window.updateUI();
                     if (window.isHost) {
                         if(window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: penaltyCount });
                         for(let i=0; i<penaltyCount; i++) window.game.drawCard(window.game.myId);
-                        window.executeEndTurn(window.game.myId); 
+                        window.executeEndTurn(window.game.myId);
                     } else if(window.socket) {
                         window.socket.emit('player_action', { action: 'draw_penalty', count: penaltyCount });
-                        setTimeout(() => window.socket.emit('player_action', { action: 'end_turn' }), 500); 
+                        setTimeout(() => window.socket.emit('player_action', { action: 'end_turn' }), 500);
                     }
-                });
-            } else {
-                window.isDrawing = false;
-                window.isProcessingPlay = false; 
-                window.game.selectedIndices = []; window.updateUI();
-                if (window.isHost) {
-                    if(window.socket) window.socket.emit('request_draw_animation', { playerId: window.game.myId, count: penaltyCount });
-                    for(let i=0; i<penaltyCount; i++) window.game.drawCard(window.game.myId);
-                    window.executeEndTurn(window.game.myId);
-                } else if(window.socket) {
-                    window.socket.emit('player_action', { action: 'draw_penalty', count: penaltyCount });
-                    setTimeout(() => window.socket.emit('player_action', { action: 'end_turn' }), 500);
                 }
-            }
+            });
         });
         return; 
     }
