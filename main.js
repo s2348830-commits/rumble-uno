@@ -1610,13 +1610,15 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
             });
 
             const finishResolve = () => {
-                window.broadcastGameState(false, guides);
+                window.broadcastGameState(false, guides, cEvent); // ★cEventを追加
                 if (!someoneWon) setTimeout(() => window.checkTurn(), 500);
             };
 
             if (needsPenalty) {
+                const alertMsg = `能力上がり禁止！\nペナルティとして ${penaltyCount}枚ドローします！`;
                 if (playerId === window.game.myId && typeof window.showPenaltyAlert === 'function') {
-                    window.showPenaltyAlert(`能力上がり禁止！\nペナルティとして ${penaltyCount}枚ドローします！`, () => {
+                    if (cEvent && typeof window.showClaraResultUI === 'function') window.showClaraResultUI(cEvent.result); // ★ホストのクララUI表示
+                    window.showPenaltyAlert(alertMsg, () => {
                         for (let i = 0; i < penaltyCount; i++) window.game.drawCard(playerId);
                         if (window.socket) window.socket.emit('request_draw_animation', { playerId: playerId, count: penaltyCount });
                         finishResolve();
@@ -1624,7 +1626,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                 } else {
                     for (let i = 0; i < penaltyCount; i++) window.game.drawCard(playerId);
                     if (window.socket) window.socket.emit('request_draw_animation', { playerId: playerId, count: penaltyCount });
-                    window.broadcastGameState(false, guides, { targetId: playerId, msg: alertMsg });
+                    window.broadcastGameState(false, guides, { type: 'penalty', targetId: playerId, msg: alertMsg, claraResult: cEvent ? cEvent.result : null });
                     finishResolve();
                 }
             } else {
@@ -3049,9 +3051,16 @@ function initMainSocketEvents() {
                 }, delay);
             });
         }
-        if (state.penaltyEvent && state.penaltyEvent.targetId === window.myId) {
-            if (typeof window.showPenaltyAlert === 'function') {
-                window.showPenaltyAlert(state.penaltyEvent.msg, () => {});
+        if (state.penaltyEvent) {
+            if (state.penaltyEvent.type === 'clara') {
+                if (typeof window.showClaraResultUI === 'function') window.showClaraResultUI(state.penaltyEvent.result);
+            } else {
+                if (state.penaltyEvent.claraResult && typeof window.showClaraResultUI === 'function') {
+                    window.showClaraResultUI(state.penaltyEvent.claraResult);
+                }
+                if (state.penaltyEvent.targetId === window.myId && typeof window.showPenaltyAlert === 'function') {
+                    window.showPenaltyAlert(state.penaltyEvent.msg, () => {});
+                }
             }
         }
         if (typeof window.updatePhaseUI === 'function') {

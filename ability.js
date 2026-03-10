@@ -169,7 +169,7 @@ window.AbilityEngine = {
                             const rIdx = Math.floor(Math.random() * tHand.length);
                             const dropCard = tHand.splice(rIdx, 1)[0];
                             
-                            // ★修正: 捨てたカードが場の一番上に出ないように、一番下(unshift)に隠すか墓地へ送る
+                            // ★カードが場の上に出ないよう、墓地か山札の下に隠す
                             if (dropCard.value && String(dropCard.value).startsWith('id_')) {
                                 if(!game.abilityGraveyard) game.abilityGraveyard = [];
                                 game.abilityGraveyard.push(dropCard.value);
@@ -179,11 +179,11 @@ window.AbilityEngine = {
                             }
                         }
                         guides.push({ from: attackerId, to: attackerId, text: `2枚破棄(成功)` });
-                        extraData.claraResult = 'success'; // ★追加: UI表示用の成功フラグ
                     }
+                    extraData.claraResult = 'success'; // ★追加: 成功フラグ
                 } else {
                     guides.push({ from: attackerId, to: attackerId, text: `不発` });
-                    extraData.claraResult = 'fail'; // ★追加: UI表示用の失敗フラグ
+                    extraData.claraResult = 'fail'; // ★追加: 失敗フラグ
                 }
             }
             else if (abilityId === 'id_35') { // イヴ
