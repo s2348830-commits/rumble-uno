@@ -38,9 +38,9 @@ window.AbilityDef = {
     'id_34': { rarity: 'SR', type: 'HE', name: 'オリヴィア', desc: '【HE】自分に回避I(20%の確率で攻撃を防ぐ)を1ターン付与する。' },
     'id_35': { rarity: 'UR', type: 'HV', name: 'イヴ', desc: '【HV】ランダム燃焼＋全員裂傷付与。さらに蘇生(次に引く時手札に戻る)を付与。' },
     'id_36': { rarity: 'UR', type: 'HV', name: 'アミリー', desc: '【HV】使用後、赤バラ、桃バラ、白バラの3つのうち好きなカードを手札に加える。', needsAmilySelect: true },
-    'bara1': { rarity: 'SSR', type: 'AT', name: '赤バラ', desc: '【AT】自分以外のランダムなプレイヤーに固定で3枚ドローさせる。(防御不可)', fixedDraw: true, unblockable: true },
-    'bara2': { rarity: 'SSR', type: 'HE', name: '桃バラ', desc: '【HE】使用後自分にシールドIIIを3ターン付与する。' },
-    'bara3': { rarity: 'SSR', type: 'HE', name: '白バラ', desc: '【HE】70%の確率で赤バラと桃バラのカード両方を手札に加える。外れた場合カードを1枚引く。' }
+    'bari1': { rarity: 'SSR', type: 'AT', name: '赤バラ', desc: '【AT】自分以外のランダムなプレイヤーに固定で3枚ドローさせる。(防御不可)', fixedDraw: true, unblockable: true },
+    'bari2': { rarity: 'SSR', type: 'HE', name: '桃バラ', desc: '【HE】使用後自分にシールドIIIを3ターン付与する。' },
+    'bari3': { rarity: 'SSR', type: 'HE', name: '白バラ', desc: '【HE】70%の確率で赤バラと桃バラのカード両方を手札に加える。外れた場合カードを1枚引く。' }
 };
 
 window.AbilityEngine = {
@@ -132,7 +132,6 @@ window.AbilityEngine = {
             costPaid = true;
         }
 
-        // --- 個別能力解決 ---
         for (let m = 0; m < multiplier; m++) {
             
             if (abilityId === 'id_20') { 
@@ -223,16 +222,16 @@ window.AbilityEngine = {
                     }
                 }
             }
-            else if (abilityId === 'bara2') {
+            else if (abilityId === 'bari2') {
                 if (self) self.shield = { level: 3, turns: this.getAdjustedTurns(game, attackerId, 3) };
                 guides.push({ from: attackerId, to: attackerId, text: '🛡️シールドIII(3T)' });
             }
-            else if (abilityId === 'bara3') {
+            else if (abilityId === 'bari3') {
                 if (Math.random() < 0.70) {
                     const hand = game.hands[attackerId];
                     if (hand) {
-                        hand.push({ color: 'black', value: 'bara1' });
-                        hand.push({ color: 'black', value: 'bara2' });
+                        hand.push({ color: 'black', value: 'bari1' });
+                        hand.push({ color: 'black', value: 'bari2' });
                         guides.push({ from: attackerId, to: attackerId, text: '🌹赤＆桃獲得' });
                         if (window.isHost && window.socket) window.socket.emit('request_draw_animation', { playerId: attackerId, count: 2 });
                     }
@@ -246,7 +245,7 @@ window.AbilityEngine = {
                 let actualTargets = [];
                 if (def.needsTarget && selectedTargetId) actualTargets = [selectedTargetId];
                 else if (['id_2', 'id_6', 'id_9', 'id_18', 'id_29'].includes(abilityId)) actualTargets = others.map(p => p.id);
-                else if (['id_14', 'id_24', 'id_28', 'bara1'].includes(abilityId)) {
+                else if (['id_14', 'id_24', 'id_28', 'bari1'].includes(abilityId)) {
                     if (others.length > 0) actualTargets = [others[Math.floor(Math.random() * others.length)].id];
                 }
 
@@ -307,12 +306,12 @@ window.AbilityEngine = {
                             if (self) { self.usedRaia = true; self.raiaReturnPending = true; }
                             guides.push({ from: attackerId, to: attackerId, text: '回収待機' });
                         }
-                    } else if (abilityId === 'bara1') {
+                    } else if (abilityId === 'bari1') {
                         drawCount = 3; // 赤バラのドロー
                     }
 
                     if (drawCount > 0) {
-                        const actualDrawn = this.applyDraw(game, targetId, drawCount, abilityId !== 'id_28' && abilityId !== 'bara1', true);
+                        const actualDrawn = this.applyDraw(game, targetId, drawCount, abilityId !== 'id_28' && abilityId !== 'bari1', true);
                         if (actualDrawn === -1) guides.push({ from: attackerId, to: targetId, text: `💨回避!` });
                         else if(actualDrawn > 0) guides.push({ from: attackerId, to: targetId, text: `${actualDrawn}枚` });
                     }
