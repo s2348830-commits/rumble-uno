@@ -189,12 +189,12 @@ window.AbilityEngine = {
             else if (abilityId === 'id_35') { // イヴ
                 if (others.length > 0) {
                     const tid = others[Math.floor(Math.random() * others.length)].id;
-                    this.applyBurn(game, tid, 2);
-                    guides.push({ from: attackerId, to: tid, text: '🔥燃焼(2T)', se: 'fire' });
+                    this.applyBurn(game, tid, 3);
+                    guides.push({ from: attackerId, to: tid, text: '🔥燃焼(3T)', se: 'fire' });
                 }
                 others.forEach(o => {
-                    o.lacerationTurns = 3;
-                    guides.push({ from: attackerId, to: o.id, text: '💢裂傷(3T)' });
+                    o.lacerationTurns = 4;
+                    guides.push({ from: attackerId, to: o.id, text: '💢裂傷(4T)' });
                 });
                 if (self && self.resurrectionEveCount === -1) self.resurrectionEveCount = 0;
             }
