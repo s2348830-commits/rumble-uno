@@ -732,8 +732,11 @@ window.showAttackGuide = function(fromId, toId, labelText, seName) {
 };
 window.tryEarlyStartReset = function() {
     if (!window.isHost || !window.abilityResetConfirmedPlayers) return;
-    const connectedPlayers = window.game.players.filter(p => p.connected && p.type === 'player');
-    if (window.abilityResetConfirmedPlayers.size >= connectedPlayers.length) {
+    
+    // p.type === 'player' ではなく、Botではない（!== 'bot'）人全員を待つように修正
+    const humanPlayers = window.game.players.filter(p => p.type !== 'bot');
+    
+    if (window.abilityResetConfirmedPlayers.size >= humanPlayers.length) {
         if (window.abilityResetTimeoutId) {
             clearTimeout(window.abilityResetTimeoutId);
             window.abilityResetTimeoutId = null;
@@ -881,20 +884,21 @@ window.showAbilityResetUI = function(maxCount) {
         if (pSub) pSub.style.display = 'none';
         if (tTitle) tTitle.innerText = '他のプレイヤーを待っています...';
         
-        if (window.isHost && window.abilityResetConfirmedPlayers) {
-            window.abilityResetConfirmedPlayers.add(window.game.myId);
-            window.tryEarlyStartReset();
-        }
+        const vals = selectedCards.map(c => c.value);
 
-        if (selectedCards.length > 0) {
-            const vals = selectedCards.map(c => c.value);
-            if (window.isHost) {
+        if (window.isHost) {
+            if (vals.length > 0) {
                 window.game.replaceAbilityCards(window.game.myId, vals);
                 if (window.isHandSortEnabled && typeof window.sortPlayerHand === 'function') window.sortPlayerHand(true);
                 window.updateUI();
-            } else {
-                if(window.socket) window.socket.emit('player_action', { action: 'ability_reset', cards: vals });
             }
+            if (window.abilityResetConfirmedPlayers) {
+                window.abilityResetConfirmedPlayers.add(window.game.myId);
+                window.tryEarlyStartReset();
+            }
+        } else {
+            // 参加者は 0枚でも必ずホストに完了の通信を送る！
+            if(window.socket) window.socket.emit('player_action', { action: 'ability_reset', cards: vals });
         }
     };
     
