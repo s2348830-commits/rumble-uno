@@ -658,11 +658,14 @@ window.showAbilityResetUI = function(maxCount) {
         };
         el.appendChild(infoBtn);
     };
+    // 👆👆 追加ここまで 👆👆
+
     const renderCards = () => {
         resetArea.innerHTML = '';
         selectedCards.forEach((c, idx) => {
             const el = Renderer.createCardElement(c);
-            el.style.transform = 'none'; el.style.position = 'static'; el.style.margin = '0';
+            el.style.transform = 'none'; el.style.position = 'relative'; el.style.margin = '0';
+            appendInfoBtn(el, c.value); // ★ボタンを追加
             el.onclick = () => {
                 selectedCards.splice(idx, 1);
                 myAbilities.push(c);
@@ -674,8 +677,8 @@ window.showAbilityResetUI = function(maxCount) {
         handArea.innerHTML = '';
         myAbilities.forEach((c, idx) => {
             const el = Renderer.createCardElement(c);
-            el.style.transform = 'none'; el.style.position = 'static'; el.style.margin = '0';
-            appendInfoBtn(el, c.value);
+            el.style.transform = 'none'; el.style.position = 'relative'; el.style.margin = '0';
+            appendInfoBtn(el, c.value); // ★ボタンを追加
             el.onclick = () => {
                 if (selectedCards.length < maxCount) {
                     myAbilities.splice(idx, 1);
@@ -686,6 +689,7 @@ window.showAbilityResetUI = function(maxCount) {
             handArea.appendChild(el);
         });
     };
+    
     renderCards();
     overlay.classList.remove('hidden');
     
