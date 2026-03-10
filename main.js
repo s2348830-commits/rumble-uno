@@ -602,6 +602,24 @@ window.showAbilityResetUI = function(maxCount) {
     const maxSpan = document.getElementById('reset-max');
     
     if(!overlay) return;
+
+    // 👇👇 説明文を表示するエリアを動的に作成 👇👇
+    let descArea = document.getElementById('reset-desc-area');
+    if (!descArea) {
+        descArea = document.createElement('div');
+        descArea.id = 'reset-desc-area';
+        descArea.style.color = '#00d2ff';
+        descArea.style.fontSize = '12px';
+        descArea.style.marginTop = '15px';
+        descArea.style.minHeight = '36px';
+        descArea.style.textAlign = 'center';
+        descArea.style.maxWidth = '90%';
+        descArea.style.fontWeight = 'bold';
+        descArea.style.whiteSpace = 'pre-wrap';
+        if (btnConfirm) btnConfirm.parentNode.insertBefore(descArea, btnConfirm);
+    }
+    descArea.innerText = 'カードの「？」を押すとここに効果が表示されます';
+    // 👆👆 追加ここまで 👆👆
     
     let timeLeft = 10;
     maxSpan.innerText = maxCount;
@@ -609,7 +627,37 @@ window.showAbilityResetUI = function(maxCount) {
     handArea.innerHTML = '';
     let selectedCards = [];
     let myAbilities = window.game.myHand.filter(c => c.value && String(c.value).startsWith('id_'));
-    
+
+    // 👇👇 情報(？)ボタンを作成してカードにくっつける関数 👇👇
+    const appendInfoBtn = (el, cardValue) => {
+        const infoBtn = document.createElement('div');
+        infoBtn.innerText = '?';
+        infoBtn.style.position = 'absolute';
+        infoBtn.style.top = '-5px';
+        infoBtn.style.right = '-5px';
+        infoBtn.style.width = '20px';
+        infoBtn.style.height = '20px';
+        infoBtn.style.background = '#0d47a1';
+        infoBtn.style.color = 'white';
+        infoBtn.style.borderRadius = '50%';
+        infoBtn.style.display = 'flex';
+        infoBtn.style.justifyContent = 'center';
+        infoBtn.style.alignItems = 'center';
+        infoBtn.style.fontSize = '12px';
+        infoBtn.style.fontWeight = 'bold';
+        infoBtn.style.zIndex = '100';
+        infoBtn.style.border = '1.5px solid white';
+        infoBtn.style.boxShadow = '0 0 5px rgba(0,0,0,0.5)';
+        infoBtn.onclick = (e) => {
+            e.stopPropagation(); // ★重要: これで「カードの入れ替え」が誤爆するのを防ぐ
+            if (window.SE) window.SE.play('buttonclick');
+            const def = window.AbilityDef ? window.AbilityDef[cardValue] : null;
+            if (def) {
+                descArea.innerText = `【${def.name}】\n${def.desc}`;
+            }
+        };
+        el.appendChild(infoBtn);
+    };
     const renderCards = () => {
         resetArea.innerHTML = '';
         selectedCards.forEach((c, idx) => {
