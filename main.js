@@ -1490,6 +1490,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                 } else {
                     for (let i = 0; i < penaltyCount; i++) window.game.drawCard(playerId);
                     if (window.socket) window.socket.emit('request_draw_animation', { playerId: playerId, count: penaltyCount });
+                    window.broadcastGameState(false, guides, { targetId: playerId, msg: alertMsg });
                     finishResolve();
                 }
             } else {
@@ -1652,6 +1653,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                     } else {
                         for (let i = 0; i < penaltyCount; i++) window.game.drawCard(playerId);
                         if (window.socket) window.socket.emit('request_draw_animation', { playerId: playerId, count: penaltyCount });
+                        window.broadcastGameState(false, guides, { targetId: playerId, msg: alertMsg });
                         finishResolve();
                     }
                 } else {
@@ -1701,6 +1703,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
             } else {
                 for (let i = 0; i < penaltyCount; i++) window.game.drawCard(playerId);
                 if (window.socket) window.socket.emit('request_draw_animation', { playerId: playerId, count: penaltyCount });
+                window.broadcastGameState(false, guides, { targetId: playerId, msg: alertMsg });
                 finishResolve();
             }
         } else {
@@ -2305,7 +2308,9 @@ window.executePlay = function(playerId, indices, isBot = false) {
         if (window.game.hands[playerId] && window.game.hands[playerId].length === 0) {
             const lastCard = result.lastCard;
             const isAction = !/^[0-9]$/.test(lastCard.value);
-            const isUnoForgot = !window.game.unoDeclared && window.RuleSettings && !window.RuleSettings.unoAuto;
+            const targetP = window.game.players.find(p => p.id === playerId);
+            const isDeclared = targetP ? targetP.unoDeclared : window.game.unoDeclared;
+            const isUnoForgot = !isDeclared && window.RuleSettings && !window.RuleSettings.unoAuto;
 
             if (isAction && window.RuleSettings && !window.RuleSettings.allowActionFinish) {
                 needsPenalty = true;
@@ -2383,7 +2388,7 @@ window.executePlay = function(playerId, indices, isBot = false) {
             } else {
                 for (let i = 0; i < penaltyCount; i++) window.game.drawCard(playerId);
                 if (window.socket) window.socket.emit('request_draw_animation', { playerId: playerId, count: penaltyCount });
-                window.broadcastGameState(false, guides);
+                window.broadcastGameState(false, guides, { targetId: playerId, msg: alertMsg });
                 continuePlayProcess();
             }
         } else {
@@ -2503,6 +2508,7 @@ window.declareUno = function() {
     if (window.isInitialDealing || window.isGameOver) return; 
     window.game.unoDeclared = true; window.updateUI();
     const me = window.game.players.find(p => p.id === window.game.myId);
+    if (me) me.unoDeclared = true;
     if(me && window.socket) window.socket.emit('declare_uno', { id: me.id, name: me.name });
 };
 
@@ -2534,6 +2540,40 @@ window.showPenaltyAlert = function(msg, callback) {
         pOverlay.classList.add('hidden');
         if (callback) callback(); 
     };
+};
+
+//クララの成功/失敗を画面中央に出す関数
+window.showClaraResultUI = function(result) {
+    let overlay = document.getElementById('clara-result-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'clara-result-overlay';
+        overlay.style.cssText = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:150000; display:flex; flex-direction:column; justify-content:center; align-items:center; pointer-events:none; transition: opacity 0.3s;";
+        document.body.appendChild(overlay);
+    }
+    
+    if (result === 'success') {
+        overlay.innerHTML = `<div style="background:rgba(0,100,0,0.85); border:3px solid #4caf50; border-radius:15px; padding:20px 40px; text-align:center; box-shadow:0 10px 30px rgba(76,175,80,0.6);">
+            <h2 style="color:#fff; margin:0; font-size:32px; text-shadow:2px 2px 4px #000;">✨ 成功！ ✨</h2>
+            <p style="color:#ddd; font-weight:bold; margin-top:10px;">手札を2枚破棄しました</p>
+        </div>`;
+        if (window.SE) window.SE.play('win'); // 成功音
+    } else {
+        overlay.innerHTML = `<div style="background:rgba(100,0,0,0.85); border:3px solid #ff5252; border-radius:15px; padding:20px 40px; text-align:center; box-shadow:0 10px 30px rgba(255,82,82,0.6);">
+            <h2 style="color:#fff; margin:0; font-size:32px; text-shadow:2px 2px 4px #000;">💦 失敗... 💦</h2>
+            <p style="color:#ddd; font-weight:bold; margin-top:10px;">効果は発動しませんでした</p>
+        </div>`;
+        if (window.SE) window.SE.play('Impossible'); // ブブー音
+    }
+    
+    overlay.classList.remove('hidden');
+    overlay.style.opacity = '1';
+    
+    // 2秒後に自動で消える
+    setTimeout(() => {
+        overlay.style.opacity = '0';
+        setTimeout(() => overlay.classList.add('hidden'), 300);
+    }, 2000);
 };
 
 window.applyAutoUnoPenalty = function() {
@@ -2798,7 +2838,11 @@ function initMainSocketEvents() {
                 }, delay);
             });
         }
-
+        if (state.penaltyEvent && state.penaltyEvent.targetId === window.myId) {
+            if (typeof window.showPenaltyAlert === 'function') {
+                window.showPenaltyAlert(state.penaltyEvent.msg, () => {});
+            }
+        }
         if (typeof window.updatePhaseUI === 'function') {
             window.updatePhaseUI(state);
         }
@@ -2808,6 +2852,10 @@ function initMainSocketEvents() {
         if (window.SE) {
             const unoSounds = ['uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6'];
             window.SE.play(unoSounds[Math.floor(Math.random() * unoSounds.length)]);
+        }
+        if (window.game && window.game.players) {
+            const p = window.game.players.find(x => x.id === data.id);
+            if (p) p.unoDeclared = true;
         }
         const target = (data.id === window.myId) ? document.getElementById('my-player-info') : document.querySelector(`.circle-player-badge[data-id="${data.id}"]`);
         if(target) { target.classList.add('uno-pop-badge'); setTimeout(() => target.classList.remove('uno-pop-badge'), 2500); }

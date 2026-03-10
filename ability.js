@@ -27,7 +27,7 @@ window.AbilityDef = {
     'id_23': { rarity: 'SSR', type: 'HE', name: 'ダンタ', desc: '【HE】自分を1ターン無敵状態にし、デバフを1つランダムに解除する。' },
     'id_24': { rarity: 'R', type: 'AT', name: 'アクアヘッド', desc: '【AT】自分以外のランダムなプレイヤーに燃焼を1ターン付与する。' },
     'id_25': { rarity: 'UR', type: 'HV', name: 'ミサ', desc: '【HV】1枚Wild化+SSR以下能力回収。さらに蘇生(次に引く時手札に戻る)を付与。', needsGraveyard: true },
-    'id_26': { rarity: 'UR', type: 'HV', name: '運命の三姉妹', desc: '【HV】じゃんけん(最大4回)。勝敗に関わらず2ドロー、勝利/あいこなら相手2ドローさせ自分は既存カード1枚破棄。', needsJanken: true },
+    'id_26': { rarity: 'UR', type: 'HV', name: '運命の三姉妹', desc: '【HV】じゃんけん(最大4回)。勝敗に関わらず3ドロー、勝利/あいこなら相手2ドローさせ自分は既存カード1枚破棄。', needsJanken: true },
     'id_27': { rarity: 'SR', type: 'HE', name: 'クララ', desc: '【HE】45%の確率で自分の手札をランダムに2枚捨てる。' },
     'id_28': { rarity: 'SSR', type: 'AT', name: 'リナ', desc: '【AT】ランダムなプレイヤーに2ターン燃焼を付与する。その後そのプレイヤーに1枚引かせる(防御不可)。' },
     'id_29': { rarity: 'SR', type: 'AT', name: 'エロス', desc: '【AT】自分以外の全員に75%の確率で2枚引かせる。' },
@@ -144,7 +144,8 @@ window.AbilityEngine = {
                         guides.push({ from: attackerId, to: attackerId, text: `${toReturn.length}枚山札送り` });
                     }
                 }
-            } 
+            }
+
             else if (abilityId === 'id_25') { // ミサ
                 const hand = game.hands[attackerId];
                 if (hand && hand.length > 0) {
@@ -167,13 +168,22 @@ window.AbilityEngine = {
                         for (let i = 0; i < dropCount; i++) {
                             const rIdx = Math.floor(Math.random() * tHand.length);
                             const dropCard = tHand.splice(rIdx, 1)[0];
-                            game.discardPile.push(dropCard);
-                            game.discardRotations.push(0);
+                            
+                            // ★修正: 捨てたカードが場の一番上に出ないように、一番下(unshift)に隠すか墓地へ送る
+                            if (dropCard.value && String(dropCard.value).startsWith('id_')) {
+                                if(!game.abilityGraveyard) game.abilityGraveyard = [];
+                                game.abilityGraveyard.push(dropCard.value);
+                            } else {
+                                game.discardPile.unshift(dropCard);
+                                game.discardRotations.unshift(0);
+                            }
                         }
                         guides.push({ from: attackerId, to: attackerId, text: `2枚破棄(成功)` });
+                        extraData.claraResult = 'success'; // ★追加: UI表示用の成功フラグ
                     }
                 } else {
                     guides.push({ from: attackerId, to: attackerId, text: `不発` });
+                    extraData.claraResult = 'fail'; // ★追加: UI表示用の失敗フラグ
                 }
             }
             else if (abilityId === 'id_35') { // イヴ
@@ -183,8 +193,8 @@ window.AbilityEngine = {
                     guides.push({ from: attackerId, to: tid, text: '🔥燃焼(2T)', se: 'fire' });
                 }
                 others.forEach(o => {
-                    o.lacerationTurns = 2;
-                    guides.push({ from: attackerId, to: o.id, text: '💢裂傷(2T)' });
+                    o.lacerationTurns = 3;
+                    guides.push({ from: attackerId, to: o.id, text: '💢裂傷(3T)' });
                 });
                 if (self && self.resurrectionEveCount === -1) self.resurrectionEveCount = 0;
             }
