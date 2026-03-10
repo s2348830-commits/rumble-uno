@@ -64,55 +64,125 @@ window.sortPlayerHand = function(suppressUpdate = false) {
     }
 };
 
+window.startUITimer = function(elementId, timerSpanId, defaultActionCallback) {
+    if (window.currentUITimer) clearInterval(window.currentUITimer);
+    let timeLeft = 10;
+    const span = document.getElementById(timerSpanId);
+    if (span) span.innerText = timeLeft;
+    window.currentUITimer = setInterval(() => {
+        timeLeft--;
+        if (span) span.innerText = timeLeft;
+        if (timeLeft <= 0) {
+            clearInterval(window.currentUITimer);
+            defaultActionCallback();
+        }
+    }, 1000);
+};
+
+window.stopUITimer = function() {
+    if (window.currentUITimer) {
+        clearInterval(window.currentUITimer);
+        window.currentUITimer = null;
+    }
+};
+
 window.ensureModalsExist = function() {
-    if (!document.getElementById('target-modal')) {
-        const targetModal = document.createElement('div');
-        targetModal.id = 'target-modal';
-        targetModal.className = 'action-popup hidden';
-        targetModal.innerHTML = `<h3>対象のプレイヤーを選択</h3><div id="target-modal-list" class="action-popup-grid"></div>`;
-        document.body.appendChild(targetModal);
-    }
-    if (!document.getElementById('discard-modal')) {
-        const discardModal = document.createElement('div');
-        discardModal.id = 'discard-modal';
-        discardModal.className = 'action-popup hidden';
-        discardModal.innerHTML = `<h3>捨てるカードを選択</h3><div id="discard-modal-list" class="action-popup-grid" style="overflow-x:auto; flex-wrap:nowrap; max-width:90vw;"></div>`;
-        document.body.appendChild(discardModal);
-    }
-    if (!document.getElementById('multi-discard-modal')) {
-        const multiDiscardModal = document.createElement('div');
-        multiDiscardModal.id = 'multi-discard-modal';
-        multiDiscardModal.className = 'action-popup hidden';
-        multiDiscardModal.innerHTML = `
-            <h3 id="multi-discard-title">捨てるカードを選択 (複数可)</h3>
-            <div id="multi-discard-modal-list" class="action-popup-grid" style="overflow-x:auto; flex-wrap:nowrap; max-width:90vw;"></div>
-            <button id="btn-multi-discard-confirm" style="margin-top:15px; padding:8px 15px; background:#4caf50; color:white; border:none; border-radius:8px; cursor:pointer;">確定</button>
-        `;
-        document.body.appendChild(multiDiscardModal);
-    }
-    if (!document.getElementById('graveyard-modal')) {
-        const gyModal = document.createElement('div');
-        gyModal.id = 'graveyard-modal';
-        gyModal.className = 'action-popup hidden';
-        gyModal.innerHTML = `
-            <h3 style="margin-top:0;">墓地からカードを1枚回収(SSR以下)</h3>
-            <div id="graveyard-list" class="action-popup-grid" style="overflow-x:auto; flex-wrap:nowrap; max-width:90vw; gap:5px;"></div>
-            <button id="btn-cancel-graveyard" style="margin-top:15px; padding:8px 15px; background:#777; color:white; border:none; border-radius:8px; cursor:pointer;">キャンセル</button>
-        `;
-        document.body.appendChild(gyModal);
-    }
-    if (!document.getElementById('debuff-modal')) {
-        const dbModal = document.createElement('div');
-        dbModal.id = 'debuff-modal';
-        dbModal.className = 'action-popup hidden';
-        dbModal.innerHTML = `
-            <h3 style="margin-top:0;">解除するデバフを選択</h3>
-            <div style="display:flex; justify-content:center; gap:20px;">
-                <button id="btn-debuff-freeze" style="font-size:24px; padding:10px; border-radius:10px; background:#00bfff; cursor:pointer;">❄️凍結</button>
-                <button id="btn-debuff-burn" style="font-size:24px; padding:10px; border-radius:10px; background:#ff4500; cursor:pointer;">🔥燃焼</button>
+    let targetModal = document.getElementById('target-modal');
+    if (targetModal) targetModal.remove();
+    targetModal = document.createElement('div');
+    targetModal.id = 'target-modal';
+    targetModal.className = 'action-popup hidden';
+    targetModal.innerHTML = `<h3 style="margin-top:0;">対象のプレイヤーを選択</h3><div style="color:#fbc02d; font-size:18px; font-weight:bold; margin-bottom:10px;">残り <span id="target-timer">10</span> 秒</div><div id="target-modal-list" class="action-popup-grid"></div>`;
+    document.body.appendChild(targetModal);
+
+    let discardModal = document.getElementById('discard-modal');
+    if (discardModal) discardModal.remove();
+    discardModal = document.createElement('div');
+    discardModal.id = 'discard-modal';
+    discardModal.className = 'action-popup hidden';
+    discardModal.innerHTML = `<h3 style="margin-top:0;">捨てるカードを選択</h3><div style="color:#fbc02d; font-size:18px; font-weight:bold; margin-bottom:10px;">残り <span id="discard-timer">10</span> 秒</div><div id="discard-modal-list" class="action-popup-grid" style="overflow-x:auto; flex-wrap:nowrap; max-width:90vw;"></div>`;
+    document.body.appendChild(discardModal);
+
+    let multiDiscardModal = document.getElementById('multi-discard-modal');
+    if (multiDiscardModal) multiDiscardModal.remove();
+    multiDiscardModal = document.createElement('div');
+    multiDiscardModal.id = 'multi-discard-modal';
+    multiDiscardModal.className = 'action-popup hidden';
+    multiDiscardModal.innerHTML = `
+        <h3 id="multi-discard-title" style="margin-top:0;">捨てるカードを選択 (複数可)</h3>
+        <div style="color:#fbc02d; font-size:18px; font-weight:bold; margin-bottom:10px;">残り <span id="multi-timer">10</span> 秒</div>
+        <div id="multi-discard-modal-list" class="action-popup-grid" style="overflow-x:auto; flex-wrap:nowrap; max-width:90vw;"></div>
+        <button id="btn-multi-discard-confirm" style="margin-top:15px; padding:8px 15px; background:#4caf50; color:white; border:none; border-radius:8px; cursor:pointer;">確定</button>
+    `;
+    document.body.appendChild(multiDiscardModal);
+
+    let gyModal = document.getElementById('graveyard-modal');
+    if (gyModal) gyModal.remove();
+    gyModal = document.createElement('div');
+    gyModal.id = 'graveyard-modal';
+    gyModal.className = 'action-popup hidden';
+    gyModal.innerHTML = `
+        <h3 style="margin-top:0;">墓地からカードを1枚回収(SSR以下)</h3>
+        <div style="color:#fbc02d; font-size:18px; font-weight:bold; margin-bottom:10px;">残り <span id="graveyard-timer">10</span> 秒</div>
+        <div id="graveyard-list" class="action-popup-grid" style="overflow-x:auto; flex-wrap:nowrap; max-width:90vw; gap:5px;"></div>
+        <button id="btn-cancel-graveyard" style="margin-top:15px; padding:8px 15px; background:#777; color:white; border:none; border-radius:8px; cursor:pointer;">キャンセル</button>
+    `;
+    document.body.appendChild(gyModal);
+
+    let dbModal = document.getElementById('debuff-modal');
+    if (dbModal) dbModal.remove();
+    dbModal = document.createElement('div');
+    dbModal.id = 'debuff-modal';
+    dbModal.className = 'action-popup hidden';
+    dbModal.innerHTML = `
+        <h3 style="margin-top:0;">解除するデバフを選択</h3>
+        <div style="color:#fbc02d; font-size:18px; font-weight:bold; margin-bottom:10px;">残り <span id="debuff-timer">10</span> 秒</div>
+        <div style="display:flex; justify-content:center; gap:20px;">
+            <button id="btn-debuff-freeze" style="font-size:24px; padding:10px; border-radius:10px; background:#00bfff; cursor:pointer;">❄️凍結</button>
+            <button id="btn-debuff-burn" style="font-size:24px; padding:10px; border-radius:10px; background:#ff4500; cursor:pointer;">🔥燃焼</button>
+        </div>
+    `;
+    document.body.appendChild(dbModal);
+
+    if (!document.getElementById('amily-modal')) {
+        const amilyModal = document.createElement('div');
+        amilyModal.id = 'amily-modal';
+        amilyModal.className = 'action-popup hidden';
+        amilyModal.innerHTML = `
+            <h3 style="margin-top:0;">アミリー：カードを選択</h3>
+            <div style="color:#fbc02d; font-size:18px; font-weight:bold; margin-bottom:10px;">残り <span id="amily-timer">10</span> 秒</div>
+            <div id="amily-desc-area" style="color:#00d2ff; font-size:12px; margin-bottom:10px; min-height:36px; white-space:pre-wrap;">カードの「？」を押すとここに効果が表示されます</div>
+            <div style="display:flex; justify-content:center; gap:10px;">
+                <div style="position:relative;">
+                    <img id="btn-amily-37" src="card/custom/bara1.png" style="width:60px; cursor:pointer;" onerror="this.src='data:image/svg+xml;charset=utf-8,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 40 60\\'%3E%3Crect width=\\'40\\' height=\\'60\\' rx=\\'6\\' fill=\\'%23ff5252\\'/%3E%3Ctext x=\\'50%25\\' y=\\'50%25\\' dominant-baseline=\\'middle\\' text-anchor=\\'middle\\' fill=\\'white\\' font-size=\\'12\\'%3E赤バラ%3C/text%3E%3C/svg%3E'">
+                    <div class="amily-info" data-id="bara1" style="position:absolute; top:-5px; right:-5px; width:20px; height:20px; background:#0d47a1; color:white; border-radius:50%; display:flex; justify-content:center; align-items:center; font-size:12px; cursor:pointer; border:1.5px solid white;">?</div>
+                </div>
+                <div style="position:relative;">
+                    <img id="btn-amily-38" src="card/custom/bara2.png" style="width:60px; cursor:pointer;" onerror="this.src='data:image/svg+xml;charset=utf-8,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 40 60\\'%3E%3Crect width=\\'40\\' height=\\'60\\' rx=\\'6\\' fill=\\'%23ff9800\\'/%3E%3Ctext x=\\'50%25\\' y=\\'50%25\\' dominant-baseline=\\'middle\\' text-anchor=\\'middle\\' fill=\\'white\\' font-size=\\'12\\'%3E桃バラ%3C/text%3E%3C/svg%3E'">
+                    <div class="amily-info" data-id="bara2" style="position:absolute; top:-5px; right:-5px; width:20px; height:20px; background:#0d47a1; color:white; border-radius:50%; display:flex; justify-content:center; align-items:center; font-size:12px; cursor:pointer; border:1.5px solid white;">?</div>
+                </div>
+                <div style="position:relative;">
+                    <img id="btn-amily-39" src="card/custom/bara1.png" style="width:60px; cursor:pointer;" onerror="this.src='data:image/svg+xml;charset=utf-8,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 40 60\\'%3E%3Crect width=\\'40\\' height=\\'60\\' rx=\\'6\\' fill=\\'%23fff\\' stroke=\\'%23ccc\\'/%3E%3Ctext x=\\'50%25\\' y=\\'50%25\\' dominant-baseline=\\'middle\\' text-anchor=\\'middle\\' fill=\\'black\\' font-size=\\'12\\'%3E白バラ%3C/text%3E%3C/svg%3E'">
+                    <div class="amily-info" data-id="bara1" style="position:absolute; top:-5px; right:-5px; width:20px; height:20px; background:#0d47a1; color:white; border-radius:50%; display:flex; justify-content:center; align-items:center; font-size:12px; cursor:pointer; border:1.5px solid white;">?</div>
+                </div>
             </div>
         `;
-        document.body.appendChild(dbModal);
+        document.body.appendChild(amilyModal);
+        
+        amilyModal.querySelectorAll('.amily-info').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                if (window.SE) window.SE.play('buttonclick');
+                const def = window.AbilityDef ? window.AbilityDef[btn.dataset.id] : null;
+                if (def) document.getElementById('amily-desc-area').innerText = `【${def.name}】\n${def.desc}`;
+            };
+        });
+    }
+
+    const colorSel = document.getElementById('color-selector');
+    if (colorSel && !document.getElementById('color-timer')) {
+        const p = colorSel.querySelector('p');
+        if (p) p.innerHTML = `色を選んでください<br><span style="color:#fbc02d; font-size:18px; font-weight:bold;">残り <span id="color-timer">10</span> 秒</span>`;
     }
     let defModal = document.getElementById('defense-modal');
     if (!defModal || !document.getElementById('defense-question-area')) {
@@ -1076,10 +1146,14 @@ window.openTargetSelection = function(players, callback) {
         const btn = document.createElement('div');
         btn.className = 'target-icon-btn';
         btn.innerHTML = `<img src="${p.icon || defaultIcon}"><span style="font-size:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:60px;">${p.name}</span>`;
-        btn.onclick = () => { modal.classList.add('hidden'); callback(p.id); };
+        btn.onclick = () => { window.stopUITimer(); modal.classList.add('hidden'); callback(p.id); };
         list.appendChild(btn);
     });
     modal.classList.remove('hidden');
+    window.startUITimer('target-modal', 'target-timer', () => {
+        modal.classList.add('hidden');
+        callback(targets[Math.floor(Math.random() * targets.length)].id);
+    });
 };
 
 window.openDiscardSelection = function(hand, excludeIndices, def, callback) {
@@ -1089,27 +1163,21 @@ window.openDiscardSelection = function(hand, excludeIndices, def, callback) {
 
     const isAbilityDiscard = def && def.needsAbilityDiscard;
 
-    if (!modal || !list) {
-        const discardable = hand.findIndex((c, i) => {
-            if (excludeIndices.includes(i)) return false;
-            if (isAbilityDiscard) return (c.value && String(c.value).startsWith('id_'));
-            return !(c.value && String(c.value).startsWith('id_'));
-        });
-        callback(discardable > -1 ? discardable : 0);
-        return;
-    }
+    if (!modal || !list) { callback(0); return; }
 
     list.innerHTML = '';
     let addedCount = 0;
+    const validIndices = [];
     hand.forEach((card, idx) => {
         if (excludeIndices.includes(idx)) return;
         const isAb = card.value && String(card.value).startsWith('id_');
         if (isAbilityDiscard && !isAb) return;
         if (!isAbilityDiscard && def && def.needsDiscard && isAb) return;
 
+        validIndices.push(idx);
         const btn = Renderer.createCardElement(card);
         btn.style.width = '50px'; btn.style.height = '75px'; btn.style.margin = '5px'; btn.style.cursor = 'pointer';
-        btn.onclick = () => { modal.classList.add('hidden'); callback(idx); };
+        btn.onclick = () => { window.stopUITimer(); modal.classList.add('hidden'); callback(idx); };
         list.appendChild(btn);
         addedCount++;
     });
@@ -1118,6 +1186,10 @@ window.openDiscardSelection = function(hand, excludeIndices, def, callback) {
         modal.classList.add('hidden'); callback(null);
     } else {
         modal.classList.remove('hidden');
+        window.startUITimer('discard-modal', 'discard-timer', () => {
+            modal.classList.add('hidden');
+            callback(validIndices[Math.floor(Math.random()*validIndices.length)]);
+        });
     }
 };
 
@@ -1154,11 +1226,16 @@ window.openMultiDiscardSelection = function(hand, validIndices, callback) {
     });
 
     btnConfirm.onclick = () => {
+        window.stopUITimer();
         modal.classList.add('hidden');
         callback(selectedIndices);
     };
 
     modal.classList.remove('hidden');
+    window.startUITimer('multi-discard-modal', 'multi-timer', () => {
+        modal.classList.add('hidden');
+        callback(selectedIndices);
+    });
 };
 
 window.openGraveyardSelection = function(callback) {
@@ -1186,6 +1263,7 @@ window.openGraveyardSelection = function(callback) {
         btn.src = `card/custom/${id}.png`;
         btn.style.width = '60px'; btn.style.cursor = 'pointer';
         btn.onclick = () => {
+            window.stopUITimer();
             modal.classList.add('hidden');
             callback(id);
         };
@@ -1193,11 +1271,16 @@ window.openGraveyardSelection = function(callback) {
     });
 
     document.getElementById('btn-cancel-graveyard').onclick = () => {
+        window.stopUITimer();
         modal.classList.add('hidden');
         callback(false); 
     };
 
     modal.classList.remove('hidden');
+    window.startUITimer('graveyard-modal', 'graveyard-timer', () => {
+        modal.classList.add('hidden');
+        callback(list[Math.floor(Math.random()*list.length)]);
+    });
 };
 
 window.openDebuffSelection = function(callback) {
@@ -1206,10 +1289,33 @@ window.openDebuffSelection = function(callback) {
     const btnFreeze = document.getElementById('btn-debuff-freeze');
     const btnBurn = document.getElementById('btn-debuff-burn');
     
-    btnFreeze.onclick = () => { modal.classList.add('hidden'); callback('frozen'); };
-    btnBurn.onclick = () => { modal.classList.add('hidden'); callback('burn'); };
+    btnFreeze.onclick = () => { window.stopUITimer(); modal.classList.add('hidden'); callback('frozen'); };
+    btnBurn.onclick = () => { window.stopUITimer(); modal.classList.add('hidden'); callback('burn'); };
     
     modal.classList.remove('hidden');
+    window.startUITimer('debuff-modal', 'debuff-timer', () => {
+        modal.classList.add('hidden');
+        const opts = ['frozen', 'burn'];
+        callback(opts[Math.floor(Math.random()*2)]);
+    });
+};
+
+window.openAmilySelection = function(callback) {
+    window.ensureModalsExist();
+    const modal = document.getElementById('amily-modal');
+    if (!modal) return;
+    
+    modal.classList.remove('hidden');
+    
+    window.startUITimer('amily-modal', 'amily-timer', () => {
+        modal.classList.add('hidden');
+        const choices = ['bara1', 'bara2', 'bara3'];
+        callback(choices[Math.floor(Math.random() * choices.length)]);
+    });
+
+    document.getElementById('btn-amily-37').onclick = () => { window.stopUITimer(); modal.classList.add('hidden'); callback('bara1'); };
+    document.getElementById('btn-amily-38').onclick = () => { window.stopUITimer(); modal.classList.add('hidden'); callback('bara2'); };
+    document.getElementById('btn-amily-39').onclick = () => { window.stopUITimer(); modal.classList.add('hidden'); callback('bara3'); };
 };
 
 window.showDefenseModal = function(attackCardValue) {
@@ -1547,7 +1653,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
         let responses = {};
         let needsDefense = false;
         
-        if (cardValue !== 'id_28') { 
+        if (cardValue !== 'id_28' && cardValue !== 'id_37') { 
             targets.forEach(tid => {
                 const p = window.game.players.find(px=>px.id===tid);
                 if(p && p.type==='bot') {
@@ -1581,7 +1687,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
             });
         }
 
-        if (cardValue === 'id_28' || !needsDefense) {
+        if (cardValue === 'id_28' || cardValue === 'id_37' || !needsDefense) {
             let guides = [];
             if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, responses, multiplier, selectedColor, multiCards, extraData);
             guides.forEach(g => { if(g.delay === undefined) g.delay = 2500; });
@@ -2145,6 +2251,10 @@ window.checkTurn = function() {
                         }
                         
                         let extraData = {};
+                        if (def && def.needsAmilySelect) {
+                                    const choices = ['bara1', 'bara2', 'bara3'];
+                                    extraData.amilySelected = choices[Math.floor(Math.random() * choices.length)];
+                                }
                         if (def && def.needsGraveyard) {
                             const gyList = window.game.abilityGraveyard.filter(id => window.AbilityDef[id] && window.AbilityDef[id].rarity !== 'UR');
                             if (gyList.length > 0) extraData.graveyardCardId = gyList[Math.floor(Math.random() * gyList.length)];
@@ -2225,6 +2335,10 @@ window.checkTurn = function() {
                                 }
 
                                 let extraData = {};
+                                if (def && def.needsAmilySelect) {
+                                    const choices = ['bara1', 'bara2', 'bara3'];
+                                    extraData.amilySelected = choices[Math.floor(Math.random() * choices.length)];
+                                }
                                 if (def && def.needsGraveyard) {
                                     const gyList = window.game.abilityGraveyard.filter(id => window.AbilityDef[id] && window.AbilityDef[id].rarity !== 'UR');
                                     if (gyList.length > 0) extraData.graveyardCardId = gyList[Math.floor(Math.random() * gyList.length)];
@@ -2349,6 +2463,18 @@ window.handlePlayAction = function() {
             } else { finishAbilityPlay(); }
         }
 
+        let amilySelected = null;
+        const stepAmily = () => {
+            if (def && def.needsAmilySelect) {
+                window.openAmilySelection((selected) => {
+                    extraData.amilySelected = selected;
+                    step6();
+                });
+            } else {
+                step6();
+            }
+        };
+
         window.localRaiaReturnedTurn = window.localRaiaReturnedTurn || -1;
         const stepRaia = () => {
             const currentRaiaCount = me.raiaUseCount || 0;
@@ -2361,7 +2487,7 @@ window.handlePlayAction = function() {
                 alert("ライアの回収効果は1ゲームにつき3回までです。\n今回は手札に戻りません。");
             }
             
-            step6();
+            stepAmily(); 
         }
 
         const step5 = () => {

@@ -36,16 +36,17 @@ window.AbilityDef = {
     'id_32': { rarity: 'SSR', type: 'AT', name: 'フェイ', desc: '【AT】自分以外のランダムなプレイヤーに燃焼(2T開始時固定1ドロー)を付与(3回発動)。既に燃焼がある場合は重複する。' },
     'id_33': { rarity: 'SSR', type: 'AT', name: 'ライア', desc: '【AT】自分以外のプレイヤーを一人指定し1枚ドローさせる。発動後このカードを手札に戻してもよい。(3回のみ)', needsTarget: true },
     'id_34': { rarity: 'SR', type: 'HE', name: 'オリヴィア', desc: '【HE】自分に回避I(20%の確率で攻撃を防ぐ)を1ターン付与する。' },
-    'id_35': { rarity: 'UR', type: 'HV', name: 'イヴ', desc: '【HV】ランダム燃焼＋全員裂傷付与。さらに蘇生(次に引く時手札に戻る)を付与。' }
+    'id_35': { rarity: 'UR', type: 'HV', name: 'イヴ', desc: '【HV】ランダム燃焼＋全員裂傷付与。さらに蘇生(次に引く時手札に戻る)を付与。' },
+    'id_36': { rarity: 'UR', type: 'HV', name: 'アミリー', desc: '【HV】使用後、赤バラ、桃バラ、白バラの3つのうち好きなカードを手札に加える。', needsAmilySelect: true },
+    'bara1': { rarity: 'SSR', type: 'AT', name: '赤バラ', desc: '【AT】自分以外のランダムなプレイヤーに固定で3枚ドローさせる。(防御不可)', fixedDraw: true, unblockable: true },
+    'bara2': { rarity: 'SSR', type: 'HE', name: '桃バラ', desc: '【HE】使用後自分にシールドIIIを3ターン付与する。' },
+    'bara3': { rarity: 'SSR', type: 'HE', name: '白バラ', desc: '【HE】70%の確率で赤バラと桃バラのカード両方を手札に加える。外れた場合カードを1枚引く。' }
 };
 
 window.AbilityEngine = {
-    // 自分のターンの場合はターン数を+1して実質的な目減りを防ぐ関数
     getAdjustedTurns: function(game, targetId, baseTurns) {
         const current = game.currentPlayer;
-        if (current && current.id === targetId) {
-            return baseTurns + 1;
-        }
+        if (current && current.id === targetId) return baseTurns + 1;
         return baseTurns;
     },
 
@@ -67,7 +68,6 @@ window.AbilityEngine = {
         let actualDrawn = count;
         let lacerationTriggered = false;
 
-        // 自分がドローする時で、裂傷ドロー以外の時に+1枚する
         if (!isLacerationDraw && t.lacerationTurns > 0 && actualDrawn > 0) {
             actualDrawn += 1;
             lacerationTriggered = true;
@@ -77,7 +77,6 @@ window.AbilityEngine = {
             game.drawCard(targetId, !blockable, isForcedByAbility); 
         }
 
-        // 裂傷で追加ドローしたならSEを鳴らす
         if (lacerationTriggered && window.SE) {
             window.SE.play('laceration');
         }
@@ -136,7 +135,7 @@ window.AbilityEngine = {
         // --- 個別能力解決 ---
         for (let m = 0; m < multiplier; m++) {
             
-            if (abilityId === 'id_20') { // 幽艶レベッカ
+            if (abilityId === 'id_20') { 
                 const hand = game.hands[attackerId];
                 if (hand && selectedColor) {
                     let toReturn = [];
@@ -154,8 +153,7 @@ window.AbilityEngine = {
                     }
                 }
             }
-
-            else if (abilityId === 'id_25') { // ミサ
+            else if (abilityId === 'id_25') { 
                 const hand = game.hands[attackerId];
                 if (hand && hand.length > 0) {
                     const rIdx = Math.floor(Math.random() * hand.length);
@@ -169,7 +167,7 @@ window.AbilityEngine = {
                 if (self && self.resurrectionMisaCount === -1) self.resurrectionMisaCount = 0;
                 guides.push({ from: attackerId, to: attackerId, text: 'Wild化＆蘇生付与' });
             }
-            else if (abilityId === 'id_27') { // クララ
+            else if (abilityId === 'id_27') { 
                 if (Math.random() < 0.45) {
                     const tHand = game.hands[attackerId];
                     if (tHand && tHand.length > 0) {
@@ -177,8 +175,6 @@ window.AbilityEngine = {
                         for (let i = 0; i < dropCount; i++) {
                             const rIdx = Math.floor(Math.random() * tHand.length);
                             const dropCard = tHand.splice(rIdx, 1)[0];
-                            
-                            // ★カードが場の上に出ないよう、墓地か山札の下に隠す
                             if (dropCard.value && String(dropCard.value).startsWith('id_')) {
                                 if(!game.abilityGraveyard) game.abilityGraveyard = [];
                                 game.abilityGraveyard.push(dropCard.value);
@@ -195,7 +191,7 @@ window.AbilityEngine = {
                     extraData.claraResult = 'fail'; 
                 }
             }
-            else if (abilityId === 'id_35') { // イヴ
+            else if (abilityId === 'id_35') { 
                 if (others.length > 0) {
                     const tid = others[Math.floor(Math.random() * others.length)].id;
                     this.applyBurn(game, tid, 3);
@@ -217,13 +213,40 @@ window.AbilityEngine = {
                     }
                 }
             }
+            else if (abilityId === 'id_36') {
+                if (extraData.amilySelected) {
+                    const hand = game.hands[attackerId];
+                    if (hand) {
+                        hand.push({ color: 'black', value: extraData.amilySelected });
+                        guides.push({ from: attackerId, to: attackerId, text: `${window.AbilityDef[extraData.amilySelected].name}獲得` });
+                        if (window.isHost && window.socket) window.socket.emit('request_draw_animation', { playerId: attackerId, count: 1 });
+                    }
+                }
+            }
+            else if (abilityId === 'bara2') {
+                if (self) self.shield = { level: 3, turns: this.getAdjustedTurns(game, attackerId, 3) };
+                guides.push({ from: attackerId, to: attackerId, text: '🛡️シールドIII(3T)' });
+            }
+            else if (abilityId === 'bara3') {
+                if (Math.random() < 0.70) {
+                    const hand = game.hands[attackerId];
+                    if (hand) {
+                        hand.push({ color: 'black', value: 'bara1' });
+                        hand.push({ color: 'black', value: 'bara2' });
+                        guides.push({ from: attackerId, to: attackerId, text: '🌹赤＆桃獲得' });
+                        if (window.isHost && window.socket) window.socket.emit('request_draw_animation', { playerId: attackerId, count: 2 });
+                    }
+                } else {
+                    this.applyDraw(game, attackerId, 1, false, true);
+                    guides.push({ from: attackerId, to: attackerId, text: '1枚ドロー(外れ)' });
+                }
+            }
 
-            // --- AT/HE 共通判定 ---
             if (def.type === 'AT' || def.type === 'AT_BL') {
                 let actualTargets = [];
                 if (def.needsTarget && selectedTargetId) actualTargets = [selectedTargetId];
                 else if (['id_2', 'id_6', 'id_9', 'id_18', 'id_29'].includes(abilityId)) actualTargets = others.map(p => p.id);
-                else if (['id_14', 'id_24', 'id_28'].includes(abilityId)) {
+                else if (['id_14', 'id_24', 'id_28', 'bara1'].includes(abilityId)) {
                     if (others.length > 0) actualTargets = [others[Math.floor(Math.random() * others.length)].id];
                 }
 
@@ -284,10 +307,12 @@ window.AbilityEngine = {
                             if (self) { self.usedRaia = true; self.raiaReturnPending = true; }
                             guides.push({ from: attackerId, to: attackerId, text: '回収待機' });
                         }
+                    } else if (abilityId === 'bara1') {
+                        drawCount = 3; // 赤バラのドロー
                     }
 
                     if (drawCount > 0) {
-                        const actualDrawn = this.applyDraw(game, targetId, drawCount, abilityId !== 'id_28', true);
+                        const actualDrawn = this.applyDraw(game, targetId, drawCount, abilityId !== 'id_28' && abilityId !== 'bara1', true);
                         if (actualDrawn === -1) guides.push({ from: attackerId, to: targetId, text: `💨回避!` });
                         else if(actualDrawn > 0) guides.push({ from: attackerId, to: targetId, text: `${actualDrawn}枚` });
                     }
@@ -388,7 +413,7 @@ window.AbilityEngine = {
                     guides.push({ from: attackerId, to: attackerId, text: '💨回避I(1T)' });
                 }
             }
-        } // multiplier loop ends
+        }
         return guides;
     }
 };
