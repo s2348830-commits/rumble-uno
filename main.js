@@ -889,8 +889,7 @@ window.showAbilityResetUI = function(maxCount) {
             const vals = selectedCards.map(c => c.value);
             if (window.isHost) {
                 window.game.replaceAbilityCards(window.game.myId, vals);
-                if (window.isHandSortEnabled && typeof window.sortPlayerHand === 'function') window.sortPlayerHand();
-                window.updateUI();
+                if (window.isHandSortEnabled && typeof window.sortPlayerHand === 'function') window.sortPlayerHand(true);                window.updateUI();
             } else {
                 if(window.socket) window.socket.emit('player_action', { action: 'ability_reset', cards: vals });
             }
@@ -3010,8 +3009,6 @@ function initMainSocketEvents() {
                 }
             }
         } else if (!window.isInitialDealing) {
-            const abOverlay = document.getElementById('ability-reset-overlay');
-            if (abOverlay) abOverlay.classList.add('hidden');
             const myId = window.myId || (window.game && window.game.myId);
             
             if (myId && window.game.hands && window.game.hands[myId] && state.hands && state.hands[myId]) {
