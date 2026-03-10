@@ -2862,6 +2862,21 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     } 
+
+    const btnUnoAuto = document.getElementById('btn-uno-auto');
+    if (btnUnoAuto) {
+        btnUnoAuto.addEventListener('click', () => {
+            window.isUnoAutoEnabled = !window.isUnoAutoEnabled;
+            if (window.isUnoAutoEnabled) {
+                btnUnoAuto.innerText = 'UNOオート: ON';
+                btnUnoAuto.classList.add('is-on');
+                if (typeof window.updateUI === 'function') window.updateUI();
+            } else {
+                btnUnoAuto.innerText = 'UNOオート: OFF';
+                btnUnoAuto.classList.remove('is-on');
+            }
+        });
+    }
 });
 const btnUnoAuto = document.getElementById('btn-uno-auto');
     if (btnUnoAuto) {
