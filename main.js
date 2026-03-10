@@ -632,6 +632,12 @@ window.drawOpponentAnimation = function(playerId, count, callback) {
 };
 
 window.showAttackGuide = function(fromId, toId, labelText, seName) {
+    if (fromId === 'CLOSE_UI') {
+        const resetOverlay = document.getElementById('ability-reset-overlay');
+        if (resetOverlay) resetOverlay.classList.add('hidden');
+        if (typeof window.updateUI === 'function') window.updateUI();
+        return;
+    }
     if (seName && window.SE) window.SE.play(seName);
 
     let fromEl = document.querySelector(`.circle-player-badge[data-id="${fromId}"]`);
@@ -739,10 +745,12 @@ window.tryEarlyStartReset = function() {
             clearTimeout(window.abilityResetTimeoutId);
             window.abilityResetTimeoutId = null;
             
-            // 全員揃ったので即時開始
+            // ホスト自身の画面を閉じる
             const resetOverlay = document.getElementById('ability-reset-overlay');
             if (resetOverlay) resetOverlay.classList.add('hidden');
-            window.broadcastGameState(true);
+            
+            // 参加者全員へ「待機画面を閉じてゲーム開始！」という特殊なシグナルを送る
+            window.broadcastGameState(true, [{from: 'CLOSE_UI', to: 'CLOSE_UI', text: ''}]);
             window.checkTurn();
         }
     }
@@ -949,17 +957,14 @@ window.animateInitialDeal = function(targetHands, callback) {
                     window.abilityResetConfirmedPlayers = new Set(); 
                     window.abilityResetTimeoutId = setTimeout(() => {
                         window.abilityResetTimeoutId = null;
+                        
+                        // ホスト自身の画面を閉じる
                         const resetOverlay = document.getElementById('ability-reset-overlay');
                         if (resetOverlay) resetOverlay.classList.add('hidden');
-                        window.broadcastGameState(true);
+                        
+                        // 時間切れ(0秒)になったら、強制的に全員の画面を閉じさせてゲームを開始する
+                        window.broadcastGameState(true, [{from: 'CLOSE_UI', to: 'CLOSE_UI', text: ''}]);
                         window.checkTurn();
-                    }, waitTime);
-                } else {
-                    // 参加者側も13秒固定ではなく、枚数に合わせた waitTime で強制的に閉じる
-                    setTimeout(() => {
-                        const resetOverlay = document.getElementById('ability-reset-overlay');
-                        if (resetOverlay) resetOverlay.classList.add('hidden');
-                        if (typeof window.updateUI === 'function') window.updateUI();
                     }, waitTime);
                 }
             } else {
