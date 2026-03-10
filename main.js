@@ -2816,6 +2816,15 @@ function initMainSocketEvents() {
     window.socket.on('game_over', (data) => {
         window.isGameOver = true;
         if (window.SE) window.SE.stopLoop('final_sprint');
+        window.pendingJanken = null;
+        window.isJankenShowing = false;
+        ['janken-overlay', 'defense-modal', 'discard-modal', 'multi-discard-modal', 'target-modal', 'graveyard-modal', 'debuff-modal'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.classList.add('hidden');
+                el.classList.remove('result-showing');
+            }
+        });
         if (data.isDraw) {
             if (window.SE) window.SE.play('draw');
             setTimeout(() => document.getElementById('draw-curtain').classList.add('show'), 100);
