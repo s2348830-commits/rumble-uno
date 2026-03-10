@@ -428,6 +428,8 @@ window.checkFinalSprint = function() {
 };
 
 window.updatePhaseUI = function(state) {
+    window.isGlobalDefensePhase = !!state.defensePhase;
+    window.isGlobalJankenPhase = !!state.jankenPhase;
     if (state.defensePhase) {
         const { attackerId, cardValue, targets, phaseId } = state.defensePhase;
         if (targets && targets.includes(window.myId) && window.myId !== attackerId) {
@@ -2114,8 +2116,8 @@ window.handlePlayAction = function() {
     if (window.game.selectedIndices.length === 0 || window.isGameOver || window.isInitialDealing || window.isDrawing) return;
     if (window.pendingJanken) return; 
 
-    if (window.pendingDefense || window.currentDefensePhaseId) {
-        alert("現在、他の能力が処理中です。解決するまでお待ちください。");
+    if (window.pendingDefense || window.currentDefensePhaseId || window.isGlobalDefensePhase || window.pendingJanken || window.isGlobalJankenPhase) {
+        if (typeof window.showBusyAlert === 'function') window.showBusyAlert();
         window.game.selectedIndices = []; window.updateUI(); return;
     }
 
@@ -2606,6 +2608,31 @@ window.applyAutoUnoPenalty = function() {
             setTimeout(finishAutoPenalty, 500);
         }
     });
+};
+window.showBusyAlert = function() {
+    let bOverlay = document.getElementById('busy-overlay');
+    if (!bOverlay) {
+        bOverlay = document.createElement('div');
+        bOverlay.id = 'busy-overlay';
+        bOverlay.className = 'hidden';
+        bOverlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.5); z-index:150000; display:flex; flex-direction:column; justify-content:center; align-items:center; backdrop-filter:blur(3px);";
+        bOverlay.innerHTML = `
+            <div style="background:#222; border:3px solid #fbc02d; border-radius:15px; padding:20px 30px; text-align:center; box-shadow:0 10px 30px rgba(251,192,45,0.5); max-width:80%;">
+                <h2 style="color:#fbc02d; margin-top:0; font-size:24px; text-shadow:2px 2px 4px rgba(0,0,0,0.5);">⚠️ 処理中 ⚠️</h2>
+                <div style="color:white; font-size:16px; font-weight:bold; margin-bottom:20px; white-space:pre-wrap; line-height:1.5;">現在、他の能力が処理中です。\n解決するまでお待ちください。</div>
+                <button id="btn-busy-ok" style="padding:10px 40px; background:#fbc02d; color:black; border:none; border-radius:8px; font-size:18px; font-weight:bold; cursor:pointer; box-shadow:0 4px 6px rgba(0,0,0,0.3);">確認</button>
+            </div>
+        `;
+        document.body.appendChild(bOverlay);
+        
+        document.getElementById('btn-busy-ok').onclick = () => {
+            if (window.SE) window.SE.play('buttonclick');
+            bOverlay.classList.add('hidden');
+        };
+    }
+    
+    if (window.SE) window.SE.play('Impossible');
+    bOverlay.classList.remove('hidden');
 };
 
 window.tryDrawWithAbility = function(callback) {
