@@ -154,16 +154,16 @@ window.ensureModalsExist = function() {
             <div id="amily-desc-area" style="color:#00d2ff; font-size:12px; margin-bottom:10px; min-height:36px; white-space:pre-wrap;">カードの「？」を押すとここに効果が表示されます</div>
             <div style="display:flex; justify-content:center; gap:10px;">
                 <div style="position:relative;">
-                    <img id="btn-amily-bari1" src="card/custom/bari1.png" style="width:60px; cursor:pointer;" onerror="this.src='data:image/svg+xml;charset=utf-8,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 40 60\\'%3E%3Crect width=\\'40\\' height=\\'60\\' rx=\\'6\\' fill=\\'%23ff5252\\'/%3E%3Ctext x=\\'50%25\\' y=\\'50%25\\' dominant-baseline=\\'middle\\' text-anchor=\\'middle\\' fill=\\'white\\' font-size=\\'12\\'%3E赤バラ%3C/text%3E%3C/svg%3E'">
-                    <div class="amily-info" data-id="bari1" style="position:absolute; top:-5px; right:-5px; width:20px; height:20px; background:#0d47a1; color:white; border-radius:50%; display:flex; justify-content:center; align-items:center; font-size:12px; cursor:pointer; border:1.5px solid white;">?</div>
+                    <img id="btn-amily-bara1" src="card/custom/bara1.png" style="width:60px; cursor:pointer;" onerror="this.src='data:image/svg+xml;charset=utf-8,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 40 60\\'%3E%3Crect width=\\'40\\' height=\\'60\\' rx=\\'6\\' fill=\\'%23ff5252\\'/%3E%3Ctext x=\\'50%25\\' y=\\'50%25\\' dominant-baseline=\\'middle\\' text-anchor=\\'middle\\' fill=\\'white\\' font-size=\\'12\\'%3E赤バラ%3C/text%3E%3C/svg%3E'">
+                    <div class="amily-info" data-id="bara1" style="position:absolute; top:-5px; right:-5px; width:20px; height:20px; background:#0d47a1; color:white; border-radius:50%; display:flex; justify-content:center; align-items:center; font-size:12px; cursor:pointer; border:1.5px solid white;">?</div>
                 </div>
                 <div style="position:relative;">
-                    <img id="btn-amily-bari2" src="card/custom/bari2.png" style="width:60px; cursor:pointer;" onerror="this.src='data:image/svg+xml;charset=utf-8,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 40 60\\'%3E%3Crect width=\\'40\\' height=\\'60\\' rx=\\'6\\' fill=\\'%23ff9800\\'/%3E%3Ctext x=\\'50%25\\' y=\\'50%25\\' dominant-baseline=\\'middle\\' text-anchor=\\'middle\\' fill=\\'white\\' font-size=\\'12\\'%3E桃バラ%3C/text%3E%3C/svg%3E'">
-                    <div class="amily-info" data-id="bari2" style="position:absolute; top:-5px; right:-5px; width:20px; height:20px; background:#0d47a1; color:white; border-radius:50%; display:flex; justify-content:center; align-items:center; font-size:12px; cursor:pointer; border:1.5px solid white;">?</div>
+                    <img id="btn-amily-bara2" src="card/custom/bara2.png" style="width:60px; cursor:pointer;" onerror="this.src='data:image/svg+xml;charset=utf-8,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 40 60\\'%3E%3Crect width=\\'40\\' height=\\'60\\' rx=\\'6\\' fill=\\'%23ff9800\\'/%3E%3Ctext x=\\'50%25\\' y=\\'50%25\\' dominant-baseline=\\'middle\\' text-anchor=\\'middle\\' fill=\\'white\\' font-size=\\'12\\'%3E桃バラ%3C/text%3E%3C/svg%3E'">
+                    <div class="amily-info" data-id="bara2" style="position:absolute; top:-5px; right:-5px; width:20px; height:20px; background:#0d47a1; color:white; border-radius:50%; display:flex; justify-content:center; align-items:center; font-size:12px; cursor:pointer; border:1.5px solid white;">?</div>
                 </div>
                 <div style="position:relative;">
-                    <img id="btn-amily-bari3" src="card/custom/bari3.png" style="width:60px; cursor:pointer;" onerror="this.src='data:image/svg+xml;charset=utf-8,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 40 60\\'%3E%3Crect width=\\'40\\' height=\\'60\\' rx=\\'6\\' fill=\\'%23fff\\' stroke=\\'%23ccc\\'/%3E%3Ctext x=\\'50%25\\' y=\\'50%25\\' dominant-baseline=\\'middle\\' text-anchor=\\'middle\\' fill=\\'black\\' font-size=\\'12\\'%3E白バラ%3C/text%3E%3C/svg%3E'">
-                    <div class="amily-info" data-id="bari3" style="position:absolute; top:-5px; right:-5px; width:20px; height:20px; background:#0d47a1; color:white; border-radius:50%; display:flex; justify-content:center; align-items:center; font-size:12px; cursor:pointer; border:1.5px solid white;">?</div>
+                    <img id="btn-amily-bara3" src="card/custom/bara3.png" style="width:60px; cursor:pointer;" onerror="this.src='data:image/svg+xml;charset=utf-8,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 40 60\\'%3E%3Crect width=\\'40\\' height=\\'60\\' rx=\\'6\\' fill=\\'%23fff\\' stroke=\\'%23ccc\\'/%3E%3Ctext x=\\'50%25\\' y=\\'50%25\\' dominant-baseline=\\'middle\\' text-anchor=\\'middle\\' fill=\\'black\\' font-size=\\'12\\'%3E白バラ%3C/text%3E%3C/svg%3E'">
+                    <div class="amily-info" data-id="bara3" style="position:absolute; top:-5px; right:-5px; width:20px; height:20px; background:#0d47a1; color:white; border-radius:50%; display:flex; justify-content:center; align-items:center; font-size:12px; cursor:pointer; border:1.5px solid white;">?</div>
                 </div>
             </div>
         `;
@@ -1321,13 +1321,13 @@ window.openAmilySelection = function(callback) {
     
     window.startUITimer('amily-modal', 'amily-timer', () => {
         modal.classList.add('hidden');
-        const choices = ['bari1', 'bari2', 'bari3'];
+        const choices = ['bara1', 'bara2', 'bara3'];
         callback(choices[Math.floor(Math.random() * choices.length)]);
     });
 
-    document.getElementById('btn-amily-bari1').onclick = () => { window.stopUITimer(); modal.classList.add('hidden'); callback('bari1'); };
-    document.getElementById('btn-amily-bari2').onclick = () => { window.stopUITimer(); modal.classList.add('hidden'); callback('bari2'); };
-    document.getElementById('btn-amily-bari3').onclick = () => { window.stopUITimer(); modal.classList.add('hidden'); callback('bari3'); };
+    document.getElementById('btn-amily-bara1').onclick = () => { window.stopUITimer(); modal.classList.add('hidden'); callback('bara1'); };
+    document.getElementById('btn-amily-bara2').onclick = () => { window.stopUITimer(); modal.classList.add('hidden'); callback('bara2'); };
+    document.getElementById('btn-amily-bara3').onclick = () => { window.stopUITimer(); modal.classList.add('hidden'); callback('bara3'); };
 };
 
 window.showDefenseModal = function(attackCardValue) {
@@ -1665,7 +1665,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
         let responses = {};
         let needsDefense = false;
         
-        if (cardValue !== 'id_28' && cardValue !== 'bari1') {
+        if (cardValue !== 'id_28' && cardValue !== 'bara1') {
             targets.forEach(tid => {
                 const p = window.game.players.find(px=>px.id===tid);
                 if(p && p.type==='bot') {
@@ -1699,7 +1699,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
             });
         }
 
-        if (cardValue === 'id_28' || cardValue === 'bari1' || !needsDefense) {
+        if (cardValue === 'id_28' || cardValue === 'bara1' || !needsDefense) {
             let guides = [];
             if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, responses, multiplier, selectedColor, multiCards, extraData);
             guides.forEach(g => { if(g.delay === undefined) g.delay = 2500; });
@@ -2264,7 +2264,7 @@ window.checkTurn = function() {
                         
                         let extraData = {};
                         if (def && def.needsAmilySelect) {
-                                    const choices = ['bari1', 'bari2', 'bari3'];
+                                    const choices = ['bara1', 'bara2', 'bara3'];
                                     extraData.amilySelected = choices[Math.floor(Math.random() * choices.length)];
                                 }
                         if (def && def.needsGraveyard) {

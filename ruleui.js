@@ -185,7 +185,7 @@ if (typeof window.RuleSettings === 'undefined') {
                     div.dataset.count = 0;
                     
                     const descSafe = c.desc.replace(/\n/g, '\\n').replace(/'/g, "\\'");
-                    const maxCount = (c.id === 'id_20' || c.id === 'id_25' || c.id === 'id_26' || c.id === 'id_35') ? 1 : 4;
+                    const maxCount = (c.id === 'id_20' || c.id === 'id_25' || c.id === 'id_26' || c.id === 'id_35' || c.id === 'id_36') ? 1 : 4;
                     
                     let rarityColor = '#ccc';
                     let rarityText = 'SSR';
@@ -285,7 +285,7 @@ if (typeof window.RuleSettings === 'undefined') {
             const items = grid.querySelectorAll('.custom-card-item');
             items.forEach(item => {
                 const id = item.dataset.id;
-                const maxCount = (id === 'id_20' || id === 'id_25' || id === 'id_26' || id === 'id_35') ? 1 : 4;
+                const maxCount = (id === 'id_20' || id === 'id_25' || id === 'id_26' || id === 'id_35' || id === 'id_36') ? 1 : 4;
                 const count = this.customCards.filter(c => c === id).length;
                 item.dataset.count = count;
                 const countSpan = item.querySelector('.custom-card-count');
