@@ -1443,12 +1443,15 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
             if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, responses, multiplier, selectedColor, multiCards, extraData);
             guides.forEach(g => { if(g.delay === undefined) g.delay = 2500; });
             
+            // 👇👇 ★修正1: レベッカ等の即時発動カードでのUIペナルティ 👇👇
             let someoneWon = false;
+            let needsPenalty = false;
+            let penaltyCount = 0;
+
             if (window.game.hands[playerId] && window.game.hands[playerId].length === 0) {
                 if (window.RuleSettings && !window.RuleSettings.allowAbilityFinish) {
-                    const penaltyCount = parseInt(window.RuleSettings.abilityFinishPenalty) || 3;
-                    for (let i = 0; i < penaltyCount; i++) window.game.drawCard(playerId);
-                    if (window.socket) window.socket.emit('request_draw_animation', { playerId: playerId, count: penaltyCount });
+                    needsPenalty = true;
+                    penaltyCount = parseInt(window.RuleSettings.abilityFinishPenalty) || 3;
                     guides.push({ from: playerId, to: playerId, text: '能力上がり禁止!', delay: 2500 });
                 } else {
                     window.checkWin(playerId); someoneWon = true;
@@ -1459,7 +1462,27 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                     window.checkWin(p.id); someoneWon = true;
                 }
             });
-            if (!someoneWon) setTimeout(() => window.checkTurn(), 500);
+
+            const finishResolve = () => {
+                window.broadcastGameState(false, guides);
+                if (!someoneWon) setTimeout(() => window.checkTurn(), 500);
+            };
+
+            if (needsPenalty) {
+                if (playerId === window.game.myId && typeof window.showPenaltyAlert === 'function') {
+                    window.showPenaltyAlert(`能力上がり禁止！\nペナルティとして ${penaltyCount}枚ドローします！`, () => {
+                        for (let i = 0; i < penaltyCount; i++) window.game.drawCard(playerId);
+                        if (window.socket) window.socket.emit('request_draw_animation', { playerId: playerId, count: penaltyCount });
+                        finishResolve();
+                    });
+                } else {
+                    for (let i = 0; i < penaltyCount; i++) window.game.drawCard(playerId);
+                    if (window.socket) window.socket.emit('request_draw_animation', { playerId: playerId, count: penaltyCount });
+                    finishResolve();
+                }
+            } else {
+                finishResolve();
+            }
             return;
         }
 
@@ -1583,16 +1606,46 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                 }
                 guides.forEach(g => { if(g.delay === undefined) g.delay = 2500; });
 
-                window.broadcastGameState(false, guides);
-
+                // 👇👇 ★修正2: 防御フェーズ解決後のUIペナルティ 👇👇
                 let someoneWon = false;
+                let needsPenalty = false;
+                let penaltyCount = 0;
+
+                if (window.game.hands[playerId] && window.game.hands[playerId].length === 0) {
+                    if (window.RuleSettings && !window.RuleSettings.allowAbilityFinish) {
+                        needsPenalty = true;
+                        penaltyCount = parseInt(window.RuleSettings.abilityFinishPenalty) || 3;
+                        guides.push({ from: playerId, to: playerId, text: '能力上がり禁止!', delay: 2500 });
+                    } else {
+                        window.checkWin(playerId); someoneWon = true;
+                    }
+                }
                 window.game.players.forEach(p => {
-                    if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) {
+                    if (p.id !== playerId && window.game.hands[p.id] && window.game.hands[p.id].length === 0) {
                         window.checkWin(p.id); someoneWon = true;
                     }
                 });
 
-                if (!someoneWon) setTimeout(() => window.checkTurn(), 500); 
+                const finishResolve = () => {
+                    window.broadcastGameState(false, guides);
+                    if (!someoneWon) setTimeout(() => window.checkTurn(), 500);
+                };
+
+                if (needsPenalty) {
+                    if (playerId === window.game.myId && typeof window.showPenaltyAlert === 'function') {
+                        window.showPenaltyAlert(`能力上がり禁止！\nペナルティとして ${penaltyCount}枚ドローします！`, () => {
+                            for (let i = 0; i < penaltyCount; i++) window.game.drawCard(playerId);
+                            if (window.socket) window.socket.emit('request_draw_animation', { playerId: playerId, count: penaltyCount });
+                            finishResolve();
+                        });
+                    } else {
+                        for (let i = 0; i < penaltyCount; i++) window.game.drawCard(playerId);
+                        if (window.socket) window.socket.emit('request_draw_animation', { playerId: playerId, count: penaltyCount });
+                        finishResolve();
+                    }
+                } else {
+                    finishResolve();
+                }
             } else {
                 window.pendingDefense.timer--;
                 window.broadcastGameState(true);
@@ -1603,16 +1656,46 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
         if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, {}, multiplier, selectedColor, multiCards, extraData);
         guides.forEach(g => { if(g.delay === undefined) g.delay = 2500; });
         
-        window.broadcastGameState(false, guides);
-
+        // 👇👇 ★修正3: 単発能力（ドロー効果など）解決後のUIペナルティ 👇👇
         let someoneWon = false;
+        let needsPenalty = false;
+        let penaltyCount = 0;
+
+        if (window.game.hands[playerId] && window.game.hands[playerId].length === 0) {
+            if (window.RuleSettings && !window.RuleSettings.allowAbilityFinish) {
+                needsPenalty = true;
+                penaltyCount = parseInt(window.RuleSettings.abilityFinishPenalty) || 3;
+                guides.push({ from: playerId, to: playerId, text: '能力上がり禁止!', delay: 2500 });
+            } else {
+                window.checkWin(playerId); someoneWon = true;
+            }
+        }
         window.game.players.forEach(p => {
-            if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) {
+            if (p.id !== playerId && window.game.hands[p.id] && window.game.hands[p.id].length === 0) {
                 window.checkWin(p.id); someoneWon = true;
             }
         });
 
-        if (!someoneWon) setTimeout(() => window.checkTurn(), 500);
+        const finishResolve = () => {
+            window.broadcastGameState(false, guides);
+            if (!someoneWon) setTimeout(() => window.checkTurn(), 500);
+        };
+
+        if (needsPenalty) {
+            if (playerId === window.game.myId && typeof window.showPenaltyAlert === 'function') {
+                window.showPenaltyAlert(`能力上がり禁止！\nペナルティとして ${penaltyCount}枚ドローします！`, () => {
+                    for (let i = 0; i < penaltyCount; i++) window.game.drawCard(playerId);
+                    if (window.socket) window.socket.emit('request_draw_animation', { playerId: playerId, count: penaltyCount });
+                    finishResolve();
+                });
+            } else {
+                for (let i = 0; i < penaltyCount; i++) window.game.drawCard(playerId);
+                if (window.socket) window.socket.emit('request_draw_animation', { playerId: playerId, count: penaltyCount });
+                finishResolve();
+            }
+        } else {
+            finishResolve();
+        }
     }
 };
 
