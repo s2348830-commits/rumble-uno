@@ -54,14 +54,12 @@ window.sortPlayerHand = function(suppressUpdate = false) {
 
     if (JSON.stringify(hand) !== originalHand) {
         window.game.selectedIndices = [];
-        if (!suppressUpdate) {
-            if (window.isHost) {
-                window.broadcastGameState(true);
-                if (typeof window.updateUI === 'function') window.updateUI();
-            } else if (window.socket) {
-                window.socket.emit('player_action', { action: 'sort_hand', sortedHand: hand });
-                if (typeof window.updateUI === 'function') window.updateUI();
-            }
+        if (window.isHost) {
+            window.broadcastGameState(true);
+            if (!suppressUpdate && typeof window.updateUI === 'function') window.updateUI();
+        } else if (window.socket) {
+            window.socket.emit('player_action', { action: 'sort_hand', sortedHand: hand });
+            if (!suppressUpdate && typeof window.updateUI === 'function') window.updateUI();
         }
     }
 };
@@ -733,7 +731,6 @@ window.showAttackGuide = function(fromId, toId, labelText, seName) {
 window.tryEarlyStartReset = function() {
     if (!window.isHost || !window.abilityResetConfirmedPlayers) return;
     
-    // p.type === 'player' ではなく、Botではない（!== 'bot'）人全員を待つように修正
     const humanPlayers = window.game.players.filter(p => p.type !== 'bot');
     
     if (window.abilityResetConfirmedPlayers.size >= humanPlayers.length) {
@@ -741,7 +738,6 @@ window.tryEarlyStartReset = function() {
             clearTimeout(window.abilityResetTimeoutId);
             window.abilityResetTimeoutId = null;
             
-            // 全員揃ったので即時開始
             const resetOverlay = document.getElementById('ability-reset-overlay');
             if (resetOverlay) resetOverlay.classList.add('hidden');
             window.broadcastGameState();
@@ -897,7 +893,7 @@ window.showAbilityResetUI = function(maxCount) {
                 window.tryEarlyStartReset();
             }
         } else {
-            // 参加者は 0枚でも必ずホストに完了の通信を送る！
+            // 参加者は0枚でも必ずホストに完了の通信を送る
             if(window.socket) window.socket.emit('player_action', { action: 'ability_reset', cards: vals });
         }
     };
