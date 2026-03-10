@@ -736,8 +736,6 @@ window.showAbilityResetUI = function(maxCount) {
     const resetArea = document.getElementById('reset-area');
     const handArea = document.getElementById('reset-hand-area');
     const btnConfirm = document.getElementById('btn-reset-confirm');
-    const timerSpan = document.getElementById('reset-timer');
-    const maxSpan = document.getElementById('reset-max');
     
     if(!overlay) return;
 
@@ -747,7 +745,9 @@ window.showAbilityResetUI = function(maxCount) {
     if (handArea) handArea.style.display = 'flex';
     if (btnConfirm) btnConfirm.style.display = 'block';
     if (pSub) pSub.style.display = 'block';
-    if (tTitle) tTitle.innerHTML = `能力カード入れ替え (<span id="reset-timer" style="color:#fbc02d;">10</span>秒)`;
+
+    const timerSpan = document.getElementById('reset-timer');
+    const maxSpan = document.getElementById('reset-max');
 
     let descArea = document.getElementById('reset-desc-area');
     if (!descArea) {
@@ -766,9 +766,12 @@ window.showAbilityResetUI = function(maxCount) {
     descArea.innerText = 'カードの「？」を押すとここに効果が表示されます';
     if (descArea) descArea.style.display = 'block';
 
+    // 👇👇 ★修正: タイマーを「枚数 × 5秒」に設定 👇👇
     let timeLeft = maxCount * 5;
+    if (tTitle) tTitle.innerHTML = `能力カード入れ替え (<span id="reset-timer" style="color:#fbc02d;">${timeLeft}</span>秒)`;
     if (timerSpan) timerSpan.innerText = timeLeft;
-    maxSpan.innerText = maxCount;
+    if (maxSpan) maxSpan.innerText = maxCount;
+    
     resetArea.innerHTML = '';
     handArea.innerHTML = '';
     let selectedCards = [];
@@ -845,7 +848,9 @@ window.showAbilityResetUI = function(maxCount) {
         if (descArea) descArea.style.display = 'none';
         if (pSub) pSub.style.display = 'none';
         if (tTitle) tTitle.innerText = '他のプレイヤーを待っています...';
-        overlay.classList.add('hidden');
+        
+        // ★重要: ここで overlay.classList.add('hidden'); は呼ばない（待機画面を維持するため）
+
         if (selectedCards.length > 0) {
             const vals = selectedCards.map(c => c.value);
             if (window.isHost) {
@@ -860,7 +865,7 @@ window.showAbilityResetUI = function(maxCount) {
     btnConfirm.onclick = finish;
     const timerInt = setInterval(() => {
         timeLeft--;
-        timerSpan.innerText = timeLeft;
+        if (timerSpan) timerSpan.innerText = timeLeft;
         if (timeLeft <= 0) finish();
     }, 1000);
 };
@@ -901,6 +906,13 @@ window.animateInitialDeal = function(targetHands, callback) {
                         if (resetOverlay) resetOverlay.classList.add('hidden');
                         window.broadcastGameState();
                         window.checkTurn();
+                    }, 13000);
+                } else {
+                    // 👇👇 ★追加: 参加者側もホストと同じく13秒後に待機画面を閉じる 👇👇
+                    setTimeout(() => {
+                        const resetOverlay = document.getElementById('ability-reset-overlay');
+                        if (resetOverlay) resetOverlay.classList.add('hidden');
+                        if (typeof window.updateUI === 'function') window.updateUI();
                     }, 13000);
                 }
             } else {
@@ -2955,8 +2967,6 @@ function initMainSocketEvents() {
                 }
             }
         } else if (!window.isInitialDealing) {
-            const abOverlay = document.getElementById('ability-reset-overlay');
-            if (abOverlay) abOverlay.classList.add('hidden');
             const myId = window.myId || (window.game && window.game.myId);
             let handChanged = false;
             if (myId && window.game.hands && window.game.hands[myId] && state.hands && state.hands[myId]) {
