@@ -755,22 +755,6 @@ window.tryEarlyStartReset = function() {
         }
     }
 };
-window.tryEarlyStartReset = function() {
-    if (!window.isHost || !window.abilityResetConfirmedPlayers) return;
-    const connectedPlayers = window.game.players.filter(p => p.connected && p.type === 'player');
-    if (window.abilityResetConfirmedPlayers.size >= connectedPlayers.length) {
-        if (window.abilityResetTimeoutId) {
-            clearTimeout(window.abilityResetTimeoutId);
-            window.abilityResetTimeoutId = null;
-            
-            // 全員揃ったので即時開始
-            const resetOverlay = document.getElementById('ability-reset-overlay');
-            if (resetOverlay) resetOverlay.classList.add('hidden');
-            window.broadcastGameState();
-            window.checkTurn();
-        }
-    }
-};
 window.showAbilityResetUI = function(maxCount) {
     const overlay = document.getElementById('ability-reset-overlay');
     const resetArea = document.getElementById('reset-area');
@@ -2944,21 +2928,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
-const btnUnoAuto = document.getElementById('btn-uno-auto');
-    if (btnUnoAuto) {
-        btnUnoAuto.addEventListener('click', () => {
-            window.isUnoAutoEnabled = !window.isUnoAutoEnabled;
-            if (window.isUnoAutoEnabled) {
-                btnUnoAuto.innerText = 'UNOオート: ON';
-                btnUnoAuto.classList.add('is-on');
-                // ONにした瞬間に、もし言える状態なら即座に宣言させる
-                if (typeof window.updateUI === 'function') window.updateUI();
-            } else {
-                btnUnoAuto.innerText = 'UNOオート: OFF';
-                btnUnoAuto.classList.remove('is-on');
-            }
-        });
-    }
 
 function initMainSocketEvents() {
     if (typeof window.socket === 'undefined') {
