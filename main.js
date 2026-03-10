@@ -1665,7 +1665,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
         let responses = {};
         let needsDefense = false;
         
-        if (cardValue !== 'id_28' && cardValue !== 'bara1') {
+        if (cardValue !== 'id_28' && cardValue !== 'bara1') { 
             targets.forEach(tid => {
                 const p = window.game.players.find(px=>px.id===tid);
                 if(p && p.type==='bot') {
@@ -1704,6 +1704,11 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
             if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, responses, multiplier, selectedColor, multiCards, extraData);
             guides.forEach(g => { if(g.delay === undefined) g.delay = 2500; });
             
+            let cEvent = null;
+            if (extraData.claraResult) {
+                cEvent = { type: 'clara', result: extraData.claraResult };
+            }
+
             let someoneWon = false;
             let needsPenalty = false;
             let penaltyCount = 0;
@@ -1724,14 +1729,14 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
             });
 
             const finishResolve = () => {
-                window.broadcastGameState(false, guides, cEvent); // ★cEventを追加
+                window.broadcastGameState(false, guides, cEvent); 
                 if (!someoneWon) setTimeout(() => window.checkTurn(), 500);
             };
 
             if (needsPenalty) {
                 const alertMsg = `能力上がり禁止！\nペナルティとして ${penaltyCount}枚ドローします！`;
                 if (playerId === window.game.myId && typeof window.showPenaltyAlert === 'function') {
-                    if (cEvent && typeof window.showClaraResultUI === 'function') window.showClaraResultUI(cEvent.result); // ★ホストのクララUI表示
+                    if (cEvent && typeof window.showClaraResultUI === 'function') window.showClaraResultUI(cEvent.result); 
                     window.showPenaltyAlert(alertMsg, () => {
                         for (let i = 0; i < penaltyCount; i++) window.game.drawCard(playerId);
                         if (window.socket) window.socket.emit('request_draw_animation', { playerId: playerId, count: penaltyCount });
@@ -1901,8 +1906,9 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                 };
 
                 if (needsPenalty) {
+                    const alertMsg = `能力上がり禁止！\nペナルティとして ${penaltyCount}枚ドローします！`;
                     if (playerId === window.game.myId && typeof window.showPenaltyAlert === 'function') {
-                        window.showPenaltyAlert(`能力上がり禁止！\nペナルティとして ${penaltyCount}枚ドローします！`, () => {
+                        window.showPenaltyAlert(alertMsg, () => {
                             for (let i = 0; i < penaltyCount; i++) window.game.drawCard(playerId);
                             if (window.socket) window.socket.emit('request_draw_animation', { playerId: playerId, count: penaltyCount });
                             finishResolve();
@@ -1910,7 +1916,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                     } else {
                         for (let i = 0; i < penaltyCount; i++) window.game.drawCard(playerId);
                         if (window.socket) window.socket.emit('request_draw_animation', { playerId: playerId, count: penaltyCount });
-                        window.broadcastGameState(false, guides, { targetId: playerId, msg: alertMsg });
+                        window.broadcastGameState(false, guides, { type: 'penalty', targetId: playerId, msg: alertMsg });
                         finishResolve();
                     }
                 } else {
@@ -1926,6 +1932,11 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
         if (window.AbilityEngine) guides = window.AbilityEngine.resolve(window.game, playerId, cardValue, targetId, discCard, {}, multiplier, selectedColor, multiCards, extraData);
         guides.forEach(g => { if(g.delay === undefined) g.delay = 2500; });
         
+        let cEvent = null;
+        if (extraData.claraResult) {
+            cEvent = { type: 'clara', result: extraData.claraResult };
+        }
+
         let someoneWon = false;
         let needsPenalty = false;
         let penaltyCount = 0;
@@ -1946,13 +1957,15 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
         });
 
         const finishResolve = () => {
-            window.broadcastGameState(false, guides);
+            window.broadcastGameState(false, guides, cEvent); 
             if (!someoneWon) setTimeout(() => window.checkTurn(), 500);
         };
 
         if (needsPenalty) {
+            const alertMsg = `能力上がり禁止！\nペナルティとして ${penaltyCount}枚ドローします！`;
             if (playerId === window.game.myId && typeof window.showPenaltyAlert === 'function') {
-                window.showPenaltyAlert(`能力上がり禁止！\nペナルティとして ${penaltyCount}枚ドローします！`, () => {
+                if (cEvent && typeof window.showClaraResultUI === 'function') window.showClaraResultUI(cEvent.result); 
+                window.showPenaltyAlert(alertMsg, () => {
                     for (let i = 0; i < penaltyCount; i++) window.game.drawCard(playerId);
                     if (window.socket) window.socket.emit('request_draw_animation', { playerId: playerId, count: penaltyCount });
                     finishResolve();
@@ -1960,7 +1973,7 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
             } else {
                 for (let i = 0; i < penaltyCount; i++) window.game.drawCard(playerId);
                 if (window.socket) window.socket.emit('request_draw_animation', { playerId: playerId, count: penaltyCount });
-                window.broadcastGameState(false, guides, { targetId: playerId, msg: alertMsg });
+                window.broadcastGameState(false, guides, { type: 'penalty', targetId: playerId, msg: alertMsg, claraResult: cEvent ? cEvent.result : null });
                 finishResolve();
             }
         } else {
