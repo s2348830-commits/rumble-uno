@@ -267,7 +267,53 @@ const ColorUI = {
 window.updateUI = function() { 
     if(window.game && window.game.players && window.game.players.length > 0) { 
         Renderer.updateAll(window.game); 
-        
+
+        const current = window.game.currentPlayer;
+        if (current && !window.isInitialDealing && !window.isGameOver) {
+            if (window.lastTurnTracker !== window.game.turnIndex || window.lastPlayerTracker !== current.id) {
+
+                if (window.lastPlayerTracker === window.game.myId && current.id !== window.game.myId) {
+                    if (window.game.myHand && window.game.myHand.length > 1) {
+                        window.game.unoDeclared = false;
+                    }
+                }
+
+                if (current.id === window.game.myId) {
+                    if (window.game.myHand && window.game.myHand.length === 1 && !window.game.unoDeclared && window.RuleSettings && !window.RuleSettings.unoAuto) {
+                        window.applyAutoUnoPenalty();
+                    }
+                }
+
+                window.lastTurnTracker = window.game.turnIndex;
+                window.lastPlayerTracker = current.id;
+            }
+        }
+
+        const unoBtn = document.getElementById('uno-btn');
+        const unoArea = document.getElementById('uno-area');
+        if (unoBtn) {
+            if (window.game.unoDeclared) {
+
+                unoBtn.classList.add('hidden');
+                unoBtn.style.display = 'none';
+                if (unoArea) {
+                    unoArea.classList.add('hidden');
+                    unoArea.style.display = 'none';
+                }
+            } else {
+
+                unoBtn.classList.remove('hidden');
+                unoBtn.style.display = 'block';
+                unoBtn.disabled = false; 
+                unoBtn.style.background = 'linear-gradient(135deg, #f1c40f, #e67e22)';
+                unoBtn.innerText = 'UNO!';
+                if (unoArea) {
+                    unoArea.classList.remove('hidden');
+                    unoArea.style.display = 'block';
+                }
+            }
+        }
+
         const discardPile = window.game.discardPile;
         if (discardPile && discardPile.length > 0) {
             const topCard = discardPile[discardPile.length - 1];
@@ -277,11 +323,10 @@ window.updateUI = function() {
             const topCardEl = cardsInDiscard.length > 0 ? cardsInDiscard[cardsInDiscard.length - 1] : null;
 
             if (topCardEl) {
-                // 👇👇 ★修正1: 能力カードかどうか、かつ「色指定が必要な能力(レベッカ等)」かどうかを判定
+
                 const isAbility = topCard.value && String(topCard.value).startsWith('id_');
                 const def = isAbility && window.AbilityDef ? window.AbilityDef[topCard.value] : null;
                 
-                // 色フィルターをかけるべきか（通常のワイルドカード、または色指定が必要な能力カードのみ許可）
                 const shouldApplyOverlay = (topCard.color === 'black' && !isAbility) || (isAbility && def && def.needsColor);
 
                 if (window.game.currentColor && topCard.color !== window.game.currentColor && shouldApplyOverlay) {
