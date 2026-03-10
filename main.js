@@ -741,6 +741,14 @@ window.showAbilityResetUI = function(maxCount) {
     
     if(!overlay) return;
 
+    const tTitle = overlay.querySelector('h2');
+    const pSub = overlay.querySelector('p');
+    if (resetArea) resetArea.style.display = 'flex';
+    if (handArea) handArea.style.display = 'flex';
+    if (btnConfirm) btnConfirm.style.display = 'block';
+    if (pSub) pSub.style.display = 'block';
+    if (tTitle) tTitle.innerHTML = `能力カード入れ替え (<span id="reset-timer" style="color:#fbc02d;">10</span>秒)`;
+
     let descArea = document.getElementById('reset-desc-area');
     if (!descArea) {
         descArea = document.createElement('div');
@@ -756,7 +764,8 @@ window.showAbilityResetUI = function(maxCount) {
         if (btnConfirm) btnConfirm.parentNode.insertBefore(descArea, btnConfirm);
     }
     descArea.innerText = 'カードの「？」を押すとここに効果が表示されます';
-    
+    if (descArea) descArea.style.display = 'block';
+
     let timeLeft = maxCount * 5;
     if (timerSpan) timerSpan.innerText = timeLeft;
     maxSpan.innerText = maxCount;
@@ -830,6 +839,12 @@ window.showAbilityResetUI = function(maxCount) {
     
     const finish = () => {
         clearInterval(timerInt);
+        if (resetArea) resetArea.style.display = 'none';
+        if (handArea) handArea.style.display = 'none';
+        if (btnConfirm) btnConfirm.style.display = 'none';
+        if (descArea) descArea.style.display = 'none';
+        if (pSub) pSub.style.display = 'none';
+        if (tTitle) tTitle.innerText = '他のプレイヤーを待っています...';
         overlay.classList.add('hidden');
         if (selectedCards.length > 0) {
             const vals = selectedCards.map(c => c.value);
@@ -882,6 +897,8 @@ window.animateInitialDeal = function(targetHands, callback) {
                 }
                 if (window.isHost) {
                     setTimeout(() => {
+                        const resetOverlay = document.getElementById('ability-reset-overlay');
+                        if (resetOverlay) resetOverlay.classList.add('hidden');
                         window.broadcastGameState();
                         window.checkTurn();
                     }, 13000);
@@ -2923,6 +2940,8 @@ function initMainSocketEvents() {
                 }
             }
         } else if (!window.isInitialDealing) {
+            const abOverlay = document.getElementById('ability-reset-overlay');
+            if (abOverlay) abOverlay.classList.add('hidden');
             const myId = window.myId || (window.game && window.game.myId);
             let handChanged = false;
             if (myId && window.game.hands && window.game.hands[myId] && state.hands && state.hands[myId]) {
