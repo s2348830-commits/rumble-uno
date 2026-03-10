@@ -21,7 +21,7 @@ window.isUnoAutoEnabled = false;
 
 window.JANKEN_BACK_IMG = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 60'%3E%3Crect width='40' height='60' rx='6' fill='%23222' stroke='%23444' stroke-width='2'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23fff' font-size='24' font-family='sans-serif' font-weight='bold'%3E?%3C/text%3E%3C/svg%3E";
 
-window.sortPlayerHand = function() {
+window.sortPlayerHand = function(suppressUpdate = false) {
     const myId = window.game ? window.game.myId : window.myId;
     if (!myId || !window.game.hands || !window.game.hands[myId]) return;
 
@@ -34,37 +34,34 @@ window.sortPlayerHand = function() {
             if (/^[0-9]+$/.test(c.value)) return 0; // 数字
             return 1; // 記号
         };
-
         const typeA = getCardType(a);
         const typeB = getCardType(b);
-
         if (typeA !== typeB) return typeA - typeB;
-
         if (typeA === 0) {
             const valA = parseInt(a.value);
             const valB = parseInt(b.value);
             if (valA !== valB) return valA - valB;
         } else if (typeA === 1) {
-            if (a.value !== b.value) return a.value.localeCompare(b.value);
+            if (a.value !== b.value) return String(a.value).localeCompare(String(b.value));
         } else if (typeA === 2) {
-            const valA = parseInt(a.value.replace('id_', ''));
-            const valB = parseInt(b.value.replace('id_', ''));
+            const valA = parseInt(String(a.value).replace('id_', ''));
+            const valB = parseInt(String(b.value).replace('id_', ''));
             if (valA !== valB) return valA - valB;
         }
-        
-        if (a.color && b.color && a.color !== b.color) return a.color.localeCompare(b.color);
-        return 0;
+        const colorOrder = { 'red': 1, 'blue': 2, 'green': 3, 'yellow': 4, 'black': 5 };
+        return (colorOrder[a.color] || 99) - (colorOrder[b.color] || 99);
     });
 
     if (JSON.stringify(hand) !== originalHand) {
-        window.game.selectedIndices = []; // 並び順が変わるので選択状態をリセット
-        if (window.isHost) {
-            window.broadcastGameState(true);
-            if (typeof window.updateUI === 'function') window.updateUI();
-        } else if (window.socket) {
-            // ★参加者がソートした時はホストに並び順を教えてあげる
-            window.socket.emit('player_action', { action: 'sort_hand', sortedHand: hand });
-            if (typeof window.updateUI === 'function') window.updateUI();
+        window.game.selectedIndices = [];
+        if (!suppressUpdate) {
+            if (window.isHost) {
+                window.broadcastGameState(true);
+                if (typeof window.updateUI === 'function') window.updateUI();
+            } else if (window.socket) {
+                window.socket.emit('player_action', { action: 'sort_hand', sortedHand: hand });
+                if (typeof window.updateUI === 'function') window.updateUI();
+            }
         }
     }
 };
@@ -315,6 +312,9 @@ const ColorUI = {
 };
 
 window.updateUI = function() { 
+    if (window.isHandSortEnabled && typeof window.sortPlayerHand === 'function') {
+        window.sortPlayerHand(true); 
+    }
     if(window.game && window.game.players && window.game.players.length > 0) { 
         Renderer.updateAll(window.game); 
 
@@ -730,7 +730,38 @@ window.showAttackGuide = function(fromId, toId, labelText, seName) {
 
     setTimeout(() => { if (document.body.contains(svg)) document.body.removeChild(svg); }, 2000);
 };
-
+window.tryEarlyStartReset = function() {
+    if (!window.isHost || !window.abilityResetConfirmedPlayers) return;
+    const connectedPlayers = window.game.players.filter(p => p.connected && p.type === 'player');
+    if (window.abilityResetConfirmedPlayers.size >= connectedPlayers.length) {
+        if (window.abilityResetTimeoutId) {
+            clearTimeout(window.abilityResetTimeoutId);
+            window.abilityResetTimeoutId = null;
+            
+            // 全員揃ったので即時開始
+            const resetOverlay = document.getElementById('ability-reset-overlay');
+            if (resetOverlay) resetOverlay.classList.add('hidden');
+            window.broadcastGameState();
+            window.checkTurn();
+        }
+    }
+};
+window.tryEarlyStartReset = function() {
+    if (!window.isHost || !window.abilityResetConfirmedPlayers) return;
+    const connectedPlayers = window.game.players.filter(p => p.connected && p.type === 'player');
+    if (window.abilityResetConfirmedPlayers.size >= connectedPlayers.length) {
+        if (window.abilityResetTimeoutId) {
+            clearTimeout(window.abilityResetTimeoutId);
+            window.abilityResetTimeoutId = null;
+            
+            // 全員揃ったので即時開始
+            const resetOverlay = document.getElementById('ability-reset-overlay');
+            if (resetOverlay) resetOverlay.classList.add('hidden');
+            window.broadcastGameState();
+            window.checkTurn();
+        }
+    }
+};
 window.showAbilityResetUI = function(maxCount) {
     const overlay = document.getElementById('ability-reset-overlay');
     const resetArea = document.getElementById('reset-area');
@@ -849,7 +880,10 @@ window.showAbilityResetUI = function(maxCount) {
         if (pSub) pSub.style.display = 'none';
         if (tTitle) tTitle.innerText = '他のプレイヤーを待っています...';
         
-        // ★重要: ここで overlay.classList.add('hidden'); は呼ばない（待機画面を維持するため）
+        if (window.isHost && window.abilityResetConfirmedPlayers) {
+            window.abilityResetConfirmedPlayers.add(window.game.myId);
+            window.tryEarlyStartReset();
+        }
 
         if (selectedCards.length > 0) {
             const vals = selectedCards.map(c => c.value);
@@ -904,15 +938,20 @@ window.animateInitialDeal = function(targetHands, callback) {
                 if (typeof window.showAbilityResetUI === 'function') {
                     window.showAbilityResetUI(window.RuleSettings.abilityResetCount);
                 }
+                
+                //  ★修正: 確定状況を追跡するための変数を初期化 
+                const waitTime = (window.RuleSettings.abilityResetCount * 5000) + 3000;
                 if (window.isHost) {
-                    setTimeout(() => {
+                    window.abilityResetConfirmedPlayers = new Set(); 
+                    window.abilityResetTimeoutId = setTimeout(() => {
+                        window.abilityResetTimeoutId = null;
                         const resetOverlay = document.getElementById('ability-reset-overlay');
                         if (resetOverlay) resetOverlay.classList.add('hidden');
                         window.broadcastGameState();
                         window.checkTurn();
-                    }, 13000);
+                    }, waitTime);
                 } else {
-                    // 👇👇 ★追加: 参加者側もホストと同じく13秒後に待機画面を閉じる 👇👇
+                    // ★追加: 参加者側もホストと同じく13秒後に待機画面を閉じる 
                     setTimeout(() => {
                         const resetOverlay = document.getElementById('ability-reset-overlay');
                         if (resetOverlay) resetOverlay.classList.add('hidden');
@@ -3174,6 +3213,12 @@ function initMainSocketEvents() {
         } else if (data.action === 'ability_reset') {
             if (window.game && typeof window.game.replaceAbilityCards === 'function') {
                 window.game.replaceAbilityCards(playerId, data.cards);
+                
+                if (window.isHost && window.abilityResetConfirmedPlayers) {
+                    window.abilityResetConfirmedPlayers.add(playerId);
+                    window.tryEarlyStartReset();
+                }
+
                 if (typeof window.broadcastGameState === 'function') window.broadcastGameState(true);
             }
         } else if (data.action === 'janken_choice') {
