@@ -3,9 +3,9 @@
  */
 window.AbilityDef = {
     'id_1': { rarity: 'SSR', type: 'AT', name: 'ミシェル', desc: '【AT】1人指定。1枚引かせ70%で凍結(能力のみ使用可)。', needsTarget: true },
-    'id_2': { rarity: 'SSR', type: 'AT_BL', name: 'ルネイユ', desc: '【AT/BL】他全員に固定で1枚引かせる。その後自分にシールドIを1ターン付与する。また60%確率で他全員に固定で1枚引かせる。', fixedDraw: true },
+    'id_2': { rarity: 'SSR', type: 'AT_BL', name: 'ルネイユ', desc: '【AT/BL】自分以外の他全員に固定で1枚引かせる。その後自分に60%の確率でシールドIIを2ターン付与し40%の確率でシールドIIを4ターン。', fixedDraw: true },
     'id_3': { rarity: 'SSR', type: 'HE', name: 'ヴィオラ', desc: '【HE】手札を1枚選んで捨てる。', needsDiscard: true },
-    'id_4': { rarity: 'SSR', type: 'HE_BL', name: 'ヘイゼル', desc: '【BL/受動】捨てられた時・場に出た時、自分にシールドIIを2ターン付与する。また15%の確率でカードが消費されず、手札に残る。' },
+    'id_4': { rarity: 'SSR', type: 'HE_BL', name: 'ヘイゼル', desc: '【BL/受動】捨てられた時・場に出た時、自分にシールドIIを2ターン付与する。また55%の確率でカードが消費されず、手札に残る。' },
     'id_5': { rarity: 'SSR', type: 'HE', name: '瑠璃', desc: '【HE】自分の手札に+カードを2枚持ってくる。(内訳、各種+2：8割、+4：2割)' },
     'id_6': { rarity: 'SSR', type: 'AT', name: 'ラン', desc: '【AT】他全員に手札を2枚ランダムに捨てさせその後に3枚ドローさせる。' },
     'id_7': { rarity: 'SSR', type: 'AT', name: 'リリス', desc: '【AT】1人指定。燃焼(5T開始時固定1ドロー)を付与。既に燃焼がある場合はターン数が重複(加算)する。', needsTarget: true },
@@ -16,7 +16,7 @@ window.AbilityDef = {
     'id_12': { rarity: 'SR', type: 'AT', name: 'アンドロス', desc: '【AT】1人指定。2枚引かせる。', needsTarget: true },
     'id_13': { rarity: 'SSR', type: 'HE', name: 'エリザベス', desc: '【HE】選ばれたランダムなプレイヤーに1枚引かせランダムな記号カードを1枚山札に戻す。無ければ追加で1枚引かせる。' },
     'id_14': { rarity: 'SSR', type: 'AT', name: 'ハンナ', desc: '【AT】ランダムなプレイヤーに4枚引かせる。' },
-    'id_15': { rarity: 'SSR', type: 'AT', name: 'メリア', desc: '【AT】1人指定。固定で2枚引かせる。', needsTarget: true, fixedDraw: true },
+    'id_15': { rarity: 'SSR', type: 'AT_BL', name: 'メリア', desc: '【AT/BL】1人指定。固定で2枚引かせる。その後40%の確率でもう2枚固定で引かせる。', needsTarget: true, fixedDraw: true },
     'id_16': { rarity: 'SSR', type: 'HE', name: 'ユメゴト', desc: '【HE】手札1枚捨てる。自身のデバフ(凍結/燃焼)を全て解除。その後、回避IIを1ターン付与。', needsDiscard: true },
     'id_17': { rarity: 'SR', type: 'BL', name: 'カシウス', desc: '【BL】防御時、手札1枚選んで捨てる。', needsDiscard: true },
     'id_18': { rarity: 'SR', type: 'AT_BL', name: 'グレイス', desc: '【AT/BL】他全員に1枚引かせる。その後自分にシールドIを2ターン付与する。' },
@@ -40,6 +40,15 @@ window.AbilityDef = {
 };
 
 window.AbilityEngine = {
+    // 自分のターンの場合はターン数を+1して実質的な目減りを防ぐ関数
+    getAdjustedTurns: function(game, targetId, baseTurns) {
+        const current = game.currentPlayer;
+        if (current && current.id === targetId) {
+            return baseTurns + 1;
+        }
+        return baseTurns;
+    },
+
     checkEvasion: function(target) {
         if (!target || !target.evasion || target.evasion.turns <= 0 || target.evasion.level <= 0) return false;
         let rate = 0;
@@ -58,7 +67,7 @@ window.AbilityEngine = {
         let actualDrawn = count;
         let lacerationTriggered = false;
 
-        //  修正: 自分がドローする時で、裂傷ドロー以外の時に+1枚する
+        // 自分がドローする時で、裂傷ドロー以外の時に+1枚する
         if (!isLacerationDraw && t.lacerationTurns > 0 && actualDrawn > 0) {
             actualDrawn += 1;
             lacerationTriggered = true;
@@ -98,9 +107,9 @@ window.AbilityEngine = {
     triggerDiscardEffect: function(game, attackerId, abilityId, isManualDiscard, discCard) {
         if (abilityId === 'id_4') {
             const self = game.players.find(p=>p.id===attackerId);
-            if(self) self.shield = { level: 2, turns: 2 };
+            if(self) self.shield = { level: 2, turns: this.getAdjustedTurns(game, attackerId, 2) };
             if (isManualDiscard && discCard) {
-                if (Math.random() < 0.15) {
+                if (Math.random() < 0.55) {
                     if (game.hands[attackerId]) game.hands[attackerId].push(discCard);
                 }
             }
@@ -180,10 +189,10 @@ window.AbilityEngine = {
                         }
                         guides.push({ from: attackerId, to: attackerId, text: `2枚破棄(成功)` });
                     }
-                    extraData.claraResult = 'success'; // ★追加: 成功フラグ
+                    extraData.claraResult = 'success'; 
                 } else {
                     guides.push({ from: attackerId, to: attackerId, text: `不発` });
-                    extraData.claraResult = 'fail'; // ★追加: 失敗フラグ
+                    extraData.claraResult = 'fail'; 
                 }
             }
             else if (abilityId === 'id_35') { // イヴ
@@ -233,10 +242,6 @@ window.AbilityEngine = {
                         }
                     } else if (abilityId === 'id_2') {
                         drawCount = 1;
-                        if (Math.random() < 0.60) {
-                            drawCount += 1;
-                            guides.push({ from: attackerId, to: targetId, text: '追加1ドロー' });
-                        }
                     } else if (abilityId === 'id_6') {
                         const tHand = game.hands[targetId];
                         let discCount = 0;
@@ -255,7 +260,10 @@ window.AbilityEngine = {
                     } else if (abilityId === 'id_9') drawCount = 1;
                     else if (abilityId === 'id_12') drawCount = 2;
                     else if (abilityId === 'id_14') drawCount = 4;
-                    else if (abilityId === 'id_15') drawCount = 2;
+                    else if (abilityId === 'id_15') {
+                        drawCount = 2;
+                        if (Math.random() < 0.40) drawCount += 2;
+                    }
                     else if (abilityId === 'id_18') drawCount = 1;
                     else if (abilityId === 'id_21') drawCount = 3;
                     else if (abilityId === 'id_24') {
@@ -286,9 +294,10 @@ window.AbilityEngine = {
                 });
 
                 if (abilityId === 'id_2') {
-                    if(self) self.shield = { level: 1, turns: 1 };
+                    const turns = Math.random() < 0.6 ? 2 : 4;
+                    if(self) self.shield = { level: 2, turns: this.getAdjustedTurns(game, attackerId, turns) };
                 } else if (abilityId === 'id_18') {
-                    if(self) self.shield = { level: 1, turns: 2 };
+                    if(self) self.shield = { level: 1, turns: this.getAdjustedTurns(game, attackerId, 2) };
                 }
             }
 
@@ -308,7 +317,7 @@ window.AbilityEngine = {
                     }
                 } else if (abilityId === 'id_8') {
                     this.applyDraw(game, selectedTargetId, 1, true, true);
-                    if (self) self.evasion = { level: 1, turns: 2 };
+                    if (self) self.evasion = { level: 1, turns: this.getAdjustedTurns(game, attackerId, 2) };
                     guides.push({ from: attackerId, to: attackerId, text: '💨回避I(2T)' });
                 } else if (abilityId === 'id_10') {
                     if (game.lockRandomCard) game.lockRandomCard(attackerId, selectedTargetId, 'number', 3, 2);
@@ -316,9 +325,7 @@ window.AbilityEngine = {
                 } else if (abilityId === 'id_11') {
                     if (game.lockRandomCard) game.lockRandomCard(attackerId, selectedTargetId, 'symbol', 2, 2);
                     guides.push({ from: attackerId, to: selectedTargetId, text: '記号2枚ロック', se: 'rock' });
-                } 
-                // ★復活: 消えてしまっていた id_13, id_16, id_22, id_23 の処理を追加
-                else if (abilityId === 'id_13') {
+                } else if (abilityId === 'id_13') {
                     const othersList = game.players.filter(p=>p.id!==attackerId && p.connected);
                     if (othersList.length > 0) {
                         const tid = othersList[Math.floor(Math.random() * othersList.length)].id;
@@ -347,7 +354,7 @@ window.AbilityEngine = {
                 } else if (abilityId === 'id_16') {
                     if(self) { 
                         self.frozen = false; self.burnTurns = 0; 
-                        self.evasion = { level: 2, turns: 1 };
+                        self.evasion = { level: 2, turns: this.getAdjustedTurns(game, attackerId, 1) };
                         guides.push({ from: attackerId, to: attackerId, text: '✨解除＆💨回避II(1T)' }); 
                     }
                 } else if (abilityId === 'id_22') {
@@ -365,7 +372,7 @@ window.AbilityEngine = {
                     guides.push({ from: attackerId, to: attackerId, text: 'デバフ解除' });
                 } else if (abilityId === 'id_23') {
                     if(self) {
-                        self.invincibleTurns = 1;
+                        self.invincibleTurns = this.getAdjustedTurns(game, attackerId, 1);
                         let dbfs = [];
                         if (self.frozen) dbfs.push('frozen');
                         if (self.burnTurns > 0) dbfs.push('burn');
@@ -377,7 +384,7 @@ window.AbilityEngine = {
                     }
                     guides.push({ from: attackerId, to: attackerId, text: '無敵化＆デバフ解除' });
                 } else if (abilityId === 'id_34') {
-                    if(self) self.evasion = { level: 1, turns: 1 };
+                    if(self) self.evasion = { level: 1, turns: this.getAdjustedTurns(game, attackerId, 1) };
                     guides.push({ from: attackerId, to: attackerId, text: '💨回避I(1T)' });
                 }
             }

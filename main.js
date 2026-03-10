@@ -1696,51 +1696,58 @@ window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, se
                             
                             const def = window.AbilityDef[defCardId];
                             if (defCardId === 'id_2') {
-                                window.game.players.filter(px => px.id !== tid).forEach(px => {
-                                    window.AbilityEngine.applyDraw(window.game, px.id, 1);
-                                });
-                                const targetP = window.game.players.find(p=>p.id===tid);
-                                if(targetP) targetP.shield = { level: 1, turns: 1 };
-                                if (Math.random() < 0.6) {
-                                    window.game.players.filter(px => px.id !== tid).forEach(px => {
-                                        window.AbilityEngine.applyDraw(window.game, px.id, 1);
-                                    });
-                                }
-                            } else if (defCardId === 'id_4') {
-                                if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) {
-                                    window.AbilityEngine.triggerDiscardEffect(window.game, tid, 'id_4', false, null);
-                                }
-                            } else if (defCardId === 'id_9') {
-                                window.game.players.filter(px => px.id !== tid).forEach(px => {
-                                    window.AbilityEngine.applyDraw(window.game, px.id, 2);
-                                });
-                            } else if (defCardId === 'id_18') {
-                                window.game.players.filter(px => px.id !== tid).forEach(px => {
-                                    window.AbilityEngine.applyDraw(window.game, px.id, 1);
-                                });
-                                const targetP = window.game.players.find(p=>p.id===tid);
-                                if(targetP) targetP.shield = { level: 1, turns: 2 };
-                            } else if (defCardId === 'id_19') {
-                                window.AbilityEngine.applyDraw(window.game, playerId, 1);
-                                guides.push({ from: tid, to: playerId, text: 'ヴィンディ', delay: 2500 });
-                            } else if (defCardId === 'id_30') {
-                                const others = window.game.players.filter(px => px.id !== tid && px.connected);
-                                if (others.length > 0) {
-                                    const bt = others[Math.floor(Math.random() * others.length)];
-                                    window.AbilityEngine.applyBurn(window.game, bt.id, 1);
-                                    guides.push({ from: tid, to: bt.id, text: '🔥燃焼(1T)', delay: 2500 });
-                                }
-                                const targetP = window.game.players.find(p=>p.id===tid);
-                                if (targetP) targetP.shield = { level: 1, turns: 1 };
-                            } else if (defCardId === 'id_31') {
-                                const targetP = window.game.players.find(p=>p.id===tid);
-                                if (targetP) {
-                                    if (!targetP.shield) targetP.shield = { level: 0, turns: 0 };
-                                    targetP.shield.level += 3;
-                                    targetP.shield.turns += 3;
-                                    guides.push({ from: tid, to: tid, text: '🛡️シールド強化!', delay: 2500 });
-                                }
-                            }
+                    window.game.players.filter(px => px.id !== targetId).forEach(px => {
+                        window.AbilityEngine.applyDraw(window.game, px.id, 1, false, true);
+                    });
+                    const targetP = window.game.players.find(p=>p.id===targetId);
+                    if(targetP) {
+                        const turns = Math.random() < 0.6 ? 2 : 4;
+                        const addT = window.AbilityEngine.getAdjustedTurns ? window.AbilityEngine.getAdjustedTurns(window.game, targetId, turns) : turns;
+                        targetP.shield = { level: 2, turns: addT };
+                    }
+                } else if (defCardId === 'id_4') {
+                    if (window.AbilityEngine && window.AbilityEngine.triggerDiscardEffect) {
+                        window.AbilityEngine.triggerDiscardEffect(window.game, targetId, 'id_4', false, null);
+                    }
+                } else if (defCardId === 'id_9') {
+                    window.game.players.filter(px => px.id !== targetId).forEach(px => {
+                        window.AbilityEngine.applyDraw(window.game, px.id, 2);
+                    });
+                } else if (defCardId === 'id_15') {
+                    // ★追加: メリアのカウンター処理
+                    let dc = 2;
+                    if (Math.random() < 0.4) dc += 2;
+                    window.AbilityEngine.applyDraw(window.game, attackerId, dc, false, true);
+                    // ※830行目付近を修正する際は、下の guides.push... の targetId を tid、attackerId を playerId に変えてください。
+                    defenseGuides.push({ from: targetId, to: attackerId, text: `${dc}枚カウンター!`, delay: 2500 });
+                } else if (defCardId === 'id_18') {
+                    window.game.players.filter(px => px.id !== targetId).forEach(px => {
+                        window.AbilityEngine.applyDraw(window.game, px.id, 1);
+                    });
+                    const targetP = window.game.players.find(p=>p.id===targetId);
+                    if(targetP) targetP.shield = { level: 1, turns: window.AbilityEngine.getAdjustedTurns ? window.AbilityEngine.getAdjustedTurns(window.game, targetId, 2) : 2 };
+                } else if (defCardId === 'id_19') {
+                    window.AbilityEngine.applyDraw(window.game, attackerId, 1);
+                    defenseGuides.push({ from: targetId, to: attackerId, text: 'ヴィンディ', delay: 2500 });
+                } else if (defCardId === 'id_30') {
+                    const others = window.game.players.filter(px => px.id !== targetId && px.connected);
+                    if (others.length > 0) {
+                        const bt = others[Math.floor(Math.random() * others.length)];
+                        window.AbilityEngine.applyBurn(window.game, bt.id, 1);
+                        defenseGuides.push({ from: targetId, to: bt.id, text: '🔥燃焼(1T)', delay: 2500 });
+                    }
+                    const targetP = window.game.players.find(p=>p.id===targetId);
+                    if (targetP) targetP.shield = { level: 1, turns: window.AbilityEngine.getAdjustedTurns ? window.AbilityEngine.getAdjustedTurns(window.game, targetId, 1) : 1 };
+                } else if (defCardId === 'id_31') {
+                    const targetP = window.game.players.find(p=>p.id===targetId);
+                    if (targetP) {
+                        if (!targetP.shield) targetP.shield = { level: 0, turns: 0 };
+                        targetP.shield.level += 3;
+                        const addT = window.AbilityEngine.getAdjustedTurns ? window.AbilityEngine.getAdjustedTurns(window.game, targetId, 3) : 3;
+                        targetP.shield.turns += addT;
+                        defenseGuides.push({ from: targetId, to: targetId, text: '🛡️シールド強化!', delay: 2500 });
+                    }
+                }
                         }
                     });
                 }
