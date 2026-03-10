@@ -1330,18 +1330,32 @@ window.startDrawDefensePhase = function(attackerId, targetId, cardValue, guides)
             window.broadcastGameState(false, defenseGuides);
 
             let someoneWon = false;
-            window.game.players.forEach(p => {
-                if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) {
-                    window.checkWin(p.id); someoneWon = true;
-                }
-            });
+        window.game.players.forEach(p => {
+            if (window.game.hands[p.id] && window.game.hands[p.id].length === 0) {
+                window.checkWin(p.id); someoneWon = true;
+            }
+        });
 
-            if (!someoneWon) setTimeout(() => window.checkTurn(), 500); 
+        if (someoneWon) {
+            window.pendingJanken = null;
+            window.broadcastGameState();
         } else {
-            window.pendingDefense.timer--;
-            window.broadcastGameState(true);
+            const nextLoop = pJ.loopCount + 1;
+            const aId = pJ.attackerId;
+
+            if ((result === 'win' || result === 'draw') && nextLoop < 4) {
+                setTimeout(() => {
+                    window.startJankenPhase(aId, nextLoop);
+                }, 1000);
+            } else {
+                window.pendingJanken = null;
+                window.broadcastGameState();
+                
+                setTimeout(() => window.checkTurn(), 1000);
+            }
         }
-    }, 1000);
+    }
+    }, 4500); 
 };
 
 window.executeAbilityPlay = function(playerId, indices, targetId, discardIdx, selectedColor = null, multiDiscardIndices = [], extraData = {}) {
