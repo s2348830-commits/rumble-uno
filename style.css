@@ -18,12 +18,23 @@
     .manual-btn { top: 10px; right: 10px; padding: 6px 10px; font-size: 11px; }
 }
 
-body { 
-    background: radial-gradient(circle, #551111, #110000); background-attachment: fixed;
-    color: #e0e0e0; font-family: sans-serif; display: flex; justify-content: center; 
-    margin: 0; padding: 0; overflow: auto; min-width: 100vw; min-height: 100vh; touch-action: manipulation; 
+html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100dvh; /* スマホのアドレスバーを考慮して高さを固定 */
+    overflow: hidden; /* 画面全体のスクロールを禁止 */
+    overscroll-behavior-y: none; /* 上下に引っ張ったときのゴムのような動きを禁止 */
 }
-#game-container { width: 100%; max-width: 800px; text-align: center; position: relative; display: flex; flex-direction: column; min-height: 100%; justify-content: center; padding: 10px 0; }
+
+body { 
+    background: radial-gradient(circle, #551111, #110000); 
+    color: #e0e0e0; font-family: sans-serif; display: flex; justify-content: center; 
+}
+
+#game-container { 
+    width: 100%; max-width: 800px; text-align: center; position: relative; 
+    display: flex; flex-direction: column; height: 100%; justify-content: center; 
+    padding: 10px 0; overflow-y: auto; /* 画面が小さい時だけ中身がスクロールするようにする */
+}
 .hidden { display: none !important; }
 #status-message { font-size: 14px; color: #f1c40f; font-weight: bold; margin: 0 auto; padding: 3px; }
 
