@@ -1079,9 +1079,14 @@ window.animateInitialDeal = function(targetHands, callback) {
         let endX, endY;
         if (pId === window.game.myId) {
             const handEl = document.getElementById('player-hand');
-            const rect = handEl.getBoundingClientRect();
-            endX = rect.left + rect.width / 2;
-            endY = rect.top + rect.height / 2;
+            if (handEl) {
+                const rect = handEl.getBoundingClientRect();
+                endX = rect.left + rect.width / 2;
+                endY = rect.top + rect.height / 2;
+            } else {
+                endX = window.innerWidth / 2;
+                endY = window.innerHeight - 50;
+            }
         } else {
             const badge = document.querySelector(`.other-player-badge[data-id="${pId}"]`);
             if (badge) {
