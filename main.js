@@ -354,7 +354,7 @@ window.SE = {
 const unlockAudioContext = () => {
     if (window.SE.unlocked) return; window.SE.unlocked = true; window.SE.initContext();
     if (window.SE.audioCtx.state === 'suspended') window.SE.audioCtx.resume();
-['win', 'win2', 'setting', 'draw', 'uno_message', 'buttonclick', 'uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6', 'frieze', 'rock', 'Distribute', 'mvp_1', 'mvp_2', 'hv/id_20(1)', 'hv/id_20(2)', 'hv/id_25', 'hv/id_26', 'hv/id_35', 'laceration'].forEach(name => window.SE.loadSound(name, 'mp3'));
+['win', 'win2', 'setting', 'draw', 'uno_message', 'buttonclick', 'uno', 'uno2', 'uno3', 'uno4', 'uno5', 'uno6', 'frieze', 'rock', 'Distribute', 'mvp_1', 'mvp_2', 'hv/id_20(1)', 'hv/id_20(2)', 'hv/id_25', 'hv/id_26', 'hv/id_35', 'hv/id_36', 'laceration'].forEach(name => window.SE.loadSound(name, 'mp3'));
     document.removeEventListener('click', unlockAudioContext);
     document.removeEventListener('touchstart', unlockAudioContext, { passive: true });
 };
@@ -1145,6 +1145,8 @@ window.showAbilityCutin = function(cardValue, isHVActivated = false) {
         if (window.SE) window.SE.play(`hv/id_26`);
     } else if (cardValue === 'id_35') {
         if (window.SE) window.SE.play(`hv/id_35`);
+    } else if (cardValue === 'id_36') {
+        if (window.SE) window.SE.play(`hv/id_36`);
     } else {
         const randMvp = Math.random() < 0.5 ? 1 : 2;
         if (window.SE) window.SE.play(`mvp_${randMvp}`);
