@@ -995,8 +995,7 @@ window.showAbilityResetUI = function(maxCount) {
 
 window.animateInitialDeal = function(targetHands, callback) {
     if (window._isDealingCardsLock) {
-        if (callback) callback();
-        return;
+        return; 
     }
     window._isDealingCardsLock = true;
     window.isDealAnimationStarted = true;
@@ -1010,6 +1009,7 @@ window.animateInitialDeal = function(targetHands, callback) {
         window.game.hands = JSON.parse(JSON.stringify(targetHands)); window.updateUI();
         window._isDealingCardsLock = false;
         window.isDealAnimationStarted = false;
+        window.isInitialDealing = false;
         if (callback) callback(); return;
     }
 
