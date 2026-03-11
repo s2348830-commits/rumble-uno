@@ -189,7 +189,7 @@ if (typeof window.RuleSettings === 'undefined') {
                     
                     let rarityColor = '#ccc';
                     let rarityText = 'SSR';
-                    if (['id_20','id_25','id_26','id_35','id_36'].includes(c.id)) { rarityColor = '#ff4081'; rarityText = 'UR/HV'; }
+                    if (['id_20','id_25','id_26','id_35','id_36'].includes(c.id)) { rarityColor = '#ff4081'; rarityText = 'UR'; }
                     else if (['id_12','id_17','id_18','id_19','id_21','id_27','id_34'].includes(c.id)) { rarityColor = '#fbc02d'; rarityText = 'SR'; }
                     else if (['id_24'].includes(c.id)) { rarityColor = '#2196f3'; rarityText = 'R'; }
                     
