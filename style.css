@@ -375,3 +375,40 @@ button.disabled-btn { opacity: 0.5; cursor: not-allowed; }
     50% { box-shadow: 0 0 25px #4caf50; }
     100% { box-shadow: 0 0 10px #4caf50; }
 }
+/* =========================================
+   ★ バトル画面のボタン配置レイアウト調整
+   ========================================= */
+
+/* 1. ソートボタンを左下の一番下に配置 */
+#btn-sort-hand {
+    position: fixed !important;
+    bottom: 15px !important;
+    left: 15px !important;
+    z-index: 1000 !important;
+}
+
+/* 2. 音量バーをソートボタンの上に配置 */
+.game-volume {
+    position: fixed !important;
+    bottom: 65px !important;  /* ソートボタンの高さ分だけ上にずらす */
+    left: 15px !important;
+    z-index: 1000 !important;
+}
+
+/* 3. 設定確認ボタンを右下の一番下に配置 */
+/* ※HTMLでのIDが違う場合は、下の #btn-settings を実際のIDに書き換えてください */
+#btn-settings {
+    position: fixed !important;
+    bottom: 15px !important;
+    right: 15px !important;
+    z-index: 1000 !important;
+}
+
+/* 4. UNOボタンを設定確認ボタンの上に配置 */
+#uno-area {
+    position: fixed !important;
+    bottom: 65px !important;  /* 設定ボタンの高さ分だけ上にずらす */
+    right: 15px !important;
+    top: auto !important;
+    z-index: 1000 !important;
+}
