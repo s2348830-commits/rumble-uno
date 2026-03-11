@@ -360,7 +360,14 @@ const unlockAudioContext = () => {
 };
 document.addEventListener('click', unlockAudioContext);
 document.addEventListener('touchstart', unlockAudioContext, { passive: true });
-
+const resetHostAfk = () => {
+    if (window.isHost && window.game && window.game.myId) {
+        if (window.playerIsAfk) window.playerIsAfk[window.game.myId] = false;
+        if (window.playerAfkTimes) window.playerAfkTimes[window.game.myId] = 0;
+    }
+};
+document.addEventListener('click', resetHostAfk);
+document.addEventListener('touchstart', resetHostAfk, { passive: true });
 window.initVolumeControl = function() {
     const controls = document.querySelectorAll('.volume-slider');
     const icons = document.querySelectorAll('.volume-icon');
@@ -560,7 +567,11 @@ window.updateUI = function() {
 };
 
 window.checkFinalSprint = function() {
-    if (window.isGameOver || window.isInitialDealing) { window.SE.stopLoop('final_sprint'); return; }
+    const gameContainer = document.getElementById('game-container');
+    if (window.isGameOver || window.isInitialDealing || (gameContainer && gameContainer.classList.contains('hidden'))) { 
+        if (window.SE) window.SE.stopLoop('final_sprint'); 
+        return; 
+    }
     let hasUno = false;
     if (window.game.hands) Object.values(window.game.hands).forEach(h => { if (h.length === 1) hasUno = true; });
     if (hasUno) window.SE.startLoop('final_sprint'); else window.SE.stopLoop('final_sprint');
@@ -2218,7 +2229,8 @@ window.playJankenResult = function(attackerId, targetId, aH, tH, result) {
 };
 
 window.checkTurn = function() {
-    if (!window.isHost || window.isGameOver || window.isInitialDealing) return; 
+    const gameContainer = document.getElementById('game-container');
+    if (!window.isHost || window.isGameOver || window.isInitialDealing || (gameContainer && gameContainer.classList.contains('hidden'))) return;
     clearInterval(window.turnTimer); 
     const current = window.game.currentPlayer;
     if (!current) return;
@@ -2313,10 +2325,16 @@ window.checkTurn = function() {
         window.broadcastGameState();
         window.turnTimer = setInterval(() => {
             if (!window.playerAfkTimes[current.id]) window.playerAfkTimes[current.id] = 0;
-            window.playerAfkTimes[current.id]++;
+            if (window.playerIsAfk && window.playerIsAfk[current.id]) {
+                window.playerAfkTimes[current.id] = 180;
+            } else {
+                window.playerAfkTimes[current.id]++;
+            }
             if (window.playerAfkTimes[current.id] >= 180) {
                 clearInterval(window.turnTimer);
                 if(window.isGameOver || window.isInitialDealing) return;
+                if (!window.playerIsAfk) window.playerIsAfk = {};
+                window.playerIsAfk[current.id] = true;
                 window.playerAfkTimes[current.id] = 0; 
                 setTimeout(() => {
                     const result = UNOBot.play(window.game, current.id);
@@ -3228,6 +3246,8 @@ function initMainSocketEvents() {
 
     window.socket.on('game_over', (data) => {
         window.isGameOver = true;
+        clearInterval(window.turnTimer);
+        window.turnTimer = null;
         if (window.SE) window.SE.stopLoop('final_sprint');
         window.pendingJanken = null;
         window.isJankenShowing = false;
@@ -3266,6 +3286,11 @@ function initMainSocketEvents() {
     });
 
     window.socket.on('back_to_lobby', (roomState) => {
+        clearInterval(window.turnTimer);
+        window.turnTimer = null;
+        window.playerAfkTimes = {};
+        window.playerIsAfk = {};
+        if (window.SE) window.SE.stopLoop('final_sprint');
         window.currentRoomState = roomState;
         window.isGameOver = false; window.isInitialDealing = false;
         window.isDealAnimationStarted = false; 
@@ -3294,6 +3319,11 @@ function initMainSocketEvents() {
 
     window.socket.on('receive_player_action', (data) => {
         if (!window.isHost || window.isGameOver || window.isInitialDealing) return;
+        const pId = data.playerId || data.targetId || data.id;
+        if (pId && window.playerIsAfk) {
+            window.playerIsAfk[pId] = false;
+            if (window.playerAfkTimes) window.playerAfkTimes[pId] = 0;
+        }
         const playerId = data.playerId;
         const current = window.game.currentPlayer;
         
