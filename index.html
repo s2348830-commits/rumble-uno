@@ -172,10 +172,6 @@
             </g>
         </svg>
 
-        <div id="uno-area" class="floating-ui">
-            <button id="uno-btn" class="hidden">UNO!!</button>
-        </div>
-
         <div id="players-circle"></div>
 
         <div class="center-area">
@@ -199,16 +195,24 @@
         </div>
     </div>
     
-    <div class="section hand-section" style="padding-top: 15px; margin-top: 15px; position: relative;">
-        <div style="position: absolute; top: -45px; left: 5px; z-index: 10000; display: flex; flex-direction: column; gap: 5px;">
-            <div id="btn-sort-hand" class="btn-chat-toggle" style="padding: 4px 10px;">ソート: OFF</div>
+   <div class="section hand-section" style="padding-top: 15px; margin-top: 15px; position: relative;">
+        <div style="position: absolute; top: -90px; left: 5px; z-index: 10000; display: flex; flex-direction: column; gap: 5px; align-items: flex-start;">
+            <div class="volume-container" style="background: rgba(0, 0, 0, 0.5); padding: 4px 8px; border-radius: 15px; border: 1px solid #555; display: inline-flex; align-items: center; gap: 5px; position: relative !important; bottom: auto !important; left: auto !important;">
+                <span class="volume-icon">🔈</span>
+                <input type="range" class="volume-slider" min="0" max="100" value="50" style="width: 60px;">
+            </div>
+            <div id="btn-sort-hand" class="btn-chat-toggle" style="padding: 4px 10px; position: relative !important; bottom: auto !important; left: auto !important;">ソート: OFF</div>
             <div id="btn-uno-auto" class="btn-chat-toggle" style="padding: 4px 10px;">UNOオート: OFF</div>
         </div>
         
-        <div style="position: absolute; top: -50px; right: 5px; z-index: 10000; display: flex; flex-direction: column; gap: 5px; align-items: flex-end;">
-            <div id="btn-show-settings-in-game" class="btn-chat-toggle" style="padding: 4px 10px; cursor: pointer; text-align: center; width: 100%; box-sizing: border-box;" onclick="showReadonlySettings()">⚙️ 設定確認</div>
+        <div style="position: absolute; top: -95px; right: 5px; z-index: 10000; display: flex; flex-direction: column; gap: 5px; align-items: flex-end;">
+            <div id="uno-area" style="min-height: 30px; position: relative !important; bottom: auto !important; right: auto !important; top: auto !important; display: flex; justify-content: flex-end; width: 100%;">
+                <button id="uno-btn" class="hidden">UNO!!</button>
+            </div>
+            <div id="btn-show-settings-in-game" class="btn-chat-toggle" style="padding: 4px 10px; cursor: pointer; text-align: center; width: 100%; box-sizing: border-box; position: relative !important; bottom: auto !important; right: auto !important;" onclick="showReadonlySettings()">⚙️ 設定確認</div>
             <div id="btn-game-chat-toggle" class="btn-chat-toggle chat-toggle-btn is-on" style="padding: 4px 10px; text-align: center; width: 100%; box-sizing: border-box;">Chat: ON</div>
         </div>
+        
         <div id="player-hand" class="hand-display"></div>
     </div>
 
