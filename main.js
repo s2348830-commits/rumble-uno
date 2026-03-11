@@ -2077,7 +2077,7 @@ window.resolveJanken = function() {
 
         if (result === 'win' || result === 'draw') {
             winOrDrawDrawn = true;
-            window.AbilityEngine.applyDraw(window.game, pJ.targetId, drawCount, false, true);
+            window.AbilityEngine.applyDraw(window.game, pJ.targetId, drawCount, true, true);
             
             const aHand = window.game.hands[pJ.attackerId];
             if (aHand) {
@@ -2097,7 +2097,7 @@ window.resolveJanken = function() {
                 }
             }
         } else if (result === 'lose' && pJ.loopCount === 0) {
-            window.AbilityEngine.applyDraw(window.game, pJ.targetId, drawCount, false, true);
+            window.AbilityEngine.applyDraw(window.game, pJ.targetId, drawCount, true, true);
         }
         
         const guides = [{ from: pJ.attackerId, to: pJ.targetId, text: 'じゃんけんドロー!', delay: 0 }];
@@ -2862,32 +2862,70 @@ window.showClaraResultUI = function(result) {
     if (!overlay) {
         overlay = document.createElement('div');
         overlay.id = 'clara-result-overlay';
-        overlay.style.cssText = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:150000; display:flex; flex-direction:column; justify-content:center; align-items:center; pointer-events:none; transition: opacity 0.3s;";
+        
+        // 👇 UI用のリッチなアニメーションCSSを動的に追加
+        const style = document.createElement('style');
+        style.innerHTML = `
+            @keyframes claraPop {
+                0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+                60% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+                100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            }
+            @keyframes claraFadeOut {
+                0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+                100% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+            }
+            @keyframes claraBounce {
+                0% { transform: translateY(0); }
+                100% { transform: translateY(-10px); }
+            }
+            .clara-anim-enter {
+                animation: claraPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            }
+            .clara-anim-leave {
+                animation: claraFadeOut 0.3s ease-in forwards;
+            }
+            .clara-box {
+                border: 4px solid #fff; 
+                border-radius: 20px; 
+                padding: 30px 50px; 
+                text-align: center; 
+                min-width: 250px;
+            }
+        `;
+        document.head.appendChild(style);
+
+        overlay.style.cssText = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:150000; display:flex; flex-direction:column; justify-content:center; align-items:center; pointer-events:none;";
         document.body.appendChild(overlay);
     }
     
+    // クラスをリセットして表示アニメーションを適用
+    overlay.className = 'clara-anim-enter';
+    
     if (result === 'success') {
-        overlay.innerHTML = `<div style="background:rgba(0,100,0,0.85); border:3px solid #4caf50; border-radius:15px; padding:20px 40px; text-align:center; box-shadow:0 10px 30px rgba(76,175,80,0.6);">
-            <h2 style="color:#fff; margin:0; font-size:32px; text-shadow:2px 2px 4px #000;">✨ 成功！ ✨</h2>
-            <p style="color:#ddd; font-weight:bold; margin-top:10px;">手札を2枚破棄しました</p>
+        overlay.innerHTML = `
+        <div class="clara-box" style="background: linear-gradient(135deg, #4caf50, #2e7d32); box-shadow: 0 15px 35px rgba(76,175,80,0.6), inset 0 0 15px rgba(255,255,255,0.3);">
+            <div style="font-size: 50px; margin-bottom: 10px; animation: claraBounce 0.5s infinite alternate;">✨🎰✨</div>
+            <h2 style="color: #fff; margin: 0; font-size: 36px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5), 0 0 15px #fff; letter-spacing: 2px;">SUCCESS!</h2>
+            <div style="width: 100%; height: 2px; background: rgba(255,255,255,0.5); margin: 15px 0;"></div>
+            <p style="color: #e8f5e9; font-weight: bold; font-size: 18px; margin: 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">手札を2枚破棄しました</p>
         </div>`;
-        if (window.SE) window.SE.play('win'); // 成功音
+        if (window.SE) window.SE.play('win'); 
     } else {
-        overlay.innerHTML = `<div style="background:rgba(100,0,0,0.85); border:3px solid #ff5252; border-radius:15px; padding:20px 40px; text-align:center; box-shadow:0 10px 30px rgba(255,82,82,0.6);">
-            <h2 style="color:#fff; margin:0; font-size:32px; text-shadow:2px 2px 4px #000;">💦 失敗... 💦</h2>
-            <p style="color:#ddd; font-weight:bold; margin-top:10px;">効果は発動しませんでした</p>
+        overlay.innerHTML = `
+        <div class="clara-box" style="background: linear-gradient(135deg, #d32f2f, #b71c1c); box-shadow: 0 15px 35px rgba(211,47,47,0.6), inset 0 0 15px rgba(255,255,255,0.3);">
+            <div style="font-size: 50px; margin-bottom: 10px;">💦💀💦</div>
+            <h2 style="color: #fff; margin: 0; font-size: 36px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5), 0 0 15px #ff5252; letter-spacing: 2px;">FAILED...</h2>
+            <div style="width: 100%; height: 2px; background: rgba(255,255,255,0.5); margin: 15px 0;"></div>
+            <p style="color: #ffebee; font-weight: bold; font-size: 18px; margin: 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">効果は発動しませんでした</p>
         </div>`;
-        if (window.SE) window.SE.play('Impossible'); // ブブー音
+        if (window.SE) window.SE.play('Impossible'); 
     }
     
-    overlay.classList.remove('hidden');
-    overlay.style.opacity = '1';
-    
-    // 2秒後に自動で消える
+    // 2.5秒後に消すアニメーションを開始（少し長めに見せる）
     setTimeout(() => {
-        overlay.style.opacity = '0';
-        setTimeout(() => overlay.classList.add('hidden'), 300);
-    }, 2000);
+        overlay.className = 'clara-anim-leave';
+    }, 2500);
 };
 
 window.applyAutoUnoPenalty = function() {
