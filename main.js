@@ -983,6 +983,12 @@ window.showAbilityResetUI = function(maxCount) {
 };
 
 window.animateInitialDeal = function(targetHands, callback) {
+    if (window._isDealingCardsLock) {
+        if (callback) callback();
+        return;
+    }
+    window._isDealingCardsLock = true;
+    window.isDealAnimationStarted = true;
     const playerIds = window.game.players.map(p => p.id);
     window.game.hands = {};
     playerIds.forEach(id => { window.game.hands[id] = []; });
@@ -991,6 +997,8 @@ window.animateInitialDeal = function(targetHands, callback) {
     const deckEl = document.getElementById('deck-visual');
     if (!deckEl) {
         window.game.hands = JSON.parse(JSON.stringify(targetHands)); window.updateUI();
+        window._isDealingCardsLock = false;
+        window.isDealAnimationStarted = false;
         if (callback) callback(); return;
     }
 
@@ -1004,6 +1012,8 @@ window.animateInitialDeal = function(targetHands, callback) {
     function checkComplete() {
         completedDeals++;
         if (completedDeals >= totalDeals) {
+            window._isDealingCardsLock = false;
+            window.isDealAnimationStarted = false;
             window.game.hands = JSON.parse(JSON.stringify(targetHands));
             window.isInitialDealing = false;
             

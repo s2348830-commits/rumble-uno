@@ -322,8 +322,8 @@ window.AbilityEngine = {
                     if(self) self.shield = { level: 2, turns: this.getAdjustedTurns(game, attackerId, turns) };
                 } else if (abilityId === 'id_18') {
                     if(self) self.shield = { level: 1, turns: this.getAdjustedTurns(game, attackerId, 2) };
-                }
-                else if (abilityId === 'id_37') {
+                } else if (abilityId === 'id_37') {
+                    // 赤バラのデバフ解除処理
                     if(self) {
                         let dbfs = [];
                         if (self.frozen) dbfs.push('frozen');

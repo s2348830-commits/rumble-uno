@@ -38,7 +38,7 @@ window.CUSTOM_CARDS_DEF = [
     { id: 'id_33', name: 'ライア', desc: '【AT】自分以外のプレイヤーを一人指定し1枚ドローさせる。発動後このカードを手札に戻してもよい。(3回のみ)' },
     { id: 'id_34', name: 'オリヴィア', desc: '【HE】自分に回避I(20%の確率で攻撃を防ぐ)を1ターン付与する。' },
     { id: 'id_35', name: 'イヴ', desc: '【HV】ランダム燃焼+他全員裂傷(引く枚数+1)。使用後、次に+2/+4/能力で引かされる際にこのカードを手札に戻す(最大1回)。' },
-    { id: 'id_36', name: 'アミリー', desc: '【HV】使用後、赤バラ、桃バラ、白バラの3つのうち好きなカードを手札に加える。', type: 'HV' },
+    { id: 'id_36', name: 'アミリー', desc: '【HV】使用後、赤バラ、桃バラ、白バラの3つのうち好きなカードを手札に加える。', type: 'HV' }
 ];
 
 if (typeof window.AbilityDef === 'undefined') {
@@ -189,8 +189,8 @@ if (typeof window.RuleSettings === 'undefined') {
                     
                     let rarityColor = '#ccc';
                     let rarityText = 'SSR';
-                    if (['id_20','id_25','id_26'].includes(c.id)) { rarityColor = '#ff4081'; rarityText = 'UR'; }
-                    else if (['id_12','id_17','id_18','id_19','id_21','id_27'].includes(c.id)) { rarityColor = '#fbc02d'; rarityText = 'SR'; }
+                    if (['id_20','id_25','id_26','id_35','id_36'].includes(c.id)) { rarityColor = '#ff4081'; rarityText = 'UR/HV'; }
+                    else if (['id_12','id_17','id_18','id_19','id_21','id_27','id_34'].includes(c.id)) { rarityColor = '#fbc02d'; rarityText = 'SR'; }
                     else if (['id_24'].includes(c.id)) { rarityColor = '#2196f3'; rarityText = 'R'; }
                     
                     div.innerHTML = `
@@ -302,24 +302,18 @@ if (typeof window.RuleSettings === 'undefined') {
         checkStartError: function(roomState) {
             if (!roomState || !roomState.slots) return null;
 
-            // プレイヤー数（ホスト＋参加者＋Bot）をカウント
             const playerCount = roomState.slots.filter(s => s.type === 'host' || s.type === 'player' || s.type === 'bot').length;
             
-            // 👇👇 ★追加: 2人未満ならエラーにする 👇👇
             if (playerCount < 2) {
                 return `【エラー】参加人数が足りません！\n(最低2人以上のプレイヤーまたはBotが必要です)`;
             }
-            // 👆👆 追加ここまで 👆👆
 
             if (!this.customCards || this.customCards.length === 0) return null; 
 
-            // 必要な能力カードの総数 ＝ 初期手札(能力)枚数 × プレイヤー数
             const requiredCustomCards = (parseInt(this.initialCustomHandSize) || 0) * playerCount;
             
-            // 用意されている能力カードの総数
             const availableCustomCards = this.customCards.length;
             
-            // 不足している場合、エラーメッセージを返す
             if (availableCustomCards < requiredCustomCards) {
                 return `【エラー】設定された能力カードが足りません！\n(必要総数: ${requiredCustomCards}枚 / 追加枚数: ${availableCustomCards}枚)\n設定からカードを追加するか、初期手札の枚数を減らしてください。`;
             }
@@ -330,34 +324,28 @@ if (typeof window.RuleSettings === 'undefined') {
 window.addEventListener('DOMContentLoaded', () => {
     if(window.RuleSettings && typeof window.RuleSettings.init === 'function') window.RuleSettings.init();
 });
-//  ★追加: 0.5秒ごとにカード枚数を監視し、スタートボタンをリアルタイムで無効化する
 setInterval(() => {
     if (!window.isHost || !window.RuleSettings) return;
     
-    // 現在のロビーのプレイヤー情報を取得
     const roomState = window.currentRoomState;
     if (!roomState) return;
 
-    // ゲーム開始ボタンを取得（※IDが違う場合は 'btn-start-game' の部分をご自身のHTMLに合わせてください）
     const startBtn = document.getElementById('btn-start') || document.querySelector('.start-btn');
     if (!startBtn) return;
 
-    // エラーがあるかチェック
     const errorMsg = window.RuleSettings.checkStartError(roomState);
     
     if (errorMsg) {
-        // エラーがある場合：ボタンを押せなくして、見た目を半透明にする
         startBtn.disabled = true;
         startBtn.style.opacity = '0.5';
         startBtn.style.cursor = 'not-allowed';
-        startBtn.innerText = 'カード不足'; // ぱっと見で分かるように文字も変える
+        startBtn.innerText = 'カード不足'; 
         startBtn.title = "設定画面から能力カードを追加するか、初期手札の枚数を減らしてください";
     } else {
-        // エラーがない場合：通常通り押せるように戻す
         startBtn.disabled = false;
         startBtn.style.opacity = '1.0';
         startBtn.style.cursor = 'pointer';
-        startBtn.innerText = 'ゲーム開始'; // 元の文字に戻す
+        startBtn.innerText = 'ゲーム開始'; 
         startBtn.title = "";
     }
 }, 500);
