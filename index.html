@@ -9,7 +9,6 @@
 </head>
 <body>
 
-<button id="btn-manual" class="manual-btn hidden">説明書📄</button>
 
 <div id="manual-overlay" class="hidden">
     <div class="manual-content">
@@ -49,23 +48,18 @@
 </div>
 
 <div id="lobby-screen" class="screen-container hidden">
-    <div id="btn-lobby-chat-toggle" class="btn-chat-toggle chat-toggle-btn is-on" style="position:fixed; top: 15px; left: 15px; z-index: 10000;">Chat: ON</div>
-
-    <div class="lobby-box">
-        <div class="volume-container lobby-volume">
+    <div class="lobby-box" style="padding-top: 35px;">
+        <div class="volume-container lobby-volume" style="top: 10px; right: 10px;">
             <span class="volume-icon">🔈</span>
             <input type="range" class="volume-slider" min="0" max="100" value="50">
         </div>
 
-        <h2 class="room-id-title">Room ID: <span id="display-room-id">----</span></h2>
-        
-        <div class="player-count-header">プレイヤー (<span id="player-count">1</span>/10)</div>
-        
-        <div id="slot-list" class="slot-list-container"></div>
-        
-        <div class="lobby-controls-dashed">
-            <button id="btn-add-slot" class="dashed-btn hidden">+ 枠を追加</button>
-            <button id="btn-settings" class="dashed-btn">⚙ ゲーム設定</button>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 5px; width: 100%;">
+            <div id="btn-lobby-chat-toggle" class="btn-chat-toggle chat-toggle-btn is-on" style="position: static; padding: 6px 10px; margin: 0; flex-shrink: 0;">Chat: ON</div>
+            
+            <h2 class="room-id-title" style="margin: 0; font-size: 15px; white-space: nowrap; flex-grow: 1; text-align: center;">Room ID: <span id="display-room-id" style="font-size: 16px;">----</span></h2>
+            
+            <button id="btn-manual" class="manual-btn" style="position: static; padding: 6px 10px; margin: 0; transform: none; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">説明書📄</button>
         </div>
         
         <div class="lobby-controls-bottom" style="margin-top: 15px;">
