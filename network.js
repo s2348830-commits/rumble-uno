@@ -192,6 +192,32 @@ window.socket.on('room_joined', (data) => {
 
 window.socket.on('room_state_update', (roomState) => {
     window.currentRoomState = roomState;
+    const mySlot = roomState.slots.find(s => s.userId === window.clientUserId);
+    if (mySlot && mySlot.type === 'host' && !window.isHost) {
+        window.isHost = true;
+        alert("前のホストが退出したため、あなたが新しいホストに任命されました！👑");
+        
+        // ホスト用のボタン・設定を解放する
+        const btnAddSlot = document.getElementById('btn-add-slot');
+        const btnStart = document.getElementById('btn-start');
+        const btnSettings = document.getElementById('btn-settings');
+        const btnDisband = document.getElementById('btn-disband-room');
+        const btnReady = document.getElementById('btn-ready');
+        
+        if(btnAddSlot) btnAddSlot.classList.remove('hidden'); 
+        if(btnStart) btnStart.classList.remove('hidden'); 
+        if(btnSettings) btnSettings.innerText = "⚙ ゲーム設定"; 
+        if(btnDisband) btnDisband.classList.remove('hidden'); 
+        if(btnReady) btnReady.classList.add('hidden'); // 準備完了ボタンは隠す
+        
+        // 設定画面をいじれるようにする
+        document.querySelectorAll('.main-settings select, .main-settings input').forEach(el => el.disabled = false);
+
+        // もしゲーム中にホストが抜けて引き継いだ場合は、ゲームの進行役を再開する
+        if (roomState.gameStarted && typeof window.checkTurn === 'function') {
+            setTimeout(() => window.checkTurn(), 1000);
+        }
+    }
     if (!window.isHost && roomState.settings) window.applySettingsToUI(roomState.settings);
     if(!roomState.gameStarted) renderSlots(roomState);
 });
