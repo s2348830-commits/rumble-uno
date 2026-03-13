@@ -91,10 +91,9 @@ iconInput.addEventListener('change', (e) => {
 });
 
 btnCreateRoom.addEventListener('click', () => window.socket.emit('create_room', myData));
-btnShowJoin.addEventListener('click', () => joinContainer.classList.remove('hidden'));
-btnJoinRoom.addEventListener('click', () => {
-    const roomId = roomIdInput.value.trim().toUpperCase();
-    if (roomId) window.socket.emit('join_room', { roomId, userData: myData });
+btnShowJoin.addEventListener('click', () => {
+    joinContainer.classList.remove('hidden');
+    window.socket.emit('request_room_list'); // サーバーに一覧を要求
 });
 
 btnDisbandRoom.addEventListener('click', () => {
@@ -152,7 +151,17 @@ window.socket.on('room_joined', (data) => {
     loginScreen.classList.add('hidden');
     lobbyScreen.classList.remove('hidden');
     document.getElementById('display-room-id').innerText = data.roomId;
-
+    const btnVisibility = document.getElementById('btn-room-visibility');
+    if (btnVisibility) {
+        if (data.state && data.state.isPublic !== undefined) {
+            if (data.state.isPublic) {
+                btnVisibility.innerText = '部屋表示: ON'; btnVisibility.classList.add('is-on');
+            } else {
+                btnVisibility.innerText = '部屋表示: OFF'; btnVisibility.classList.remove('is-on');
+            }
+        }
+        btnVisibility.style.opacity = window.isHost ? '1' : '0.5'; // ホスト以外は半透明
+    }
     const cia = document.getElementById('chat-input-area');
     if (cia) {
         cia.style.display = 'none';
@@ -209,7 +218,8 @@ window.socket.on('room_state_update', (roomState) => {
         if(btnSettings) btnSettings.innerText = "⚙ ゲーム設定"; 
         if(btnDisband) btnDisband.classList.remove('hidden'); 
         if(btnReady) btnReady.classList.add('hidden'); // 準備完了ボタンは隠す
-        
+        const btnVisibility = document.getElementById('btn-room-visibility');
+        if (btnVisibility) btnVisibility.style.opacity = '1';
         // 設定画面をいじれるようにする
         document.querySelectorAll('.main-settings select, .main-settings input').forEach(el => el.disabled = false);
 

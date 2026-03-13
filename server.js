@@ -56,7 +56,8 @@ io.on('connection', (socket) => {
         rooms[roomId] = {
             id: roomId, host: socket.id, gameStarted: false,
             slots: [{ id: socket.id, userId: userData.userId, type: 'host', name: userData.name, icon: userData.icon, ready: true, connected: true }],
-            settings: null 
+            settings: null,
+            isPublic: true
         };
         socket.join(roomId); socket.roomId = roomId; socket.userId = userData.userId;
         socket.emit('room_joined', { roomId, isHost: true, myId: socket.id, state: rooms[roomId] });
@@ -182,7 +183,25 @@ io.on('connection', (socket) => {
             io.to(socket.roomId).emit('back_to_lobby', room);
         }
     });
+    socket.on('request_room_list', () => {
+        const publicRooms = Object.values(rooms)
+            .filter(r => r.isPublic && !r.gameStarted && r.slots.filter(s => s.type !== 'empty').length < 10)
+            .map(r => {
+                const hostSlot = r.slots.find(s => s.type === 'host');
+                return { id: r.id, hostName: hostSlot ? hostSlot.name : 'Unknown', count: r.slots.filter(s => s.type !== 'empty').length };
+            });
+        socket.emit('room_list_response', publicRooms);
+    });
 
+    // 👇👇 ★追加: 部屋の公開/非公開を切り替える処理 👇👇
+    socket.on('toggle_room_visibility', (isPublic) => {
+        const room = rooms[socket.roomId];
+        if (room && room.host === socket.id) {
+            room.isPublic = isPublic;
+            io.to(socket.roomId).emit('room_visibility_changed', isPublic);
+        }
+    });
+    
     socket.on('sync_game_state', (state) => socket.to(socket.roomId).emit('update_game_state', state));
     socket.on('request_sync_state', () => {
         const room = rooms[socket.roomId];

@@ -40,9 +40,15 @@
             <button id="btn-create-room" class="disabled-btn" disabled>部屋を作る</button>
             <button id="btn-show-join" class="disabled-btn" disabled>部屋に参加</button>
         </div>
-        <div id="join-room-container" class="hidden">
-            <input type="text" id="room-id-input" placeholder="ルームIDを入力">
-            <button id="btn-join-room">入室・復帰</button>
+        <div id="join-room-container" class="hidden" style="margin-top: 15px; display: flex; flex-direction: column; gap: 10px; align-items: center;">
+            <div style="display: flex; gap: 5px; justify-content: center; width: 100%;">
+                <input type="text" id="room-id-input" placeholder="ルームID" maxlength="6" style="padding: 8px; border-radius: 6px; border: 1px solid #772222; background: #110000; color: white; width: 60%; text-transform: uppercase;">
+                <button id="btn-join-room" style="padding: 8px 15px; background: #e67e22; color: white; border: none; border-radius: 6px; cursor: pointer; white-space: nowrap;">入室・復帰</button>
+            </div>
+            
+            <div id="public-room-list" style="width: 100%; max-height: 120px; overflow-y: auto; background: rgba(0,0,0,0.5); border: 1px solid #551111; border-radius: 8px; padding: 5px; display: flex; flex-direction: column; gap: 5px; text-align: left; box-sizing: border-box;">
+                <div style="text-align: center; font-size: 12px; color: #aaa;">部屋を検索中...</div>
+            </div>
         </div>
     </div>
 </div>
@@ -55,8 +61,10 @@
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; margin-bottom: 20px;">
-            <div id="btn-lobby-chat-toggle" class="btn-chat-toggle chat-toggle-btn is-on" style="position: static; padding: 6px 10px; margin: 0; font-size: 11px;">Chat: ON</div>
-            
+            <div style="display: flex; flex-direction: column; gap: 5px; align-items: flex-start;">
+                <div id="btn-lobby-chat-toggle" class="btn-chat-toggle chat-toggle-btn is-on" style="position: static; padding: 6px 10px; margin: 0; font-size: 11px; width: 100%; box-sizing: border-box; text-align: center;">Chat: ON</div>
+                <div id="btn-room-visibility" class="btn-chat-toggle is-on" style="position: static; padding: 6px 10px; margin: 0; font-size: 11px; width: 100%; box-sizing: border-box; text-align: center;">部屋表示: ON</div>
+            </div>
             <h2 class="room-id-title" style="margin: 0; font-size: 16px; flex-grow: 1; text-align: center;">
                 Room ID: <span id="display-room-id" style="color: #fbc02d;">----</span>
             </h2>
