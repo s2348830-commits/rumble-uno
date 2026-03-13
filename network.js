@@ -490,3 +490,62 @@ window.socket.on('back_to_lobby', (roomState) => {
     
     renderSlots(roomState);
 });
+
+// ==========================================
+// ★ 追加：部屋一覧・部屋表示の通信処理
+// ==========================================
+window.socket.on('room_list_response', (publicRooms) => {
+    const listEl = document.getElementById('public-room-list');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    
+    if (publicRooms.length === 0) {
+        listEl.innerHTML = '<div style="text-align: center; font-size: 12px; color: #aaa; padding: 10px;">現在公開されている部屋はありません</div>';
+        return;
+    }
+    
+    publicRooms.forEach(r => {
+        const item = document.createElement('div');
+        item.style.cssText = "display: flex; justify-content: space-between; align-items: center; background: #222; padding: 8px 10px; border-radius: 6px; border: 1px solid #444; cursor: pointer; transition: background 0.2s;";
+        item.innerHTML = `
+            <div style="font-size: 13px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: white;">${r.hostName} の部屋</div>
+            <div style="font-size: 11px; color: #aaa; white-space: nowrap; background: #111; padding: 2px 6px; border-radius: 10px;">👤 ${r.count}/10</div>
+        `;
+        item.onmouseover = () => item.style.background = '#333';
+        item.onmouseout = () => item.style.background = '#222';
+        item.onclick = () => {
+            if (window.SE) window.SE.play('buttonclick');
+            document.getElementById('room-id-input').value = r.id;
+            document.getElementById('btn-join-room').click(); // ワンタップでそのまま入室
+        };
+        listEl.appendChild(item);
+    });
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const btnVisibility = document.getElementById('btn-room-visibility');
+    if (btnVisibility) {
+        btnVisibility.addEventListener('click', () => {
+            if (!window.isHost) {
+                alert("部屋の表示設定はホストのみ変更できます。");
+                return;
+            }
+            if (window.SE) window.SE.play('buttonclick');
+            const isCurrentlyOn = btnVisibility.classList.contains('is-on');
+            window.socket.emit('toggle_room_visibility', !isCurrentlyOn);
+        });
+    }
+});
+
+window.socket.on('room_visibility_changed', (isPublic) => {
+    const btnVisibility = document.getElementById('btn-room-visibility');
+    if (btnVisibility) {
+        if (isPublic) {
+            btnVisibility.innerText = '部屋表示: ON';
+            btnVisibility.classList.add('is-on');
+        } else {
+            btnVisibility.innerText = '部屋表示: OFF';
+            btnVisibility.classList.remove('is-on');
+        }
+    }
+});
