@@ -96,9 +96,17 @@ btnShowJoin.addEventListener('click', () => {
     window.socket.emit('request_room_list'); // サーバーに一覧を要求
 });
 
+btnJoinRoom.addEventListener('click', () => {
+    const rId = roomIdInput.value.trim().toUpperCase();
+    if (rId) {
+        window.socket.emit('join_room', { roomId: rId, userData: myData });
+    }
+});
+
 btnDisbandRoom.addEventListener('click', () => {
     if(confirm("ルームを解散しますか？")) window.socket.emit('disband_room');
 });
+
 
 window.applySettingsToUI = function(newSettings) {
     if (!newSettings) return;
@@ -522,30 +530,29 @@ window.socket.on('room_list_response', (publicRooms) => {
     });
 });
 
-document.addEventListener('DOMContentLoaded', () => {
-    const btnVisibility = document.getElementById('btn-room-visibility');
-    if (btnVisibility) {
-        btnVisibility.addEventListener('click', () => {
-            if (!window.isHost) {
-                alert("部屋の表示設定はホストのみ変更できます。");
-                return;
-            }
-            if (window.SE) window.SE.play('buttonclick');
-            const isCurrentlyOn = btnVisibility.classList.contains('is-on');
-            window.socket.emit('toggle_room_visibility', !isCurrentlyOn);
-        });
-    }
-});
+// 👇★修正：タイミングの囲みを消して、直接クリック処理を紐付けます
+const btnVisibility = document.getElementById('btn-room-visibility');
+if (btnVisibility) {
+    btnVisibility.addEventListener('click', () => {
+        if (!window.isHost) {
+            alert("部屋の表示設定はホストのみ変更できます。");
+            return;
+        }
+        if (window.SE) window.SE.play('buttonclick');
+        const isCurrentlyOn = btnVisibility.classList.contains('is-on');
+        window.socket.emit('toggle_room_visibility', !isCurrentlyOn);
+    });
+}
 
 window.socket.on('room_visibility_changed', (isPublic) => {
-    const btnVisibility = document.getElementById('btn-room-visibility');
-    if (btnVisibility) {
+    const btnVis = document.getElementById('btn-room-visibility');
+    if (btnVis) {
         if (isPublic) {
-            btnVisibility.innerText = '部屋表示: ON';
-            btnVisibility.classList.add('is-on');
+            btnVis.innerText = '部屋表示: ON';
+            btnVis.classList.add('is-on');
         } else {
-            btnVisibility.innerText = '部屋表示: OFF';
-            btnVisibility.classList.remove('is-on');
+            btnVis.innerText = '部屋表示: OFF';
+            btnVis.classList.remove('is-on');
         }
     }
 });
